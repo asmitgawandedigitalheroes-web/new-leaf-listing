@@ -1,0 +1,263 @@
+import { useState, useEffect } from 'react';
+import AppLayout from '../../../components/layout/AppLayout';
+import { SectionCard } from '../../../components/ui/Card';
+import Button from '../../../components/ui/Button';
+import Skeleton from '../../../components/ui/Skeleton';
+import { useAuth } from '../../../context/AuthContext';
+import { useToast } from '../../../context/ToastContext';
+import { HiCheckCircle, HiClock } from 'react-icons/hi2';
+
+const PLAN_STYLES = {
+  starter:   { bg: '#F3F4F6', text: '#4B5563', price: '$9/mo' },
+  pro:       { bg: 'rgba(212,175,55,0.12)', text: '#B8962E', price: '$29/mo' },
+  dominator: { bg: '#EDE9FE', text: '#5B21B6', price: '$79/mo' },
+  sponsor:   { bg: '#DBEAFE', text: '#1D4ED8', price: '$199/mo' },
+};
+
+export default function RealtorProfilePage() {
+  const { profile, subscription, updateProfile, isLoading: authLoading } = useAuth();
+  const { addToast } = useToast();
+  const [form, setForm] = useState({ full_name: '', phone: '' });
+  const [isSaving, setIsSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [referralCopied, setReferralCopied] = useState(false);
+
+  // Sync form with profile once loaded
+  useEffect(() => {
+    if (profile) {
+      setForm({
+        full_name: profile.full_name || '',
+        phone: profile.phone || '',
+      });
+    }
+  }, [profile]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    const { error } = await updateProfile(form);
+    setIsSaving(false);
+    if (error) {
+      addToast({ type: 'error', title: 'Save failed', desc: error.message });
+    } else {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    }
+  };
+
+  const handleReset = () => {
+    if (profile) setForm({ full_name: profile.full_name || '', phone: profile.phone || '' });
+  };
+
+  const initials = profile?.full_name
+    ? profile.full_name.trim().split(' ').filter(Boolean).length >= 2
+      ? (profile.full_name.split(' ')[0][0] + profile.full_name.split(' ').at(-1)[0]).toUpperCase()
+      : profile.full_name.slice(0, 2).toUpperCase()
+    : 'R?';
+
+  const planKey = subscription?.plan || null;
+  const planStyle = PLAN_STYLES[planKey] || null;
+
+  const referralCode = profile?.full_name
+    ? profile.full_name.toUpperCase().replace(/\s+/g, '_').slice(0, 20)
+    : 'MY_REF';
+  const referralLink = `https://nlvlistings.com/join?ref=${referralCode}`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(referralLink).catch(() => {});
+    setReferralCopied(true);
+    setTimeout(() => setReferralCopied(false), 2000);
+  };
+
+  const inputClass = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none';
+  const labelClass = 'block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5';
+
+  return (
+    <AppLayout role="realtor" title="My Profile">
+      <div className="p-4 md:p-6 flex flex-col gap-6 max-w-3xl">
+
+        {/* Profile Photo + Basic Info */}
+        <SectionCard title="Profile">
+          <div className="px-6 py-5 flex flex-col gap-5">
+
+            {/* Avatar */}
+            <div className="flex items-center gap-5">
+              <div className="relative">
+                {authLoading ? (
+                  <Skeleton variant="circle" width="80px" height="80px" />
+                ) : (
+                  <div className="w-20 h-20 rounded-full overflow-hidden bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center">
+                    {profile?.avatar_url ? (
+                      <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-white text-2xl font-black">{initials}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div>
+                {authLoading ? (
+                  <>
+                    <Skeleton width="120px" height="20px" className="mb-2" />
+                    <Skeleton width="180px" height="14px" className="mb-1" />
+                    <Skeleton width="140px" height="12px" />
+                  </>
+                ) : (
+                  <>
+                    <div className="font-bold text-gray-900 text-lg">{profile?.full_name || 'Realtor'}</div>
+                    <div className="text-sm text-gray-400">{profile?.email}</div>
+                    <div className="text-xs text-gray-400 mt-0.5 capitalize">
+                      {profile?.role || 'Realtor'} · {profile?.status || 'active'}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Form fields */}
+            <div className="grid sm:grid-cols-2 gap-4">
+              {authLoading ? (
+                [...Array(4)].map((_, i) => (
+                  <div key={i}>
+                    <Skeleton width="60px" height="10px" className="mb-2" />
+                    <Skeleton width="100%" height="38px" />
+                  </div>
+                ))
+              ) : (
+                <>
+                  <div>
+                    <label className={labelClass}>Full Name</label>
+                    <input
+                      value={form.full_name}
+                      onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))}
+                      className={inputClass}
+                      placeholder="Your full name"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Email</label>
+                    <input
+                      value={profile?.email || ''}
+                      readOnly
+                      className={inputClass + ' bg-gray-50 cursor-not-allowed text-gray-400'}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Phone</label>
+                    <input
+                      value={form.phone}
+                      onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                      className={inputClass}
+                      placeholder="(555) 000-0000"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Territory</label>
+                    <input
+                      value={profile?.territory || 'Not assigned'}
+                      readOnly
+                      className={inputClass + ' bg-gray-50 cursor-not-allowed text-gray-400'}
+                    />
+                    <p className="text-[11px] text-gray-400 mt-1">Set by your Director. Contact them to change.</p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* Account Info */}
+        <SectionCard title="Account">
+          <div className="px-6 py-5">
+            <div className="grid sm:grid-cols-2 gap-4 text-sm">
+              <div className="flex justify-between py-2 border-b border-gray-50">
+                <span className="text-gray-500">Status</span>
+                <span className="font-medium capitalize">{profile?.status || 'active'}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-50">
+                <span className="text-gray-500">Role</span>
+                <span className="font-medium capitalize">{profile?.role || 'realtor'}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-50">
+                <span className="text-gray-500">Member Since</span>
+                <span className="font-medium">
+                  {profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}
+                </span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-50">
+                <span className="text-gray-500">Verified</span>
+                <span className="font-medium flex items-center gap-1">
+                  {profile?.verified_at
+                    ? <><HiCheckCircle className="w-4 h-4 text-green-600" /> Yes</>
+                    : <><HiClock className="w-4 h-4 text-yellow-500" /> Pending</>}
+                </span>
+              </div>
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* Subscription */}
+        <SectionCard title="Subscription">
+          <div className="px-6 py-5 flex flex-col gap-4">
+            {planStyle ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold text-gray-900">Current Plan</div>
+                    <div className="text-sm text-gray-400 mt-0.5">
+                      {subscription?.status === 'active' ? 'Active subscription' : `Status: ${subscription?.status}`}
+                      {subscription?.current_period_end && (
+                        <> · Renews {new Date(subscription.current_period_end).toLocaleDateString()}</>
+                      )}
+                    </div>
+                  </div>
+                  <span className="px-3 py-1 rounded-full font-semibold text-sm capitalize"
+                    style={{ background: planStyle.bg, color: planStyle.text }}>
+                    {planKey} — {planStyle.price}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-sm text-gray-400 mb-3">No active subscription</p>
+                <Button variant="primary" onClick={() => window.location.href = '/realtor/billing'}>
+                  View Plans
+                </Button>
+              </div>
+            )}
+          </div>
+        </SectionCard>
+
+        {/* Referral */}
+        <SectionCard title="NLV Referral Program">
+          <div className="px-6 py-5 flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex-1 px-3 py-2 bg-gray-50 rounded-lg font-mono text-sm text-gray-700 border border-gray-200 truncate">
+                {referralLink}
+              </div>
+              <Button variant={referralCopied ? 'green' : 'primary'} onClick={handleCopy}>
+                {referralCopied ? 'Copied!' : 'Copy Link'}
+              </Button>
+            </div>
+            <p className="text-xs text-gray-400">
+              Earn commission when someone signs up through your referral link and activates a paid plan.
+            </p>
+          </div>
+        </SectionCard>
+
+        {/* Save */}
+        <div className="flex justify-end gap-3">
+          <Button variant="ghost" onClick={handleReset} disabled={authLoading || isSaving}>Reset</Button>
+          <Button
+            variant={saved ? 'green' : 'primary'}
+            onClick={handleSave}
+            isLoading={isSaving}
+            disabled={authLoading}
+          >
+            {saved ? 'Saved!' : 'Save Changes'}
+          </Button>
+        </div>
+
+      </div>
+    </AppLayout>
+  );
+}
