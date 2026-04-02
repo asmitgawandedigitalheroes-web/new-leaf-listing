@@ -27,8 +27,8 @@ const COLS = [
     links: [
       { label: 'About NLV', to: '/about' },
       { label: 'Contact Us', to: '/contact' },
-      { label: 'Privacy Policy', to: '#' },
-      { label: 'Terms of Service', to: '#' },
+      { label: 'Privacy Policy', to: '/privacy-policy' },
+      { label: 'Terms of Service', to: '/terms-of-service' },
     ],
   },
   {

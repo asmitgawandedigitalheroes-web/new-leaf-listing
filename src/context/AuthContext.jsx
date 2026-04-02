@@ -62,12 +62,12 @@ export function AuthProvider({ children }) {
       const [profileRes, subRes] = await withTimeout(Promise.all([
         supabase
           .from('profiles')
-          .select('*')
+          .select('id, email, role, full_name, avatar_url, phone, status, territory_id, company, accepted_terms_at')
           .eq('id', authUser.id)
-          .single()
-          .then(res => { 
-            console.log(`[AuthContext] Profile fetch took ${Date.now() - start}ms`); 
-            return res; 
+          .maybeSingle()
+          .then(res => {
+            console.log(`[AuthContext] Profile fetch took ${Date.now() - start}ms`);
+            return res;
           }),
         supabase
           .from('subscriptions')
@@ -75,11 +75,11 @@ export function AuthProvider({ children }) {
           .eq('user_id', authUser.id)
           .eq('status', 'active')
           .maybeSingle()
-          .then(res => { 
-            console.log(`[AuthContext] Subscription fetch took ${Date.now() - start}ms`); 
-            return res; 
+          .then(res => {
+            console.log(`[AuthContext] Subscription fetch took ${Date.now() - start}ms`);
+            return res;
           })
-      ]), 30000); // Increased from 10s to 30s
+      ]), 10000); // H-1 fix: reduced from 30s to 10s
 
       // If the API returns 400 it means the JWT is malformed/corrupted (not just
       // expired — expired = 401). A malformed token causes auth.uid() to return
@@ -137,8 +137,7 @@ export function AuthProvider({ children }) {
       return finalProfile;
     } catch (err) {
       const isTimeout = err.message === 'Timeout';
-      console.error('[AuthContext] loadUserData error:', isTimeout ? `Request timed out after 30s` : err);
-      // Fallback: If it's a timeout, we still want to finish loading state
+      console.error('[AuthContext] loadUserData error:', isTimeout ? `Request timed out after 10s` : err);
       return null;
     }
   }, []);
