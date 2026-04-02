@@ -125,7 +125,7 @@ CREATE TABLE IF NOT EXISTS listings (
   territory_id  uuid REFERENCES territories (id) ON DELETE SET NULL,
   realtor_id    uuid REFERENCES profiles (id) ON DELETE SET NULL,
   status        text NOT NULL DEFAULT 'draft'
-                  CHECK (status IN ('draft','pending','active','sold','expired','rejected')),
+                  CHECK (status IN ('draft','pending','active','under_contract','sold','expired','rejected')),
   upgrade_type  text NOT NULL DEFAULT 'standard'
                   CHECK (upgrade_type IN ('standard','featured','top')),
   approved_by   uuid REFERENCES profiles (id) ON DELETE SET NULL,

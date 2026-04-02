@@ -17,6 +17,7 @@ import Button from '../../components/ui/Button';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 
 // Demo credentials — only available in development builds.
 // Set VITE_DEMO_ADMIN_EMAIL etc. in .env.local to override defaults.
@@ -52,6 +53,7 @@ const TESTIMONIAL = {
 };
 
 export default function LoginPage() {
+  useDocumentTitle('Sign In');
   const navigate = useNavigate();
   const { addToast } = useToast();
   const auth = useAuth();

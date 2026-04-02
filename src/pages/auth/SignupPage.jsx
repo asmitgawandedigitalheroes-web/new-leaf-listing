@@ -21,6 +21,7 @@ import Button from '../../components/ui/Button';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 
 // NLV Brand Colors
 const P   = '#D4AF37';
@@ -85,6 +86,7 @@ function InputField({ label, type = 'text', placeholder, value, onChange, icon, 
 }
 
 export default function SignupPage() {
+  useDocumentTitle('Create Account');
   const navigate = useNavigate();
   const { addToast } = useToast();
   const auth = useAuth();
@@ -137,10 +139,10 @@ export default function SignupPage() {
         return;
       }
       addToast({ type: 'success', title: 'Account created!', desc: 'Welcome to New Leaf Listings.' });
-      const role = auth.role;
-      if (role === 'admin')         navigate('/admin/dashboard');
-      else if (role === 'director') navigate('/director/dashboard');
-      else                          navigate('/realtor/dashboard');
+      // HP-7: All public signups are realtors (enforced by AuthContext).
+      // Navigate directly to avoid a race condition where auth.role may still
+      // be null immediately after signup() returns.
+      navigate('/realtor/dashboard');
     }
   };
 

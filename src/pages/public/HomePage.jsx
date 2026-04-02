@@ -1,4 +1,5 @@
 import React from 'react';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import Navbar from '../../components/shared/Navbar';
 import Footer from '../../components/shared/Footer';
 import Hero from '../../components/home/Hero';
@@ -16,6 +17,7 @@ const BG = '#F7F6F2';   // Soft Ivory background
 const OS = '#0B0B0B';   // Midnight Black
 
 export default function HomePage() {
+  useDocumentTitle('Premium Real Estate Platform');
   return (
     <div className="min-h-screen font-body" style={{ background: BG, color: OS }}>
       {/* Visual Overlay */}

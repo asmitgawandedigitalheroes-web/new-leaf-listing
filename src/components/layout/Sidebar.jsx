@@ -1,14 +1,14 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { 
-  HiViewColumns, 
-  HiUsers, 
-  HiHomeModern, 
-  HiChatBubbleLeftRight, 
-  HiMap, 
-  HiCreditCard, 
-  HiBanknotes, 
-  HiClipboardDocumentList, 
+import {
+  HiViewColumns,
+  HiUsers,
+  HiHomeModern,
+  HiChatBubbleLeftRight,
+  HiMap,
+  HiCreditCard,
+  HiBanknotes,
+  HiClipboardDocumentList,
   HiCog6Tooth,
   HiIdentification,
   HiChartBar,
@@ -16,6 +16,8 @@ import {
   HiArrowLeftOnRectangle,
   HiChevronLeft,
   HiCurrencyDollar,
+  HiEnvelope,
+  HiSparkles,
 } from 'react-icons/hi2';
 
 // Reusable icon wrapper for consistency
@@ -47,6 +49,8 @@ const NAV = {
     { key: 'dashboard',    label: 'Dashboard',     icon: HiViewColumns,         to: '/realtor/dashboard' },
     { key: 'listings',     label: 'My Listings',   icon: HiHomeModern,          to: '/realtor/listings' },
     { key: 'leads',        label: 'My Leads',      icon: HiChatBubbleLeftRight,  to: '/realtor/leads' },
+    { key: 'messages',     label: 'Messages',      icon: HiEnvelope,            to: '/realtor/messages' },
+    { key: 'referrals',    label: 'NLV Referrals', icon: HiSparkles,            to: '/realtor/referrals' },
     { key: 'commissions',  label: 'Commissions',   icon: HiBanknotes,           to: '/realtor/commissions' },
     { key: 'billing',      label: 'Billing',       icon: HiCreditCard,          to: '/realtor/billing' },
     { key: 'profile',      label: 'Profile',       icon: HiUserCircle,          to: '/realtor/profile' },

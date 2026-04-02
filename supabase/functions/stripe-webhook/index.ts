@@ -315,6 +315,40 @@ serve(async (req: Request) => {
         break;
       }
 
+      case "invoice.payment_failed": {
+        const failedInvoice = event.data.object as any;
+        const failedCustomerId = failedInvoice.customer as string;
+
+        // Look up the subscription by Stripe customer ID
+        const { data: failedSubData } = await supabaseAdmin
+          .from("subscriptions")
+          .select("user_id, id")
+          .eq("stripe_customer_id", failedCustomerId)
+          .maybeSingle();
+
+        if (failedSubData) {
+          // Mark subscription as past_due
+          await supabaseAdmin
+            .from("subscriptions")
+            .update({ status: "past_due", updated_at: new Date().toISOString() })
+            .eq("stripe_customer_id", failedCustomerId);
+
+          // Insert in-app notification for the user
+          const { error: notifError } = await supabaseAdmin.from("notifications").insert({
+            user_id: failedSubData.user_id,
+            title: "Payment Failed",
+            message: "Your subscription payment could not be processed. Please update your payment method to avoid service interruption.",
+            type: "payment",
+            entity_id: null,
+            read: false,
+            created_at: new Date().toISOString(),
+          });
+          if (notifError) console.error(`[Webhook] payment_failed notification error: ${notifError.message}`);
+          console.log(`[Webhook] Subscription set to past_due for user ${failedSubData.user_id}`);
+        }
+        break;
+      }
+
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
         const { data: cancelledSub } = await supabaseAdmin

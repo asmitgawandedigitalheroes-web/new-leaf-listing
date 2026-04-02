@@ -1,4 +1,5 @@
 import { useMemo, useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import AppLayout from '../../components/layout/AppLayout';
 import KPICard from '../../components/shared/KPICard';
 import ActivityFeed from '../../components/shared/ActivityFeed';
@@ -22,6 +23,7 @@ import {
 } from 'react-icons/hi2';
 
 export default function DirectorDashboard() {
+  useDocumentTitle('Director Dashboard');
   const { profile } = useAuth();
   const { addToast } = useToast();
   const { leads, isLoading: leadsLoading, reassignLead } = useLeads();

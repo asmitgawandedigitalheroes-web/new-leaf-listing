@@ -266,6 +266,7 @@ export function AuthProvider({ children }) {
         .insert({
           id: authData.user.id,
           email,
+          full_name,
           company,
           role: ENFORCED_ROLE,  // BUG-008: always 'realtor', never from client input
           phone,

@@ -19,12 +19,15 @@ import AboutPage       from './pages/public/AboutPage';
 import ContactPage     from './pages/public/ContactPage';
 
 // ── Auth pages ────────────────────────────────────────────────────
-import LoginPage  from './pages/auth/LoginPage';
-import SignupPage from './pages/auth/SignupPage';
+import LoginPage         from './pages/auth/LoginPage';
+import SignupPage        from './pages/auth/SignupPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 
 // ── Legal pages ───────────────────────────────────────────────────
 import TermsOfService from './pages/legal/TermsOfService';
-import PrivacyPolicy from './pages/legal/PrivacyPolicy';
+import PrivacyPolicy  from './pages/legal/PrivacyPolicy';
+import PlatformRules  from './pages/legal/PlatformRules';
+import FullContracts  from './pages/legal/FullContracts';
 
 // ── Legacy /app/* routes (kept for backwards compat) ──────────────
 import AdminDashboard    from './pages/app/AdminDashboard';
@@ -55,6 +58,8 @@ import RealtorListingsPage    from './pages/app/realtor/RealtorListingsPage';
 import RealtorLeadsPage       from './pages/app/realtor/RealtorLeadsPage';
 import RealtorCommissionsPage from './pages/app/realtor/RealtorCommissionsPage';
 import RealtorProfilePage     from './pages/app/realtor/RealtorProfilePage';
+import RealtorMessagesPage    from './pages/app/realtor/RealtorMessagesPage';
+import RealtorReferralsPage   from './pages/app/realtor/RealtorReferralsPage';
 
 // ── Listing detail + edit ─────────────────────────────────────────
 import ListingDetail   from './pages/app/ListingDetail';
@@ -78,10 +83,17 @@ export default function App() {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route path="/privacy-policy"   element={<PrivacyPolicy />} />
+            <Route path="/platform-rules"   element={<PlatformRules />} />
+            <Route path="/full-contracts"   element={
+              <ProtectedRoute allowedRoles={['admin', 'director']}>
+                <FullContracts />
+              </ProtectedRoute>
+            } />
 
             {/* ── Auth ────────────────────────────────────────── */}
-            <Route path="/login"  element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
+            <Route path="/login"          element={<LoginPage />} />
+            <Route path="/signup"         element={<SignupPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
             {/* ── Admin routes ─────────────────────────────────── */}
             <Route path="/admin/dashboard" element={
@@ -193,6 +205,16 @@ export default function App() {
             <Route path="/realtor/profile" element={
               <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
                 <RealtorProfilePage />
+              </ProtectedRoute>
+            } />
+            <Route path="/realtor/messages" element={
+              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+                <RealtorMessagesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/realtor/referrals" element={
+              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+                <RealtorReferralsPage />
               </ProtectedRoute>
             } />
 

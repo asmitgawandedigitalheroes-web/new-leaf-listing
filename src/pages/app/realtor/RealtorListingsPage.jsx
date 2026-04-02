@@ -171,14 +171,14 @@ export default function RealtorListingsPage() {
 
     try {
       const { data, error } = await supabase.storage
-        .from('listings')
+        .from('listing-images')
         .upload(filePath, file);
 
       if (error) throw error;
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('listings')
+        .from('listing-images')
         .getPublicUrl(filePath);
 
       if (type === 'create') {
@@ -226,6 +226,20 @@ export default function RealtorListingsPage() {
       return;
     }
 
+    // HP-5: Auto-assign territory_id based on city + state
+    let territory_id = null;
+    if (form.city || form.state) {
+      const { data: territories } = await supabase
+        .from('territories')
+        .select('id')
+        .ilike('city', form.city || '')
+        .ilike('state', form.state || '')
+        .limit(1);
+      if (territories && territories.length > 0) {
+        territory_id = territories[0].id;
+      }
+    }
+
     const { data, error } = await createListing({
       ...form,
       price:     Number(form.price),
@@ -234,6 +248,7 @@ export default function RealtorListingsPage() {
       sqft:      Number(form.sqft) || 0,
       images:    form.images || [],
       upgrade_type: 'standard',
+      ...(territory_id ? { territory_id } : {}),
     });
     setIsSubmitting(false);
 

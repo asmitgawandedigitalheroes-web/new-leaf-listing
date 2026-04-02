@@ -11,6 +11,7 @@ import { useListings } from '../../hooks/useListings';
 import { useLeads } from '../../hooks/useLeads';
 import { supabase } from '../../lib/supabase';
 import { useEffect, useState, useMemo } from 'react';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import {
   HiHome,
   HiUsers,
@@ -19,6 +20,7 @@ import {
 } from 'react-icons/hi2';
 
 export default function RealtorDashboard() {
+  useDocumentTitle('Realtor Dashboard');
   const navigate = useNavigate();
   const { profile, user } = useAuth();
   const [selectedLead, setSelectedLead] = useState(null);

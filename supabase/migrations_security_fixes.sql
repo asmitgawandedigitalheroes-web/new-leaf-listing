@@ -127,6 +127,81 @@ DROP POLICY IF EXISTS "Authenticated users can insert notifications" ON notifica
 DROP POLICY IF EXISTS "Anyone can insert notifications"              ON notifications;
 
 -- =============================================================================
+-- 5. HP-3: Director Territory Isolation for Profile Reads
+--
+-- Directors could previously read ALL profile rows via the authenticated SELECT
+-- policy. This migration scopes director profile reads to profiles within their
+-- assigned territory only (or their own profile).
+-- =============================================================================
+
+DROP POLICY IF EXISTS "profiles_select_director_territory"  ON profiles;
+DROP POLICY IF EXISTS "director_profiles_territory_scoped"  ON profiles;
+
+CREATE POLICY "profiles_select_director_territory" ON profiles
+  FOR SELECT
+  USING (
+    -- Allow a director to see their own profile
+    auth.uid() = id
+    OR
+    -- Allow a director to see profiles in their territory
+    EXISTS (
+      SELECT 1 FROM profiles director_p
+      WHERE director_p.id = auth.uid()
+        AND director_p.role = 'director'
+        AND profiles.territory_id = director_p.territory_id
+    )
+    OR
+    -- Admins retain unrestricted read
+    EXISTS (
+      SELECT 1 FROM profiles admin_p
+      WHERE admin_p.id = auth.uid()
+        AND admin_p.role = 'admin'
+    )
+    OR
+    -- Realtors can see their own profile only (scoped by other policies)
+    (
+      EXISTS (
+        SELECT 1 FROM profiles rp
+        WHERE rp.id = auth.uid()
+          AND rp.role = 'realtor'
+      )
+      AND auth.uid() = id
+    )
+  );
+
+-- =============================================================================
+-- 6. HP-12: Prevent deletion of the last admin account (DB-level trigger)
+--
+-- A UI guard exists in UsersPage.jsx but this DB trigger enforces the rule at
+-- the storage layer so it cannot be bypassed via direct API calls.
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION prevent_last_admin_deletion()
+RETURNS TRIGGER AS $$
+DECLARE
+  admin_count int;
+BEGIN
+  -- Only applies when deleting an admin
+  IF OLD.role = 'admin' THEN
+    SELECT COUNT(*) INTO admin_count
+    FROM profiles
+    WHERE role = 'admin' AND id <> OLD.id;
+
+    IF admin_count = 0 THEN
+      RAISE EXCEPTION 'Cannot delete the last admin account. Promote another user to admin first.';
+    END IF;
+  END IF;
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_prevent_last_admin_delete ON profiles;
+CREATE TRIGGER trg_prevent_last_admin_delete
+  BEFORE DELETE ON profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION prevent_last_admin_deletion();
+
+-- =============================================================================
 -- Done. Verify with:
 --   \dp listings            -- confirm listings_update_own_realtor restricts status
 --   \dp audit_logs          -- confirm no INSERT policy for authenticated

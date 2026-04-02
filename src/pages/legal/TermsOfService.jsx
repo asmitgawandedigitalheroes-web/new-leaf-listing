@@ -1,5 +1,6 @@
 import React from 'react';
-import { HiScale, HiShieldCheck, HiLockClosed, HiDocumentText } from 'react-icons/hi2';
+import { Link } from 'react-router-dom';
+import { HiScale, HiShieldCheck, HiLockClosed, HiDocumentText, HiArrowRight } from 'react-icons/hi2';
 
 const P = '#D4AF37';
 const S = '#1F4D3A';
@@ -79,7 +80,24 @@ export default function TermsOfService() {
             </p>
           </section>
 
-          <div className="mt-12 pt-8 border-t border-slate-100 text-center">
+          {/* Link to Platform Rules (Layer 2) */}
+          <div className="mt-10 p-5 rounded-xl border border-yellow-200 bg-yellow-50 flex items-center justify-between gap-4">
+            <div>
+              <p className="font-semibold text-sm text-slate-900">Operational Platform Rules</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Detailed rules covering lead attribution, non-circumvention, listing standards, commission mechanics, and territory rules.
+              </p>
+            </div>
+            <Link
+              to="/platform-rules"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold no-underline flex-shrink-0"
+              style={{ color: P }}
+            >
+              Platform Rules <HiArrowRight size={14} />
+            </Link>
+          </div>
+
+          <div className="mt-8 pt-8 border-t border-slate-100 text-center">
             <p className="text-slate-500 text-sm">
               © 2026 NLV Listings. All rights reserved. Professional real estate networking.
             </p>

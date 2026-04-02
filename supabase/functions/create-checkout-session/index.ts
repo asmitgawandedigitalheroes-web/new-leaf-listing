@@ -115,6 +115,18 @@ serve(async (req: Request) => {
         throw new Error(`Could not determine price for upgrade type: ${upgradeType}`);
       }
 
+      // HP-10: If caller is on the 'starter' plan, apply 50% discount on listing upgrades
+      const { data: callerSub } = await supabaseAdmin
+        .from("subscriptions")
+        .select("plan")
+        .eq("user_id", caller.id)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (callerSub?.plan === "starter") {
+        unitAmount = Math.round(unitAmount * 0.5); // 50% discount
+      }
+
       const TIER_LABELS: Record<string, string> = {
         top: "Top Pick",
         featured: "Featured",
@@ -173,6 +185,16 @@ serve(async (req: Request) => {
       throw new Error("Missing required parameter: userId");
     }
 
+    // HP-10: For starter plan, record 12-month minimum commitment in metadata
+    const isStarterPlan = (planKey || "").toLowerCase() === "starter";
+    const subscriptionMeta: Record<string, string> = {
+      userId,
+      planKey: planKey || "custom",
+    };
+    if (isStarterPlan) {
+      subscriptionMeta["minimum_commitment_months"] = "12";
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [
@@ -188,12 +210,10 @@ serve(async (req: Request) => {
       metadata: {
         userId,
         planKey: planKey || "custom",
+        ...(isStarterPlan ? { minimum_commitment_months: "12" } : {}),
       },
       subscription_data: {
-        metadata: {
-          userId,
-          planKey: planKey || "custom",
-        },
+        metadata: subscriptionMeta,
       },
     });
 

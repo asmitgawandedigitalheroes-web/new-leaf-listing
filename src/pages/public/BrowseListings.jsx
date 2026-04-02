@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { Link } from 'react-router-dom';
 import { 
   HiHome, 
@@ -168,6 +169,7 @@ function ListingCardSkeleton() {
 }
 
 export default function BrowseListings() {
+  useDocumentTitle('Browse Listings');
   const [search,       setSearch]       = useState('');
   const [tierFilter,   setTierFilter]   = useState('all');
   const [sort,         setSort]         = useState('newest');

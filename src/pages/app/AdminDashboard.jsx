@@ -15,6 +15,7 @@ import { useAuditLogs } from '../../hooks/useAuditLogs';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState, useMemo } from 'react';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { 
   HiHome, 
   HiUsers, 
@@ -24,6 +25,7 @@ import {
 } from 'react-icons/hi2';
 
 export default function AdminDashboard() {
+  useDocumentTitle('Admin Dashboard');
   const navigate = useNavigate();
   const { addToast } = useToast();
   const { user, profile } = useAuth();
