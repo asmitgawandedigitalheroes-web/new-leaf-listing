@@ -133,6 +133,8 @@ export default function App() {
             } />
             {/* Alias so legacy navigate('/admin/audit-log') still works */}
             <Route path="/admin/audit-log" element={<Navigate to="/admin/audit" replace />} />
+            {/* H-3 fix: redirect /admin/commissions to the correct route */}
+            <Route path="/admin/commissions" element={<Navigate to="/admin/commissions-admin" replace />} />
             <Route path="/admin/settings" element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <SettingsPage />

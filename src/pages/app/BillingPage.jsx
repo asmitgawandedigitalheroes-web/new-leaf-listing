@@ -16,7 +16,7 @@ const planCatalog_FALLBACK = [
   { slug: 'starter',   name: 'Starter',   price: 9,   description: 'Up to 5 active listings, basic lead notifications, standard support.',                                      maxListings: 5,  maxLeads: 50  },
   { slug: 'pro',       name: 'Pro',       price: 29,  description: 'Unlimited listings, priority lead routing, analytics dashboard, email support.',                             maxListings: -1, maxLeads: 200 },
   { slug: 'dominator', name: 'Dominator', price: 79,  description: 'Everything in Pro plus territory exclusivity, featured listing upgrades, phone support.',                    maxListings: -1, maxLeads: -1  },
-  { slug: 'sponsor',   name: 'Sponsor',   price: 199, description: 'Everything in Dominator plus sponsored placement, custom branding, dedicated manager.',                      maxListings: -1, maxLeads: -1  },
+  { slug: 'sponsor',   name: 'Sponsor',   price: null, description: 'Everything in Dominator plus sponsored placement, custom branding, dedicated manager. Contact sales for pricing.', maxListings: -1, maxLeads: -1  },
 ];
 
 function formatDate(isoString) {
