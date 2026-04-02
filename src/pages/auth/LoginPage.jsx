@@ -21,13 +21,12 @@ import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 
 // Demo credentials — only available in development builds.
 // Set VITE_DEMO_ADMIN_EMAIL etc. in .env.local to override defaults.
-const IS_DEV = import.meta.env.DEV === true;
-
-const DEMO_CREDS = IS_DEV ? {
+// Demo credentials — now available in all environments per user request
+const DEMO_CREDS = {
   admin:    { email: import.meta.env.VITE_DEMO_ADMIN_EMAIL    ?? 'admin@nlvlistings.com',    password: import.meta.env.VITE_DEMO_ADMIN_PASS    ?? 'admin123' },
   director: { email: import.meta.env.VITE_DEMO_DIRECTOR_EMAIL ?? 'director@nlvlistings.com', password: import.meta.env.VITE_DEMO_DIRECTOR_PASS ?? 'director123' },
   realtor:  { email: import.meta.env.VITE_DEMO_REALTOR_EMAIL  ?? 'realtor@nlvlistings.com',  password: import.meta.env.VITE_DEMO_REALTOR_PASS  ?? 'realtor123' },
-} : null;
+};
 
 // NLV Brand Colors
 const P   = '#D4AF37';
@@ -281,7 +280,7 @@ export default function LoginPage() {
           </form>
 
           {/* Demo credentials — only rendered in development */}
-          {IS_DEV && DEMO_CREDS && (
+          {DEMO_CREDS && (
             <div className="mt-8 p-4 bg-gray-50 border border-gray-200 rounded-xl shadow-sm">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 text-center">
                 Quick Demo Access
