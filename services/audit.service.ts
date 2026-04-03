@@ -12,7 +12,7 @@ export const auditService = {
    * @param metadata - arbitrary additional context
    */
   log: async (
-    userId: string,
+    userId: string | null,
     action: AuditAction,
     entityType: string,
     entityId: string | null = null,

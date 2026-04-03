@@ -37,12 +37,18 @@ export function AuthProvider({ children }) {
   const [subscription, setSubscription] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Prevent concurrent loadUserData calls — only one in-flight at a time
+  const loadingRef = React.useRef(false);
+
   /** Fetch profile and subscription for a given Supabase auth user. */
   const loadUserData = useCallback(async (authUser) => {
+    if (loadingRef.current) return null; // already loading, skip
+    loadingRef.current = true;
     if (!authUser) {
       setProfile(null);
       setRole(null);
       setSubscription(null);
+      loadingRef.current = false;
       return;
     }
 
@@ -62,7 +68,10 @@ export function AuthProvider({ children }) {
       const [profileRes, subRes] = await withTimeout(Promise.all([
         supabase
           .from('profiles')
-          .select('id, email, role, full_name, avatar_url, phone, status, territory_id, company, accepted_terms_at')
+          .select(`
+            *,
+            territory:territories(city, state)
+          `)
           .eq('id', authUser.id)
           .maybeSingle()
           .then(res => {
@@ -125,6 +134,11 @@ export function AuthProvider({ children }) {
       if (profileRes.error && !finalProfile && profileRes.error.code !== 'PGRST116') {
         console.error('[AuthContext] Profile fetch error:', profileRes.error);
       } else {
+        console.log(`[AuthContext] Setting profile and role:`, { 
+          id: authUser.id, 
+          email: authUser.email, 
+          role: finalProfile?.role 
+        });
         setProfile(finalProfile);
         setRole(finalProfile?.role ?? null);
       }
@@ -139,6 +153,8 @@ export function AuthProvider({ children }) {
       const isTimeout = err.message === 'Timeout';
       console.error('[AuthContext] loadUserData error:', isTimeout ? `Request timed out after 10s` : err);
       return null;
+    } finally {
+      loadingRef.current = false;
     }
   }, []);
 
@@ -167,9 +183,10 @@ export function AuthProvider({ children }) {
         ) {
           setUser(session?.user ?? null);
           if (session?.user) {
-            // Skip re-fetching profile on token refresh if we already have it.
-            // TOKEN_REFRESHED fires every ~60 min (or rapidly on flaky connections)
-            // and loadUserData times out in those cases, flooding the console.
+            // Skip re-fetching profile on token refresh — fires every ~60 min or
+            // rapidly on flaky connections; loadUserData times out in those cases.
+            // Also skip repeated SIGNED_IN events if profile already loaded (prevents
+            // thundering-herd from invalid refresh token retry loops).
             const skipRefetch = event === 'TOKEN_REFRESHED';
             if (!skipRefetch) {
               await loadUserData(session.user);
@@ -234,13 +251,7 @@ export function AuthProvider({ children }) {
    * @param {string} [signupData.company]
    * @returns {Promise<{data: any, error: Error|null}>}
    */
-  const signup = async ({ email, password, full_name, company = null, phone = null }) => {
-    // BUG-008: role parameter removed entirely from the public signup function.
-    // All new accounts are unconditionally created as 'realtor'. Role elevation
-    // (to director or admin) must be performed by an existing admin via the
-    // admin-create-user Edge Function or the admin Users panel — never here.
-    const ENFORCED_ROLE = 'realtor';
-
+  const signup = async ({ email, password, full_name, company = null, phone = null, country = null, state = null, city = null, role = 'realtor' }) => {
     setIsLoading(true);
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -260,6 +271,7 @@ export function AuthProvider({ children }) {
 
     // Create profile row
     if (authData.user) {
+      console.log(`[AuthContext] Creating profile for ${email} with role: ${role}`);
       const { error: profileError } = await supabase
         .from('profiles')
         .insert({
@@ -267,8 +279,11 @@ export function AuthProvider({ children }) {
           email,
           full_name,
           company,
-          role: ENFORCED_ROLE,  // BUG-008: always 'realtor', never from client input
+          role,  // Support flexible roles (defaults to realtor)
           phone,
+          country,
+          state,
+          city,
           status: 'pending',
           accepted_terms_at: new Date().toISOString(),
         });

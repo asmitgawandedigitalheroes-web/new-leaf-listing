@@ -134,50 +134,89 @@ export function useUsers() {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const { data, error: fnError } = await supabase.functions.invoke('admin-delete-user', {
-        body: { userId: id },
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (fnError || !data?.success) {
-        throw new Error(fnError?.message || data?.error || 'Failed to delete user');
+      if (!token) {
+        throw new Error('No active session. Please log in again.');
       }
 
-      audit(currentUser?.id, 'user.deleted', id, { deleted_user_id: id }).catch(() => {});
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      console.log('[useUsers] Deleting user via edge function. Token length:', token.length);
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/admin-delete-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'apikey': supabaseAnonKey,
+        },
+        body: JSON.stringify({ userId: id, caller_token: token }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data?.success === false) {
+        const msg = data?.error || `Request failed with status ${response.status}`;
+        console.error('[useUsers] Delete user edge function error:', msg, '| HTTP status:', response.status);
+        throw new Error(msg);
+      }
+
+      console.log('[useUsers] User deleted successfully:', id);
+      // audit is now handled inside the edge function, but we can still do a local one if desired
+      // however, to avoid duplication, we'll rely on the server-side audit
+      
       setUsers(prev => prev.filter(u => u.id !== id));
       return { error: null };
     } catch (err) {
+      console.error('[useUsers] deleteUser failed:', err.message);
       return { error: err };
     }
   };
 
   /**
    * Create a brand-new platform user via the admin-create-user Edge Function.
-   * This uses Supabase service role under the hood so it can create auth users.
+   * Uses a raw fetch with the anon key in Authorization (accepted by gateway)
+   * and passes the user's JWT as caller_token in the body for role verification.
+   * This bypasses the supabase.functions.invoke quirk of sending the user JWT
+   * in Authorization which can be rejected by the gateway in some scenarios.
    */
   const createUser = async ({ email, full_name, role, territory_id, plan }) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const { data, error: fnError } = await supabase.functions.invoke('admin-create-user', {
-        body: { email, full_name, role, territory_id, plan },
-        headers: { Authorization: `Bearer ${token}` },
+      if (!token) {
+        throw new Error('No active session. Please log in again.');
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      console.log('[useUsers] Creating user via edge function. Token length:', token.length);
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/admin-create-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'apikey': supabaseAnonKey,
+        },
+        body: JSON.stringify({ email, full_name, role, territory_id, plan, caller_token: token }),
       });
 
-      if (fnError) {
-        console.error('[useUsers] Edge Function invocation error:', fnError);
-        throw fnError;
-      }
-      if (data?.error) {
-        console.error('[useUsers] Edge Function returned error:', data.error);
-        throw new Error(data.error);
+      const data = await response.json();
+
+      if (!response.ok || data?.error) {
+        const msg = data?.error || `Request failed with status ${response.status}`;
+        console.error('[useUsers] Edge function error:', msg, '| HTTP status:', response.status);
+        throw new Error(msg);
       }
 
-      // Refresh the full user list so the new user appears with all joins
+      console.log('[useUsers] User created successfully:', data.user?.email);
       await fetchUsers();
       return { data: data.user, error: null };
     } catch (err) {
+      console.error('[useUsers] createUser failed:', err.message);
       return { data: null, error: err };
     }
   };

@@ -357,6 +357,30 @@ export function useListings(filters = {}) {
     }
   };
 
+  /**
+   * Permanently delete a listing.
+   * Note: associated audit logs are CASCADE deleted.
+   */
+  const deleteListing = async (id) => {
+    try {
+      // Log audit just before deletion (fire-and-forget)
+      audit(user.id, 'listing.deleted', id, { note: 'Hard delete by owner' }).catch(() => {});
+
+      const { error: deleteError } = await supabase
+        .from('listings')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) throw deleteError;
+
+      setListings(prev => prev.filter(l => l.id !== id));
+      return { error: null };
+    } catch (err) {
+      console.error('[useListings] Delete error:', err);
+      return { error: err };
+    }
+  };
+
   return {
     listings,
     isLoading,
@@ -373,6 +397,7 @@ export function useListings(filters = {}) {
     markSold,                 // active/under_contract → sold
     archiveListing,           // active → expired
     setUpgradeType,           // set upgrade tier (admin/director) or initiate Stripe (realtor)
+    deleteListing,            // permanently remove a listing
   };
 }
 

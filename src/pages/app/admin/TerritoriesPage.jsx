@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import AppLayout from '../../../components/layout/AppLayout';
 import KPICard from '../../../components/shared/KPICard';
 import { SectionCard } from '../../../components/ui/Card';
+import SearchableSelect from '../../../components/ui/SearchableSelect';
 import Badge from '../../../components/ui/Badge';
 import Button from '../../../components/ui/Button';
 import Modal from '../../../components/ui/Modal';
@@ -58,8 +59,8 @@ export default function TerritoriesPage() {
   };
 
   const handleAddTerritory = async () => {
-    if (!form.city || !form.state) {
-      addToast({ type: 'error', title: 'Missing fields', desc: 'Please fill in city and state.' });
+    if (!form.country || !form.state.trim() || !form.city.trim()) {
+      addToast({ type: 'error', title: 'Missing fields', desc: 'Please fill in country, state, and city.' });
       return;
     }
     setIsSubmitting(true);
@@ -100,12 +101,12 @@ export default function TerritoriesPage() {
       <div className="p-4 md:p-6 flex flex-col gap-6">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Territories</h1>
             <p className="text-sm text-gray-400">Manage market regions and director assignments.</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 self-start sm:self-auto">
             <button onClick={refresh} title="Refresh" className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors">
               <HiArrowPath size={16} className="text-gray-500" />
             </button>
@@ -131,14 +132,14 @@ export default function TerritoriesPage() {
           <select
             value={filterCountry}
             onChange={e => handleCountryChange(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white"
+            className="flex-1 min-w-[130px] px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white"
           >
             {countries.map(c => <option key={c}>{c}</option>)}
           </select>
           <select
             value={filterState}
             onChange={e => setFilterState(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white"
+            className="flex-1 min-w-[130px] px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white"
           >
             {states.map(s => <option key={s}>{s}</option>)}
           </select>
@@ -246,10 +247,17 @@ export default function TerritoriesPage() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Initial Director (optional)</label>
-            <select value={form.director_id} onChange={e => setForm(f => ({ ...f, director_id: e.target.value }))} className={inputClass}>
-              <option value="">— Select Director —</option>
-              {directors.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-            </select>
+            <SearchableSelect
+              value={form.director_id}
+              onChange={val => setForm(f => ({ ...f, director_id: val }))}
+              options={directors.map(d => ({
+                value: d.id,
+                label: d.full_name,
+                sublabel: d.email
+              }))}
+              emptyLabel="— Select Director —"
+              placeholder="Search directors..."
+            />
           </div>
         </div>
       </Modal>
@@ -272,10 +280,17 @@ export default function TerritoriesPage() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Select Director</label>
-            <select value={assignDirectorId} onChange={e => setAssignDirectorId(e.target.value)} className={inputClass}>
-              <option value="">— None —</option>
-              {directors.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-            </select>
+            <SearchableSelect
+              value={assignDirectorId}
+              onChange={val => setAssignDirectorId(val)}
+              options={directors.map(d => ({
+                value: d.id,
+                label: d.full_name,
+                sublabel: d.email
+              }))}
+              emptyLabel="— None —"
+              placeholder="Search directors..."
+            />
           </div>
         </div>
       </Modal>

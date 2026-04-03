@@ -114,7 +114,10 @@ export function useLeads() {
           notes: inquiryData.message,
           assigned_realtor_id: assignedRealtorId,
           territory_id: territoryId,
-          status: assignedRealtorId ? 'assigned' : 'new'
+          status: assignedRealtorId ? 'assigned' : 'new',
+          budget_min: inquiryData.budget_min || null,
+          budget_max: inquiryData.budget_max || null,
+          source: inquiryData.source || 'website'
         })
         .select('*, listing:listings(title, address, city, state), assigned_realtor:profiles!leads_assigned_realtor_id_fkey(full_name, email)')
         .single();
@@ -144,14 +147,14 @@ export function useLeads() {
         setLeads(prev => [data, ...prev]);
       }
       
-      // 4. CRM Sync
-      crmService.syncLead(data).catch(err => {
+      // 4. CRM Sync — pass lead ID string, not the lead object
+      crmService.syncLead(data.id).catch(err => {
         console.error('[useLeads] CRM Sync failed (queued for retry):', err);
       });
-      
-      // Email Notification
+
+      // Email Notification — directorId not available here, pass null
       if (data.assigned_realtor_id) {
-        notificationService.notifyNewLead(data.id, data.assigned_realtor_id).catch(console.error);
+        notificationService.notifyNewLead(data.id, data.assigned_realtor_id, null).catch(console.error);
       }
       
       return { data, error: null };
@@ -163,32 +166,54 @@ export function useLeads() {
 
   const updateLeadStatus = async (id, status) => {
     try {
-      const { data, error: updateError } = await supabase
+      // Separate update from select to avoid RLS join failures on listings/profiles.
+      // The UPDATE itself succeeds even when the chained SELECT with joins is blocked.
+      const { error: updateError } = await supabase
         .from('leads')
         .update({ status, updated_at: new Date().toISOString() })
-        .eq('id', id)
-        .select();
+        .eq('id', id);
 
       if (updateError) throw updateError;
 
+      // Optimistically update local state — no re-fetch needed.
+      setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l));
+
       audit(user.id, `lead.status_changed`, id, { status }).catch(() => {});
-      
-      // CRM Sync Status Update
+
       crmService.syncLeadStatus(id, status).catch(err => {
         console.error('[useLeads] CRM Status Sync failed:', err);
       });
 
-      if (data && data.length > 0) {
-        setLeads(prev => prev.map(l => l.id === id ? data[0] : l));
-        return { data: data[0], error: null };
-      } else {
-        setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l));
-        await fetchLeads();
-        return { data: { id, status }, error: null };
-      }
+      return { data: { id, status }, error: null };
     } catch (err) {
       console.error('[useLeads] Update status error:', err);
       return { data: null, error: err };
+    }
+  };
+
+  /**
+   * Add a manual note/comment to a lead.
+   * Stores in audit_logs for timeline consistency.
+   */
+  const addLeadNote = async (id, note) => {
+    try {
+      const { error: auditError } = await supabase.from('audit_logs').insert({
+        user_id: user.id,
+        action: 'lead.note_added',
+        entity_type: 'lead',
+        entity_id: id,
+        timestamp: new Date().toISOString(),
+        metadata: { note }
+      });
+
+      if (auditError) throw auditError;
+
+      // Log success and return
+      audit(user.id, 'lead.noted', id, { note_preview: note.slice(0, 50) }).catch(() => {});
+      return { error: null };
+    } catch (err) {
+      console.error('[useLeads] Add note error:', err);
+      return { error: err };
     }
   };
 
@@ -216,8 +241,8 @@ export function useLeads() {
 
       audit(user.id, 'lead.reassigned', id, { new_realtor_id: newRealtorId, lock_until: lockUntil }).catch(() => {});
       
-      // Email Notification
-      notificationService.notifyNewLead(id, newRealtorId).catch(console.error);
+      // Email Notification — directorId not available in reassign context, pass null
+      notificationService.notifyNewLead(id, newRealtorId, null).catch(console.error);
 
       if (data) {
         setLeads(prev => prev.map(l => l.id === id ? data : l));
@@ -239,15 +264,21 @@ export function useLeads() {
    * Fetch available realtors for lead assignment (admin/director only).
    * Returns active realtors with their profile info.
    */
-  const fetchAvailableRealtors = useCallback(async () => {
+  const fetchAvailableRealtors = useCallback(async (territoryId = null) => {
     try {
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from('profiles')
         .select('id, full_name, email, territory_id, status')
         .eq('role', 'realtor')
         .eq('status', 'active')
         .order('full_name');
 
+      // Filter by territory to prevent cross-territory lead assignment
+      if (territoryId) {
+        query = query.eq('territory_id', territoryId);
+      }
+
+      const { data, error: fetchError } = await query;
       if (fetchError) throw fetchError;
       return { data: data || [], error: null };
     } catch (err) {
@@ -264,6 +295,7 @@ export function useLeads() {
     createInquiry,
     updateLeadStatus,
     reassignLead,
+    addLeadNote,
     fetchAvailableRealtors,
   };
 }

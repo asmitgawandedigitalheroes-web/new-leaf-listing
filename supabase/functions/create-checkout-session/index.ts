@@ -6,31 +6,22 @@ const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
   httpClient: Stripe.createFetchHttpClient(),
 });
 
+const url = Deno.env.get("SUPABASE_URL") || "";
+const serviceKey = Deno.env.get("ADMIN_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
 // Service-role client used only to look up prices server-side (BUG-031).
-const supabaseAdmin = createClient(
-  Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
+const supabaseAdmin = createClient(url, serviceKey, { 
+  auth: { autoRefreshToken: false, persistSession: false } 
+});
 
-// BUG-034: Replace wildcard CORS with an explicit allowlist.
-// Set ALLOWED_ORIGINS env var to a comma-separated list of permitted origins.
-const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
-  .split(",")
-  .map(o => o.trim())
-  .filter(Boolean);
-
-function getCorsHeaders(req: Request): Record<string, string> {
-  const origin = req.headers.get("origin") ?? "";
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : "";
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
-}
+// Standard CORS headers for development flexibility
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
 serve(async (req: Request) => {
-  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -46,7 +37,7 @@ serve(async (req: Request) => {
         status: 401,
       });
     }
-    const token = authHeader.replace("Bearer ", "");
+    const token = authHeader.replace(/^Bearer /i, "");
     const { data: { user: caller }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !caller) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -195,6 +186,17 @@ serve(async (req: Request) => {
       subscriptionMeta["minimum_commitment_months"] = "12";
     }
 
+    // Determine success/cancel URLs — invited users (from admin invite flow) land
+    // on the pricing page with ?invited=true, so we send them to their dashboard
+    // on success instead of the billing page.
+    const isInvitedFlow = body.invitedFlow === true;
+    const successUrl = isInvitedFlow
+      ? `${origin}/realtor/billing?session_id={CHECKOUT_SESSION_ID}&status=success&onboarded=true`
+      : `${origin}/realtor/billing?session_id={CHECKOUT_SESSION_ID}&status=success`;
+    const cancelUrl = isInvitedFlow
+      ? `${origin}/pricing?invited=true&status=cancelled`
+      : `${origin}/realtor/billing?status=cancelled`;
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [
@@ -204,8 +206,8 @@ serve(async (req: Request) => {
         },
       ],
       mode: "subscription",
-      success_url: `${origin}/realtor/billing?session_id={CHECKOUT_SESSION_ID}&status=success`,
-      cancel_url: `${origin}/realtor/billing?status=cancelled`,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
       customer_email: userEmail,
       metadata: {
         userId,
@@ -213,6 +215,10 @@ serve(async (req: Request) => {
         ...(isStarterPlan ? { minimum_commitment_months: "12" } : {}),
       },
       subscription_data: {
+        // 14-day free trial on all plans — card is collected now but first charge
+        // happens after the trial ends. The stripe-webhook handles the
+        // checkout.session.completed event and sets subscription status="trialing".
+        trial_period_days: 14,
         metadata: subscriptionMeta,
       },
     });

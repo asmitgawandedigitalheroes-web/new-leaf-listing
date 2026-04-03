@@ -27,8 +27,14 @@ const fadeUp = `
 
 export default function Hero() {
   return (
-    <section className="relative overflow-hidden flex flex-col lg:block bg-jet-black" style={{ minHeight: '100vh', background: 'var(--color-jet-black)' }}>
-      <style>{fadeUp}</style>
+    <section id="hero-section" className="relative overflow-hidden flex flex-col lg:block bg-primary-dark lg:bg-jet-black" style={{ minHeight: '100vh' }}>
+      <style>{`
+        ${fadeUp}
+        #hero-section { background: var(--color-primary-dark); }
+        @media (min-width: 1024px) {
+          #hero-section { background: var(--color-jet-black); }
+        }
+      `}</style>
       
       {/* Right/Top: house image */}
       <div className="relative lg:absolute lg:right-0 lg:top-0 lg:bottom-0 h-[45vh] lg:h-full lg:w-3/5" style={{ zIndex: 0 }}>
@@ -42,7 +48,7 @@ export default function Hero() {
           background: `linear-gradient(100deg, var(--color-jet-black) 0%, var(--color-jet-black) 6%, rgba(10,10,10,.94) 20%, rgba(10,10,10,.5) 38%, transparent 58%)`,
         }} />
         {/* Mobile overlay */}
-        <div className="absolute inset-0 lg:hidden" style={{ background: `linear-gradient(to bottom, transparent 60%, var(--color-jet-black))` }} />
+        <div className="absolute inset-0 lg:hidden" style={{ background: `linear-gradient(to bottom, transparent 60%, var(--color-primary-dark))` }} />
         <div className="absolute inset-x-0 bottom-0 h-32 hidden lg:block" style={{ background: `linear-gradient(to top, var(--color-jet-black), transparent)` }} />
       </div>
 
@@ -74,14 +80,14 @@ export default function Hero() {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 mb-14">
-          <Button as={Link} to="/browse" variant="primary" className="w-full sm:w-auto">
-            Browse Listings <Icon n="arrow_forward" sz={16} c="var(--color-jet-black)" />
+          <Button as={Link} to="/browse" variant="primary" premium size="lg" className="w-full sm:w-auto">
+            Browse Listings
           </Button>
-          <Button as={Link} to="/signup" variant="secondary" className="w-full sm:w-auto">Join as Realtor</Button>
+          <Button as={Link} to="/signup" variant="secondary" size="lg" className="w-full sm:w-auto">Join as Realtor</Button>
         </div>
 
         {/* Metrics row */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 sm:gap-0 pt-7" style={{ borderTop: `1px solid rgba(201, 164, 92, 0.2)` }}>
+        <div className="hidden sm:flex sm:flex-row items-center gap-0 pt-7" style={{ borderTop: `1px solid rgba(201, 164, 92, 0.2)` }}>
           {[
             { val: '2,400+', label: 'Listings' },
             { val: '340+', label: 'Realtors' },

@@ -12,6 +12,9 @@ import { useLeads } from '../../hooks/useLeads';
 import { supabase } from '../../lib/supabase';
 import { useEffect, useState, useMemo } from 'react';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { maskName, maskEmail } from '../../utils/masking';
+import Modal from '../../components/ui/Modal';
+import { useToast } from '../../context/ToastContext';
 import {
   HiHome,
   HiUsers,
@@ -23,13 +26,16 @@ export default function RealtorDashboard() {
   useDocumentTitle('Realtor Dashboard');
   const navigate = useNavigate();
   const { profile, user } = useAuth();
+  const { addToast } = useToast();
   const [selectedLead, setSelectedLead] = useState(null);
-  const { listings: myListings, isLoading: listingsLoading, submitForApproval } = useListings();
+  const { listings: myListings, isLoading: listingsLoading, submitForApproval, deleteListing } = useListings();
   const { leads: myLeads, isLoading: leadsLoading } = useLeads();
   const [commissions, setCommissions] = useState([]);
   const [commissionsLoading, setCommissionsLoading] = useState(true);
   const [activities, setActivities] = useState([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     async function fetchDashboardData() {
@@ -59,6 +65,19 @@ export default function RealtorDashboard() {
     }
     fetchDashboardData();
   }, [user?.id]);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    const { error } = await deleteListing(deleteTarget.id);
+    setIsDeleting(false);
+    if (error) {
+      addToast({ type: 'error', title: 'Delete failed', desc: error.message });
+    } else {
+      addToast({ type: 'success', title: 'Listing deleted successfully' });
+    }
+    setDeleteTarget(null);
+  };
 
   const kpis = useMemo(() => [
     { label: 'My Listings',   value: myListings.length.toString(),                     trend: null, trendLabel: '', icon: <HiHome className="text-blue-600" /> },
@@ -102,8 +121,6 @@ export default function RealtorDashboard() {
                       <th>Property</th>
                       <th>Price</th>
                       <th>Status</th>
-                      <th>Views</th>
-                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -113,7 +130,6 @@ export default function RealtorDashboard() {
                           <td><Skeleton width="140px" height="14px" /><Skeleton width="80px" height="10px" className="mt-1" /></td>
                           <td><Skeleton width="70px" height="14px" /></td>
                           <td><Skeleton width="60px" height="20px" /></td>
-                          <td><Skeleton width="40px" height="12px" /></td>
                         </tr>
                       ))
                     ) : myListings.slice(0, 4).map(l => (
@@ -124,18 +140,6 @@ export default function RealtorDashboard() {
                         </td>
                         <td className="font-semibold text-gray-900">${l.price?.toLocaleString()}</td>
                         <td><Badge status={l.status} /></td>
-                        <td className="text-gray-500">{l.views_count || 0}</td>
-                        <td>
-                          {(l.status === 'draft' || l.status === 'rejected') && (
-                            <Button
-                              variant="primary"
-                              size="xs"
-                              onClick={() => submitForApproval(l.id)}
-                            >
-                              Submit
-                            </Button>
-                          )}
-                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -204,8 +208,8 @@ export default function RealtorDashboard() {
                 ) : myLeads.slice(0, 5).map(lead => (
                   <tr key={lead.id} className="cursor-pointer" onClick={() => setSelectedLead(lead)}>
                     <td>
-                      <div className="font-medium text-gray-900">{lead.contact_name}</div>
-                      <div className="text-xs text-gray-400">{lead.contact_email}</div>
+                      <div className="font-medium text-gray-900" title="Full details available in Leads section">{maskName(lead.contact_name)}</div>
+                      <div className="text-xs text-gray-400">{maskEmail(lead.contact_email)}</div>
                     </td>
                     <td><Badge status={lead.status} /></td>
                     <td>
@@ -240,6 +244,31 @@ export default function RealtorDashboard() {
           onClose={() => setSelectedLead(null)}
         />
       )}
+
+      {/* Delete confirmation modal */}
+      <Modal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete Listing?"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button
+              variant="primary"
+              onClick={handleDelete}
+              isLoading={isDeleting}
+              style={{ background: '#DC2626' }}
+            >
+              Delete
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-600">
+          Are you sure you want to delete <strong>"{deleteTarget?.title}"</strong>?{' '}
+          This action cannot be undone.
+        </p>
+      </Modal>
 
     </AppLayout>
   );

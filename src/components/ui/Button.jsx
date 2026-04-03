@@ -1,3 +1,6 @@
+import React from 'react';
+import { HiArrowRight } from 'react-icons/hi2';
+
 // ── Button ──────────────────────────────
 // variants: primary | green | outline | ghost | danger | white
 // sizes: sm | md | lg
@@ -38,9 +41,9 @@ const VARIANT_HOVER = {
 };
 
 const SIZES = {
-  sm: 'h-8 px-3 text-xs gap-1.5',
-  md: 'h-10 px-5 text-sm gap-1.5',
-  lg: 'h-12 px-7 text-base gap-2',
+  sm: 'h-10 px-5 text-sm gap-1.5',
+  md: 'h-12 px-8 text-sm gap-2',
+  lg: 'h-14 px-12 text-base gap-2.5',
 };
 
 export default function Button({
@@ -56,14 +59,21 @@ export default function Button({
   as: Tag = 'button',
   href,
   style: extraStyle = {},
+  premium = false,
   ...props
 }) {
-  const base = 'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-150 whitespace-nowrap cursor-pointer disabled:opacity-40 disabled:pointer-events-none gap-2';
+  const base = 'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-300 whitespace-nowrap cursor-pointer disabled:opacity-40 disabled:pointer-events-none gap-2';
   const sizeClass = SIZES[size] || SIZES.md;
   const variantStyle = VARIANT_STYLES[variant] || VARIANT_STYLES.outline;
   const hoverStyle = VARIANT_HOVER[variant] || {};
   const isActuallyDisabled = disabled || isLoading;
-  const cls = `${base} ${sizeClass} ${fullWidth ? 'w-full' : ''} ${className}`;
+  
+  // Premium classes for scale and shadow on hover
+  const premiumClasses = premium 
+    ? 'group hover:scale-[1.03] hover:-translate-y-0.5 active:scale-[0.98] hover:shadow-xl' 
+    : '';
+
+  const cls = `${base} ${sizeClass} ${premiumClasses} ${fullWidth ? 'w-full' : ''} ${className}`;
 
   const handleEnter = (e) => {
     if (isActuallyDisabled) return;
@@ -82,18 +92,17 @@ export default function Button({
   const content = (
     <>
       {isLoading && <span className="spinner" />}
-      {children}
+      <span className="relative z-10">{children}</span>
+      
+      {premium && (
+        <span className="w-0 opacity-0 transform -translate-x-3 transition-all duration-300 group-hover:w-5 group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-1.5 flex items-center overflow-hidden">
+          <HiArrowRight size={size === 'sm' ? 14 : size === 'lg' ? 20 : 18} />
+        </span>
+      )}
     </>
   );
 
-  if (Tag !== 'button') {
-    return (
-      <Tag className={cls} style={combinedStyle} onClick={onClick}
-        onMouseEnter={handleEnter} onMouseLeave={handleLeave} {...props}>
-        {content}
-      </Tag>
-    );
-  }
+  const TagComponent = Tag || 'button';
 
   if (href) {
     return (
@@ -105,9 +114,10 @@ export default function Button({
   }
 
   return (
-    <button type={type} className={cls} style={combinedStyle} disabled={isActuallyDisabled}
+    <TagComponent type={TagComponent === 'button' ? type : undefined} className={cls} style={combinedStyle} disabled={isActuallyDisabled}
       onClick={onClick} onMouseEnter={handleEnter} onMouseLeave={handleLeave} {...props}>
       {content}
-    </button>
+    </TagComponent>
   );
 }
+

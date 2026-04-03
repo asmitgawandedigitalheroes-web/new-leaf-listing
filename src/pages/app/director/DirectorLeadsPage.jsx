@@ -1,14 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import AppLayout from '../../../components/layout/AppLayout';
-import { SectionCard } from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import Modal from '../../../components/ui/Modal';
-import Avatar from '../../../components/ui/Avatar';
 import Skeleton from '../../../components/ui/Skeleton';
 import { useAuth } from '../../../context/AuthContext';
 import { useLeads } from '../../../hooks/useLeads';
 import { useToast } from '../../../context/ToastContext';
-import { HiLockClosed } from 'react-icons/hi2';
+import { HiCheckCircle, HiUserGroup, HiXMark } from 'react-icons/hi2';
 import LeadDrawer from '../../../components/shared/LeadDrawer';
 
 const SCORE_COLOR = (s) => s >= 80 ? '#1F4D3A' : s >= 50 ? '#D4AF37' : '#DC2626';
@@ -17,7 +15,6 @@ const COLUMNS = ['new', 'assigned', 'contacted', 'closed'];
 const COL_LABELS = { new: 'New', assigned: 'Assigned', contacted: 'Contacted', closed: 'Closed' };
 const COL_COLORS = { new: '#1F4D3A', assigned: '#D4AF37', contacted: '#3B82F6', closed: '#6B7280' };
 
-// Map DB statuses to kanban columns
 const toColumn = (status) => {
   if (status === 'new') return 'new';
   if (status === 'assigned') return 'assigned';
@@ -29,7 +26,7 @@ const toColumn = (status) => {
 export default function DirectorLeadsPage() {
   const { profile } = useAuth();
   const { addToast } = useToast();
-  const { leads, isLoading, reassignLead, fetchAvailableRealtors } = useLeads();
+  const { leads, isLoading, reassignLead, fetchAvailableRealtors, updateLeadStatus, addLeadNote } = useLeads();
 
   const [assignOpen, setAssignOpen]     = useState(false);
   const [assignTarget, setAssignTarget] = useState(null);
@@ -39,9 +36,16 @@ export default function DirectorLeadsPage() {
   const [assigning, setAssigning]       = useState(false);
   const [availableRealtors, setAvailableRealtors] = useState([]);
 
+  // Bulk selection state
+  const [selectedLeads, setSelectedLeads] = useState(new Set());
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+  const [bulkAssignTo, setBulkAssignTo]   = useState('');
+  const [bulkAssigning, setBulkAssigning] = useState(false);
+
+  // Pass territory_id so only territory realtors appear in assign dropdown
   useEffect(() => {
-    fetchAvailableRealtors().then(({ data }) => setAvailableRealtors(data || []));
-  }, [fetchAvailableRealtors]);
+    fetchAvailableRealtors(profile?.territory_id).then(({ data }) => setAvailableRealtors(data || []));
+  }, [fetchAvailableRealtors, profile?.territory_id]);
 
   const byStatus = useMemo(() => {
     const map = {};
@@ -73,13 +77,41 @@ export default function DirectorLeadsPage() {
     else {
       addToast({ type: 'success', title: 'Lead assigned', desc: 'Lead routed to realtor.' });
       if (drawerLead?.id === assignTarget.id) {
-         setDrawerLead(prev => ({ ...prev, assigned_realtor_id: assignTo }));
+        setDrawerLead(prev => ({ ...prev, assigned_realtor_id: assignTo }));
       }
     }
   };
 
-  const territory = profile?.territory ? `${profile.territory}` : 'My Territory';
+  // Bulk assign handler
+  const handleBulkAssign = async () => {
+    if (!bulkAssignTo || selectedLeads.size === 0) return;
+    setBulkAssigning(true);
+    let successCount = 0;
+    let errorCount = 0;
+    for (const leadId of selectedLeads) {
+      const { error } = await reassignLead(leadId, bulkAssignTo);
+      if (error) errorCount++;
+      else successCount++;
+    }
+    setBulkAssigning(false);
+    setBulkAssignOpen(false);
+    setSelectedLeads(new Set());
+    setBulkAssignTo('');
+    if (successCount > 0) addToast({ type: 'success', title: `${successCount} lead${successCount > 1 ? 's' : ''} assigned` });
+    if (errorCount > 0) addToast({ type: 'error', title: `${errorCount} assignment${errorCount > 1 ? 's' : ''} failed` });
+  };
 
+  const toggleSelect = (e, leadId) => {
+    e.stopPropagation();
+    setSelectedLeads(prev => {
+      const next = new Set(prev);
+      if (next.has(leadId)) next.delete(leadId);
+      else next.add(leadId);
+      return next;
+    });
+  };
+
+  const territory = profile?.territory ? `${profile.territory}` : 'My Territory';
   const selectClass = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white';
 
   return (
@@ -102,6 +134,36 @@ export default function DirectorLeadsPage() {
           </div>
         </div>
 
+        {/* Bulk Selection Bar */}
+        {selectedLeads.size > 0 && (
+          <div className="flex items-center justify-between px-5 py-3 rounded-xl border"
+            style={{ background: 'rgba(212,175,55,0.08)', borderColor: 'rgba(212,175,55,0.3)' }}>
+            <div className="flex items-center gap-3">
+              <HiCheckCircle className="w-5 h-5" style={{ color: '#D4AF37' }} />
+              <span className="text-sm font-semibold text-gray-800">
+                {selectedLeads.size} lead{selectedLeads.size > 1 ? 's' : ''} selected
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                className="flex items-center gap-2"
+                onClick={() => { setBulkAssignTo(''); setBulkAssignOpen(true); }}
+              >
+                <HiUserGroup className="w-4 h-4" />
+                Bulk Assign
+              </Button>
+              <button
+                onClick={() => setSelectedLeads(new Set())}
+                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <HiXMark className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Kanban Pipeline */}
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -116,7 +178,6 @@ export default function DirectorLeadsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             {COLUMNS.map(col => (
               <div key={col} className="flex flex-col gap-3">
-                {/* Column header */}
                 <div className="flex items-center justify-between px-1">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full" style={{ background: COL_COLORS[col] }} />
@@ -126,48 +187,66 @@ export default function DirectorLeadsPage() {
                     {byStatus[col]?.length || 0}
                   </span>
                 </div>
-                {/* Cards */}
                 <div className="flex flex-col gap-2">
-                  {byStatus[col]?.map(lead => (
-                    <div
-                      key={lead.id}
-                      className="bg-white rounded-xl p-4 cursor-pointer transition-all hover:shadow-md"
-                      style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.05)', borderLeft: `3px solid ${COL_COLORS[col]}` }}
-                      onClick={() => openDrawer(lead)}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="font-semibold text-gray-900 text-sm">{lead.contact_name || 'Unknown'}</div>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                          style={{ background: SCORE_COLOR(lead.score || 50) + '22', color: SCORE_COLOR(lead.score || 50) }}>
-                          {lead.score || 50}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-400 mb-1">{lead.contact_masked_email || lead.contact_email}</div>
-                      <div className="text-xs text-gray-500 mb-2">
-                        {lead.budget_max ? `$${lead.budget_max.toLocaleString()}` : '—'}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500 capitalize">{lead.source || 'web'}</span>
-                        <span className="text-[10px] text-gray-400">
-                          {new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </span>
-                      </div>
-                      {lead.assigned_realtor ? (
-                        <div className="mt-2 text-[11px] text-gray-500 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                          {lead.assigned_realtor.full_name}
+                  {byStatus[col]?.map(lead => {
+                    const isSelected = selectedLeads.has(lead.id);
+                    return (
+                      <div
+                        key={lead.id}
+                        className="bg-white rounded-xl p-4 cursor-pointer transition-all hover:shadow-md"
+                        style={{
+                          boxShadow: isSelected ? `0 0 0 2px #D4AF37` : '0 1px 3px rgba(0,0,0,0.05)',
+                          borderLeft: `3px solid ${isSelected ? '#D4AF37' : COL_COLORS[col]}`,
+                        }}
+                        onClick={() => openDrawer(lead)}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            {/* Bulk select checkbox */}
+                            <div
+                              onClick={e => toggleSelect(e, lead.id)}
+                              className="w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all cursor-pointer"
+                              style={{
+                                borderColor: isSelected ? '#D4AF37' : '#D1D5DB',
+                                background: isSelected ? '#D4AF37' : 'transparent',
+                              }}
+                            >
+                              {isSelected && <span className="text-white text-[9px] font-black">✓</span>}
+                            </div>
+                            <div className="font-semibold text-gray-900 text-sm">{lead.contact_name || 'Unknown'}</div>
+                          </div>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                            style={{ background: SCORE_COLOR(lead.score || 50) + '22', color: SCORE_COLOR(lead.score || 50) }}>
+                            {lead.score || 50}
+                          </span>
                         </div>
-                      ) : (
-                        <button
-                          className="mt-2 text-[11px] font-semibold hover:underline"
-                          style={{ color: '#D4AF37' }}
-                          onClick={e => { e.stopPropagation(); openAssign(lead); }}
-                        >
-                          + Assign Realtor
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                        <div className="text-xs text-gray-400 mb-1">{lead.contact_masked_email || lead.contact_email}</div>
+                        <div className="text-xs text-gray-500 mb-2">
+                          {lead.budget_max ? `$${lead.budget_max.toLocaleString()}` : '—'}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500 capitalize">{lead.source || 'web'}</span>
+                          <span className="text-[10px] text-gray-400">
+                            {new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                        </div>
+                        {lead.assigned_realtor ? (
+                          <div className="mt-2 text-[11px] text-gray-500 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                            {lead.assigned_realtor.full_name}
+                          </div>
+                        ) : (
+                          <button
+                            className="mt-2 text-[11px] font-semibold hover:underline"
+                            style={{ color: '#D4AF37' }}
+                            onClick={e => { e.stopPropagation(); openAssign(lead); }}
+                          >
+                            + Assign Realtor
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                   {byStatus[col]?.length === 0 && (
                     <div className="bg-gray-50 rounded-xl p-4 text-center text-xs text-gray-400 border border-dashed border-gray-200">
                       No leads
@@ -181,7 +260,7 @@ export default function DirectorLeadsPage() {
 
       </div>
 
-      {/* Assign Modal */}
+      {/* Single Assign Modal */}
       <Modal
         open={assignOpen}
         onClose={() => setAssignOpen(false)}
@@ -204,8 +283,44 @@ export default function DirectorLeadsPage() {
             </span>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Select Realtor</label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Select Realtor (Territory Only)</label>
             <select value={assignTo} onChange={e => setAssignTo(e.target.value)} className={selectClass}>
+              <option value="">— Select Realtor —</option>
+              {availableRealtors.map(r => (
+                <option key={r.id} value={r.id}>{r.full_name}</option>
+              ))}
+            </select>
+            {availableRealtors.length === 0 && (
+              <p className="text-xs text-gray-400 mt-1">No active realtors in your territory yet.</p>
+            )}
+          </div>
+        </div>
+      </Modal>
+
+      {/* Bulk Assign Modal */}
+      <Modal
+        open={bulkAssignOpen}
+        onClose={() => setBulkAssignOpen(false)}
+        title={`Bulk Assign ${selectedLeads.size} Leads`}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setBulkAssignOpen(false)}>Cancel</Button>
+            <Button variant="green" onClick={handleBulkAssign} disabled={!bulkAssignTo} isLoading={bulkAssigning}>
+              Assign All {selectedLeads.size} Leads
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <div className="p-3 rounded-xl border flex items-center gap-3" style={{ background: 'rgba(212,175,55,0.06)', borderColor: 'rgba(212,175,55,0.2)' }}>
+            <HiCheckCircle className="w-5 h-5 flex-shrink-0" style={{ color: '#D4AF37' }} />
+            <div className="text-sm text-gray-700">
+              <span className="font-bold">{selectedLeads.size} leads</span> will be assigned to the selected realtor with a 180-day attribution lock applied to each.
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Assign All To (Territory Realtors)</label>
+            <select value={bulkAssignTo} onChange={e => setBulkAssignTo(e.target.value)} className={selectClass}>
               <option value="">— Select Realtor —</option>
               {availableRealtors.map(r => (
                 <option key={r.id} value={r.id}>{r.full_name}</option>
@@ -216,11 +331,13 @@ export default function DirectorLeadsPage() {
       </Modal>
 
       {/* Lead Drawer */}
-      <LeadDrawer 
-        lead={drawerLead} 
-        open={drawerOpen} 
-        onClose={() => setDrawerOpen(false)} 
+      <LeadDrawer
+        lead={drawerLead}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
         onAssign={() => openAssign(drawerLead)}
+        updateStatus={updateLeadStatus}
+        addNote={addLeadNote}
       />
     </AppLayout>
   );

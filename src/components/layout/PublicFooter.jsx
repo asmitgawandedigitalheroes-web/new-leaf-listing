@@ -52,6 +52,9 @@ const SOCIALS = [
 export default function PublicFooter() {
   return (
     <footer style={{ background: DG, color: '#fff' }}>
+      <div className="flex justify-center pt-8">
+        <div style={{ width: 1200, height: 1, background: `linear-gradient(90deg, transparent 0%, ${G} 50%, transparent 100%)`, boxShadow: `0 0 12px ${G}`, opacity: 0.8 }} />
+      </div>
 
       {/* Main grid */}
       <div className="max-w-7xl mx-auto px-6 md:px-8 pt-16 pb-10">
@@ -59,7 +62,7 @@ export default function PublicFooter() {
 
           {/* Brand column */}
           <div className="lg:col-span-1">
-            <NLVLogo mode="dark" size="sm" />
+            <NLVLogo mode="dark" size="md" />
             <p className="text-xs leading-relaxed mt-4 mb-6" style={{ color: 'rgba(255,255,255,0.45)', maxWidth: 220 }}>
               The premier digital marketplace for elite real estate professionals. Curated listings, intelligent routing, absolute discretion.
             </p>

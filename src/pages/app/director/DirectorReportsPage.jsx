@@ -51,41 +51,17 @@ export default function DirectorReportsPage() {
         const territoryId = profile?.territory_id || null;
 
         // Build filters based on director's territory
+        let realtorsQuery = supabase.from('profiles').select('id, full_name, status').eq('role', 'realtor');
+        if (territoryId) realtorsQuery = realtorsQuery.eq('territory_id', territoryId);
+
+        let leadsQuery = supabase.from('leads').select('id, status, assigned_realtor_id');
+        if (territoryId) leadsQuery = leadsQuery.eq('territory_id', territoryId);
+
         const [realtorsRes, listingsRes, leadsRes, commissionsRes] = await Promise.all([
-          supabase
-            .from('profiles')
-            .select('id, full_name, status')
-            .eq('role', 'realtor')
-            .then(res => {
-              if (territoryId) {
-                return supabase
-                  .from('profiles')
-                  .select('id, full_name, status')
-                  .eq('role', 'realtor')
-                  .eq('territory_id', territoryId);
-              }
-              return res;
-            }),
-          supabase
-            .from('listings')
-            .select('id, status, realtor_id')
-            .eq('status', 'active'),
-          supabase
-            .from('leads')
-            .select('id, status, assigned_realtor_id')
-            .then(res => {
-              if (territoryId) {
-                return supabase
-                  .from('leads')
-                  .select('id, status, assigned_realtor_id')
-                  .eq('territory_id', territoryId);
-              }
-              return res;
-            }),
-          supabase
-            .from('commissions')
-            .select('id, amount, status')
-            .in('status', ['paid', 'approved']),
+          realtorsQuery,
+          supabase.from('listings').select('id, status, realtor_id').eq('status', 'active'),
+          leadsQuery,
+          supabase.from('commissions').select('id, amount, status, recipient_user_id').in('status', ['paid', 'approved']),
         ]);
 
         const realtors = realtorsRes.data || [];
@@ -100,10 +76,8 @@ export default function DirectorReportsPage() {
         const myListings = allListings.filter(l => realtorIds.has(l.realtor_id));
 
         const allCommissions = commissionsRes.data || [];
-        const myCommissions = allCommissions.filter(c => {
-          // commissions linked via realtor — approximate with available data
-          return true;
-        });
+        // Filter commissions to those belonging to realtors in this territory
+        const myCommissions = allCommissions.filter(c => realtorIds.has(c.recipient_user_id));
 
         const convertedLeads = myLeads.filter(l => l.status === 'converted').length;
         const totalCommissionAmt = myCommissions.reduce((s, c) => s + (Number(c.amount) || 0), 0);

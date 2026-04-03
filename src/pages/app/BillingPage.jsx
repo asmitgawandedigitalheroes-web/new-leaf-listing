@@ -46,6 +46,8 @@ export default function BillingPage() {
   const [selectedPlan, setSelectedPlan] = useState('pro');
   const [upgrading, setUpgrading] = useState(false);
   const [planCatalog, setPlanCatalog] = useState(planCatalog_FALLBACK);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   // Detect Stripe redirect success/cancel
   useEffect(() => {
@@ -165,12 +167,27 @@ export default function BillingPage() {
     }
   };
 
-  const handleCancelSubscription = () => {
-    addToast({
-      type: 'warning',
-      title: 'To cancel your subscription',
-      desc: 'Please contact support at billing@nlvlistings.com',
-    });
+  const handleCancelSubscription = async () => {
+    setCancelling(true);
+    try {
+      const { error } = await supabase
+        .from('subscriptions')
+        .update({ status: 'cancelling', updated_at: new Date().toISOString() })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      addToast({
+        type: 'success',
+        title: 'Subscription cancelled',
+        desc: `Your access continues until ${nextBillingDate}. No further charges.`,
+      });
+      setCancelOpen(false);
+    } catch (err) {
+      addToast({ type: 'error', title: 'Cancellation failed', desc: 'Please contact support at billing@nlvlistings.com' });
+    } finally {
+      setCancelling(false);
+    }
   };
 
   return (
@@ -183,7 +200,7 @@ export default function BillingPage() {
         initials: (profile?.full_name || 'U').slice(0, 2).toUpperCase(),
       }}
     >
-      <div className="p-4 md:p-6 flex flex-col gap-6 max-w-4xl">
+      <div className="p-4 md:p-6 flex flex-col gap-6 max-w-4xl mx-auto">
 
         {/* Current Plan */}
         <SectionCard title="Current Plan">
@@ -220,7 +237,7 @@ export default function BillingPage() {
                 Upgrade Plan
               </Button>
               {subscription && isActive && (
-                <Button variant="outline" onClick={handleCancelSubscription}>
+                <Button variant="outline" onClick={() => setCancelOpen(true)}>
                   Cancel
                 </Button>
               )}
@@ -391,6 +408,35 @@ export default function BillingPage() {
           })}
         </div>
       </Modal>
+
+      {/* Cancel Subscription Modal */}
+      <Modal
+        open={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        title="Cancel Your Subscription?"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setCancelOpen(false)}>Keep Subscription</Button>
+            <Button
+              variant="primary"
+              onClick={handleCancelSubscription}
+              isLoading={cancelling}
+              style={{ background: '#DC2626' }}
+            >
+              Cancel Subscription
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-600 mb-3">
+          Your subscription will remain active until{' '}
+          <strong>{nextBillingDate}</strong>. After that, your listings will be deactivated.
+        </p>
+        <p className="text-xs text-gray-400">
+          You can reactivate at any time before the end date to avoid interruption.
+        </p>
+      </Modal>
+
     </AppLayout>
   );
 }

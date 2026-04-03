@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   HiUser, 
   HiSparkles, 
@@ -14,7 +14,8 @@ import {
   HiArrowRight, 
   HiArrowLeft, 
   HiCheckBadge, 
-  HiRocketLaunch 
+  HiRocketLaunch,
+  HiMapPin as HiMap
 } from 'react-icons/hi2';
 import NLVLogo from '../../components/ui/NLVLogo';
 import Button from '../../components/ui/Button';
@@ -90,8 +91,13 @@ export default function SignupPage() {
   const navigate = useNavigate();
   const { addToast } = useToast();
   const auth = useAuth();
+  const [searchParams] = useSearchParams();
+  const inviteTerritoryId = searchParams.get('territory_id') || '';
+  const inviteDirectorId  = searchParams.get('director_id') || '';
+  const isInvited = !!(inviteTerritoryId && inviteDirectorId);
+
   const [step, setStep]       = useState(0);
-  const [form, setForm]       = useState({ name: '', email: '', password: '', company: '', role: 'realtor', plan: 'pro' });
+  const [form, setForm]       = useState({ name: '', email: '', password: '', company: '', country: '', state: '', city: '', role: 'realtor', plan: 'pro' });
   const [loading, setLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [pricingPlans, setPricingPlans] = useState([]);
@@ -118,6 +124,44 @@ export default function SignupPage() {
 
   const next = async (e) => {
     e?.preventDefault();
+    // Step 0 validation — all account fields required
+    if (step === 0) {
+      if (!form.name.trim()) {
+        addToast({ type: 'error', title: 'Name required', desc: 'Please enter your full name.' });
+        return;
+      }
+      if (!form.email.trim()) {
+        addToast({ type: 'error', title: 'Email required', desc: 'Please enter your email address.' });
+        return;
+      }
+      if (!form.password || form.password.length < 8) {
+        addToast({ type: 'error', title: 'Password required', desc: 'Password must be at least 8 characters.' });
+        return;
+      }
+      if (!form.company.trim()) {
+        addToast({ type: 'error', title: 'Company required', desc: 'Please enter your company or brokerage name.' });
+        return;
+      }
+      if (!form.country.trim()) {
+        addToast({ type: 'error', title: 'Country required', desc: 'Please enter your country.' });
+        return;
+      }
+      if (!form.state.trim()) {
+        addToast({ type: 'error', title: 'State required', desc: 'Please enter your state or province.' });
+        return;
+      }
+      if (!form.city.trim()) {
+        addToast({ type: 'error', title: 'City required', desc: 'Please enter your city.' });
+        return;
+      }
+    }
+    // Step 1 validation — plan must be selected
+    if (step === 1) {
+      if (!form.plan) {
+        addToast({ type: 'error', title: 'Plan required', desc: 'Please select a subscription plan.' });
+        return;
+      }
+    }
     if (step < STEPS.length - 1) {
       setStep(s => s + 1);
     } else {
@@ -126,12 +170,21 @@ export default function SignupPage() {
         return;
       }
       setLoading(true);
-      // BUG-008: role is NOT passed to signup — AuthContext enforces 'realtor'.
+      // Pass role to signup
       const { error } = await auth.signup({
         email: form.email,
         password: form.password,
         full_name: form.name,
         company: form.company,
+        country: form.country,
+        state: form.state,
+        city: form.city,
+        role: form.role,
+        // Invite params — territory pre-assignment
+        territory_id: inviteTerritoryId || undefined,
+        invited_by_director: inviteDirectorId || undefined,
+        // Invited realtors start as pending so director can approve
+        status: isInvited ? 'pending' : undefined,
       });
       setLoading(false);
       if (error) {
@@ -139,10 +192,15 @@ export default function SignupPage() {
         return;
       }
       addToast({ type: 'success', title: 'Account created!', desc: 'Welcome to New Leaf Listings.' });
-      // HP-7: All public signups are realtors (enforced by AuthContext).
-      // Navigate directly to avoid a race condition where auth.role may still
-      // be null immediately after signup() returns.
-      navigate('/realtor/dashboard');
+      
+      // Delay navigation slightly to ensure AuthContext has processed the profile fetch
+      setTimeout(() => {
+        if (form.role === 'director') {
+          navigate('/director/dashboard');
+        } else {
+          navigate('/realtor/dashboard');
+        }
+      }, 500);
     }
   };
 
@@ -204,11 +262,27 @@ export default function SignupPage() {
               <h2 className="font-headline text-xl font-black mb-1" style={{ color: OS }}>Create your account</h2>
               <p className="text-sm mb-6" style={{ color: OSV }}>Start your 14-day free trial. No credit card required.</p>
 
+              {/* Invite banner */}
+              {isInvited && (
+                <div className="flex items-start gap-3 p-4 rounded-xl mb-5" style={{ background: '#E8F3EE', border: '1px solid rgba(31,77,58,0.2)' }}>
+                  <HiCheckBadge size={18} color={S} style={{ flexShrink: 0, marginTop: 1 }} />
+                  <div>
+                    <div className="text-[11px] font-black uppercase tracking-wider mb-0.5" style={{ color: S }}>Director Invite</div>
+                    <p className="text-xs leading-relaxed" style={{ color: '#2D5A4A' }}>
+                      You've been invited to join a territory. After signing up, you will be placed in the director's approval queue and automatically assigned to their territory.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <InputField label="Full Name"          placeholder="John Smith"           value={form.name}     onChange={update('name')}    icon={{ component: HiIdentification }} />
                 <InputField label="Company / Brokerage" placeholder="Acme Realty"         value={form.company}  onChange={update('company')} icon={{ component: HiBuildingOffice }} />
                 <InputField label="Email Address"      type="email" placeholder="john@brokerage.com" value={form.email} onChange={update('email')} icon={{ component: HiEnvelope }} />
                 <InputField label="Password"           type="password" placeholder="Min. 8 characters" value={form.password} onChange={update('password')} icon={{ component: HiLockClosed }} />
+                <InputField label="Country"            placeholder="United States"        value={form.country}  onChange={update('country')} icon={{ component: HiMap }} />
+                <InputField label="State / Province"   placeholder="Nevada"               value={form.state}    onChange={update('state')}   icon={{ component: HiMap }} />
+                <InputField label="City"               placeholder="Las Vegas"            value={form.city}     onChange={update('city')}    icon={{ component: HiMap }} />
               </div>
 
               {/* Role */}
@@ -219,6 +293,7 @@ export default function SignupPage() {
                 <div className="grid grid-cols-2 gap-3">
                   {[
                     { value: 'realtor',  label: 'Realtor',           icon: HiHomeModern },
+                    { value: 'director', label: 'Director',          icon: HiUserGroup },
                   ].map(r => (
                     <button
                       key={r.value}
@@ -342,7 +417,8 @@ export default function SignupPage() {
                   { icon: HiIdentification,   label: 'Name',    value: form.name },
                   { icon: HiEnvelope,         label: 'Email',   value: form.email },
                   { icon: HiBuildingOffice,   label: 'Company', value: form.company },
-                  { icon: HiHomeModern,       label: 'Role',    value: form.role },
+                  { icon: HiMap,              label: 'Location', value: [form.city, form.state, form.country].filter(Boolean).join(', ') || '—' },
+                  { icon: form.role === 'director' ? HiUserGroup : HiHomeModern, label: 'Role', value: form.role },
                   { icon: HiSparkles,         label: 'Plan',    value: form.plan },
                 ].map((r, i, arr) => (
                   <div

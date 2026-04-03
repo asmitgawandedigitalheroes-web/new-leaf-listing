@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import AppLayout from '../../../components/layout/AppLayout';
 import Button from '../../../components/ui/Button';
 import { useAuth } from '../../../context/AuthContext';
@@ -34,6 +35,30 @@ const defaultForm = {
   client_name: '',
 };
 
+const defaultErrors = {
+  project_name: '',
+  project_value: '',
+  client_name: '',
+};
+
+function validateReferralForm(form) {
+  const errs = { ...defaultErrors };
+  if (!form.project_name.trim() || form.project_name.trim().length < 2) {
+    errs.project_name = 'Please enter the project name (min 2 characters)';
+  }
+  if (form.project_name.trim().length > 100) {
+    errs.project_name = 'Project name must be under 100 characters';
+  }
+  if (!form.client_name.trim() || form.client_name.trim().length < 2) {
+    errs.client_name = "Please enter the client's full name";
+  }
+  const val = parseFloat(form.project_value);
+  if (!form.project_value || isNaN(val) || val <= 0) {
+    errs.project_value = 'Please enter a valid positive project value';
+  }
+  return errs;
+}
+
 function StatusBadge({ status }) {
   const cfg = {
     pending:  { bg: '#FEF9C3', color: '#854D0E', label: 'Pending' },
@@ -56,6 +81,9 @@ export default function RealtorReferralsPage() {
   const { addToast } = useToast();
 
   const [form, setForm]           = useState(defaultForm);
+  const [formErrors, setFormErrors] = useState(defaultErrors);
+  const [touched, setTouched]     = useState({});
+  const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [referrals, setReferrals] = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -70,7 +98,7 @@ export default function RealtorReferralsPage() {
       .from('commissions')
       .select('id, amount, status, created_at, metadata')
       .eq('recipient_user_id', profile.id)
-      .eq('type', 'product')
+      .eq('type', 'referral')
       .order('created_at', { ascending: false })
       .then(({ data, error }) => {
         if (error) {
@@ -82,22 +110,22 @@ export default function RealtorReferralsPage() {
       });
   }, [profile?.id, hasAccess]);
 
+  const handleBlur = (field) => {
+    setTouched(t => ({ ...t, [field]: true }));
+    const errs = validateReferralForm(form);
+    setFormErrors(errs);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.project_name.trim()) {
-      addToast({ type: 'error', title: 'Project name required' });
-      return;
-    }
-    const projectValue = parseFloat(form.project_value);
-    if (!projectValue || projectValue <= 0) {
-      addToast({ type: 'error', title: 'Invalid project value', desc: 'Enter a valid positive number.' });
-      return;
-    }
-    if (!form.client_name.trim()) {
-      addToast({ type: 'error', title: 'Client name required' });
-      return;
-    }
+    setSubmitError('');
+    // Touch all fields to show all errors
+    setTouched({ project_name: true, project_value: true, client_name: true });
+    const errs = validateReferralForm(form);
+    setFormErrors(errs);
+    if (Object.values(errs).some(v => v)) return;
 
+    const projectValue = parseFloat(form.project_value);
     setSubmitting(true);
     const commissionAmount = +(projectValue * 0.005).toFixed(2); // 0.5%
 
@@ -105,7 +133,7 @@ export default function RealtorReferralsPage() {
       .from('commissions')
       .insert({
         recipient_user_id: profile.id,
-        type: 'product',
+        type: 'referral',
         amount: commissionAmount,
         status: 'pending',
         metadata: {
@@ -120,6 +148,7 @@ export default function RealtorReferralsPage() {
 
     setSubmitting(false);
     if (error) {
+      setSubmitError(error.message || 'Submission failed. Please try again.');
       addToast({ type: 'error', title: 'Submission failed', desc: error.message });
     } else {
       addToast({
@@ -129,6 +158,9 @@ export default function RealtorReferralsPage() {
       });
       setReferrals(prev => [data, ...prev]);
       setForm(defaultForm);
+      setFormErrors(defaultErrors);
+      setTouched({});
+      setSubmitError('');
     }
   };
 
@@ -167,11 +199,11 @@ export default function RealtorReferralsPage() {
               ))}
             </ul>
           </div>
-          <a href="/realtor/billing">
+          <Link to="/realtor/billing">
             <Button size="lg">
               <HiArrowUpRight size={16} /> Upgrade Plan
             </Button>
-          </a>
+          </Link>
         </div>
       </AppLayout>
     );
@@ -179,7 +211,7 @@ export default function RealtorReferralsPage() {
 
   return (
     <AppLayout role="realtor" title="NLV Referrals">
-      <div className="p-4 md:p-6 max-w-4xl mx-auto flex flex-col gap-8">
+      <div className="p-4 md:p-6 max-w-6xl mx-auto flex flex-col gap-8">
 
         {/* Header */}
         <div>
@@ -195,19 +227,27 @@ export default function RealtorReferralsPage() {
           style={{ background: '#fff', border: `1px solid ${BORDER}`, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}
         >
           <h3 className="font-bold text-base mb-5" style={{ color: OS }}>Submit New Referral</h3>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {submitError && (
+            <div className="col-span-2 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700 mb-2">
+              {submitError}
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4" noValidate>
             <div>
               <label className={labelClass}>Project Name *</label>
               <div className="relative">
                 <HiBuildingOffice size={15} color={LGRAY} className="absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
-                  className={inputClass + ' pl-9'}
+                  className={inputClass + ' pl-9' + (touched.project_name && formErrors.project_name ? ' border-red-400' : '')}
                   placeholder="e.g. Downtown Office Renovation"
                   value={form.project_name}
-                  onChange={update('project_name')}
-                  required
+                  onChange={e => { update('project_name')(e); if (touched.project_name) { const errs = validateReferralForm({...form, project_name: e.target.value}); setFormErrors(errs); } }}
+                  onBlur={() => handleBlur('project_name')}
                 />
               </div>
+              {touched.project_name && formErrors.project_name && (
+                <p className="text-xs mt-1 text-red-500">{formErrors.project_name}</p>
+              )}
             </div>
 
             <div>
@@ -216,16 +256,17 @@ export default function RealtorReferralsPage() {
                 <HiCurrencyDollar size={15} color={LGRAY} className="absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="number"
-                  min="1"
                   step="0.01"
-                  className={inputClass + ' pl-9'}
+                  className={inputClass + ' pl-9' + (touched.project_value && formErrors.project_value ? ' border-red-400' : '')}
                   placeholder="e.g. 250000"
                   value={form.project_value}
-                  onChange={update('project_value')}
-                  required
+                  onChange={e => { update('project_value')(e); if (touched.project_value) { const errs = validateReferralForm({...form, project_value: e.target.value}); setFormErrors(errs); } }}
+                  onBlur={() => handleBlur('project_value')}
                 />
               </div>
-              {form.project_value && parseFloat(form.project_value) > 0 && (
+              {touched.project_value && formErrors.project_value ? (
+                <p className="text-xs mt-1 text-red-500">{formErrors.project_value}</p>
+              ) : form.project_value && parseFloat(form.project_value) > 0 && (
                 <p className="text-xs mt-1" style={{ color: S }}>
                   Commission: ${(parseFloat(form.project_value) * 0.005).toFixed(2)} (0.5%)
                 </p>
@@ -237,13 +278,16 @@ export default function RealtorReferralsPage() {
               <div className="relative">
                 <HiUser size={15} color={LGRAY} className="absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
-                  className={inputClass + ' pl-9'}
+                  className={inputClass + ' pl-9' + (touched.client_name && formErrors.client_name ? ' border-red-400' : '')}
                   placeholder="Client full name or company"
                   value={form.client_name}
-                  onChange={update('client_name')}
-                  required
+                  onChange={e => { update('client_name')(e); if (touched.client_name) { const errs = validateReferralForm({...form, client_name: e.target.value}); setFormErrors(errs); } }}
+                  onBlur={() => handleBlur('client_name')}
                 />
               </div>
+              {touched.client_name && formErrors.client_name && (
+                <p className="text-xs mt-1 text-red-500">{formErrors.client_name}</p>
+              )}
             </div>
 
             <div className="sm:col-span-2">
