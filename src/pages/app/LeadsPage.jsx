@@ -10,6 +10,7 @@ import Skeleton from '../../components/ui/Skeleton';
 import { useLeads } from '../../hooks/useLeads';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 
 export default function LeadsPage() {
   const { profile } = useAuth();
@@ -26,11 +27,19 @@ export default function LeadsPage() {
   const [addForm, setAddForm] = useState({ name: '', email: '', interest: 'Buying', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { leads, isLoading, reassignLead: doReassign, fetchAvailableRealtors, createInquiry } = useLeads();
+  const { leads, isLoading, reassignLead: doReassign, fetchAvailableRealtors, createInquiry, updateLeadStatus } = useLeads();
 
   const handleAddLead = async () => {
-    if (!addForm.name || !addForm.email) {
+    if (!addForm.name.trim() || !addForm.email.trim()) {
       addToast({ type: 'error', title: 'Missing info', desc: 'Name and email are required.' });
+      return;
+    }
+    if (!addForm.interest) {
+      addToast({ type: 'error', title: 'Missing info', desc: 'Please select an interest type.' });
+      return;
+    }
+    if (!addForm.message.trim()) {
+      addToast({ type: 'error', title: 'Missing info', desc: 'Please add a message or note for this lead.' });
       return;
     }
     setIsSubmitting(true);
@@ -244,9 +253,10 @@ export default function LeadsPage() {
       </div>
 
       <LeadDrawer
-        lead={selectedLead}
+        lead={leads.find(l => l.id === selectedLead?.id)}
         open={!!selectedLead}
         onClose={() => setSelectedLead(null)}
+        updateStatus={updateLeadStatus}
       />
 
       {/* Reassign Lead Modal */}
@@ -270,16 +280,17 @@ export default function LeadsPage() {
           {realtorsLoading ? (
             <div className="h-10 bg-gray-100 rounded-lg animate-pulse" />
           ) : (
-            <select
+            <SearchableSelect
               value={reassignRealtorId}
-              onChange={e => setReassignRealtorId(e.target.value)}
-              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none cursor-pointer"
-            >
-              <option value="" disabled>Select a realtor…</option>
-              {realtors.map(r => (
-                <option key={r.id} value={r.id}>{r.full_name}{r.email ? ` — ${r.email}` : ''}</option>
-              ))}
-            </select>
+              onChange={val => setReassignRealtorId(val)}
+              options={realtors.map(r => ({
+                value: r.id,
+                label: r.full_name,
+                sublabel: r.email
+              }))}
+              emptyLabel="Select a realtor…"
+              placeholder="Search realtors..."
+            />
           )}
         </div>
       </Modal>
@@ -317,18 +328,18 @@ export default function LeadsPage() {
           ))}
           <div>
             <label className="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Interest</label>
-            <select
+            <SearchableSelect
               value={addForm.interest}
-              onChange={e => setAddForm(p => ({ ...p, interest: e.target.value }))}
-              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none cursor-pointer"
-            >
-              {['Buying', 'Selling', 'Renting', 'Investment', 'General'].map(o => (
-                <option key={o} value={o}>{o}</option>
-              ))}
-            </select>
+              onChange={val => setAddForm(p => ({ ...p, interest: val }))}
+              options={['Buying', 'Selling', 'Renting', 'Investment', 'General'].map(o => ({
+                value: o,
+                label: o
+              }))}
+              placeholder="Select interest..."
+            />
           </div>
           <div>
-            <label className="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Message (optional)</label>
+            <label className="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Message *</label>
             <textarea
               rows={3}
               placeholder="Any additional notes…"

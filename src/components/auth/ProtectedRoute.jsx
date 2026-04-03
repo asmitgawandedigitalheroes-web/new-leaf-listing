@@ -101,7 +101,11 @@ function ProtectedRoute({ children, allowedRoles }) {
 
   // 3. Check role access if allowedRoles is specified
   if (allowedRoles && allowedRoles.length > 0) {
-    if (!role || !allowedRoles.includes(role)) {
+    // If user is authenticated but role hasn't resolved yet, wait for it
+    if (!role) {
+      return <LoadingSpinner />;
+    }
+    if (!allowedRoles.includes(role)) {
       return <ForbiddenPage currentRole={role} allowedRoles={allowedRoles} />;
     }
   }

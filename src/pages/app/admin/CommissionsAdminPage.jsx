@@ -149,12 +149,12 @@ export default function CommissionsAdminPage() {
       <div className="p-4 md:p-6 flex flex-col gap-6">
 
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Commissions</h2>
             <p className="text-sm text-gray-400 mt-0.5">{commissions.length} total records</p>
           </div>
-          <button onClick={refresh} title="Refresh" className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors">
+          <button onClick={refresh} title="Refresh" className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors self-start sm:self-auto">
             <HiArrowPath size={16} className="text-gray-500" />
           </button>
         </div>
@@ -165,20 +165,20 @@ export default function CommissionsAdminPage() {
         </div>
 
         {/* Filters + Bulk */}
-        <div className="flex flex-wrap items-center gap-3 justify-between">
-          <div className="flex flex-wrap gap-3">
-            <select value={filterType} onChange={e => setFilterType(e.target.value)} className={selectClass}>
+        <div className="flex flex-wrap items-start gap-3 justify-between">
+          <div className="flex flex-wrap gap-3 flex-1 min-w-0">
+            <select value={filterType} onChange={e => setFilterType(e.target.value)} className={selectClass + ' flex-1 min-w-[120px]'}>
               <option value="all">All Types</option>
               <option value="subscription">Subscription</option>
               <option value="listing">Listing</option>
               <option value="deal">Deal</option>
               <option value="referral">Referral</option>
             </select>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={selectClass}>
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={selectClass + ' flex-1 min-w-[120px]'}>
               <option value="all">All Statuses</option>
               <option>pending</option><option>approved</option><option>payable</option><option>paid</option><option>rejected</option>
             </select>
-            <select value={filterUser} onChange={e => setFilterUser(e.target.value)} className={selectClass}>
+            <select value={filterUser} onChange={e => setFilterUser(e.target.value)} className={selectClass + ' flex-1 min-w-[130px]'}>
               <option value="all">All Recipients</option>
               {recipients.filter(r => r !== 'all').map(r => <option key={r}>{r}</option>)}
             </select>

@@ -231,7 +231,7 @@ export const crmService = {
 
     // Audit the sync
     await auditService.log(
-      'system',
+      null,
       'lead.assigned',
       'crm_sync',
       leadId,
@@ -267,7 +267,7 @@ export const crmService = {
     const result = await postWebhook(config, payload, provider);
 
     await auditService.log(
-      'system',
+      null,
       'lead.status_changed',
       'crm_sync',
       leadId,
@@ -341,7 +341,7 @@ export const crmService = {
             .eq('id', leadId);
 
           await auditService.log(
-            'system',
+            null,
             'lead.status_changed',
             'lead',
             leadId,
@@ -364,7 +364,7 @@ export const crmService = {
             .eq('id', leadId);
 
           await auditService.log(
-            'system',
+            null,
             'lead.converted',
             'lead',
             leadId,

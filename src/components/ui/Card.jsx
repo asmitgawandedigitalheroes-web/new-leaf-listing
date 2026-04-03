@@ -45,11 +45,11 @@ export function SectionCard({ title, action, children, footer, noPadding = false
     <Card className={`overflow-hidden ${className}`}>
       {title && (
         <div
-          className="flex items-center justify-between px-6 py-5"
+          className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 sm:py-5"
           style={{ borderBottom: '1px solid #F9FAFB' }}
         >
           <h3 className="font-bold text-[15px] tracking-tight text-gray-900">{title}</h3>
-          {action && <div className="flex items-center">{action}</div>}
+          {action && <div className="flex items-center flex-shrink-0">{action}</div>}
         </div>
       )}
       <div className={noPadding ? '' : ''}>{children}</div>

@@ -44,6 +44,9 @@ const SOCIALS = [
 export default function Footer() {
   return (
     <footer style={{ background: DG, color: '#fff' }}>
+      <div className="flex justify-center pt-8">
+        <div style={{ width: 1200, height: 1, background: `linear-gradient(90deg, transparent 0%, ${G} 50%, transparent 100%)`, boxShadow: `0 0 12px ${G}`, opacity: 0.8 }} />
+      </div>
 
       {/* Main grid */}
       <div className="max-w-7xl mx-auto px-6 md:px-8 pt-16 pb-10">

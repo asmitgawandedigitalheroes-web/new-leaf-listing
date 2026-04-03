@@ -36,7 +36,7 @@ export function usePublicListings(filters = {}) {
           realtor:profiles!listings_realtor_id_fkey(full_name, email, avatar_url),
           territory:territories(city, state)
         `)
-        .in('status', ['active', 'under_contract']);
+        .in('status', ['active', 'under_contract', 'sold']);
 
       if (filters.search) {
         // Search title, city, or address

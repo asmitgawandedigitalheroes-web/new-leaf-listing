@@ -9,7 +9,11 @@ import {
   HiUser,
   HiMagnifyingGlass,
   HiInbox,
+  HiUserCircle,
 } from 'react-icons/hi2';
+import Badge from '../../../components/ui/Badge';
+import LeadDrawer from '../../../components/shared/LeadDrawer';
+import { useLeads } from '../../../hooks/useLeads';
 
 const P     = '#D4AF37';
 const S     = '#1F4D3A';
@@ -29,47 +33,30 @@ export default function RealtorMessagesPage() {
   const { profile } = useAuth();
   const { addToast } = useToast();
 
-  const [leads, setLeads]           = useState([]);
   const [selectedLead, setSelectedLead] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [messages, setMessages]     = useState([]);
   const [newMsg, setNewMsg]         = useState('');
   const [sending, setSending]       = useState(false);
-  const [loadingLeads, setLoadingLeads] = useState(true);
+  const { leads, updateLeadStatus, addLeadNote, isLoading: loadingLeads } = useLeads();
   const [loadingMsgs, setLoadingMsgs]  = useState(false);
   const [search, setSearch]         = useState('');
   const bottomRef = useRef(null);
 
-  // Fetch leads assigned to this realtor
-  useEffect(() => {
-    if (!profile?.id) return;
-    setLoadingLeads(true);
-    supabase
-      .from('leads')
-      .select('id, name, email, status, created_at')
-      .eq('realtor_id', profile.id)
-      .order('created_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (error) {
-          addToast({ type: 'error', title: 'Failed to load leads', desc: error.message });
-        } else {
-          setLeads(data || []);
-        }
-        setLoadingLeads(false);
-      });
-  }, [profile?.id]);
+  // useLeads handles fetching automatically
 
   // Fetch messages for selected lead
   useEffect(() => {
     if (!selectedLead) { setMessages([]); return; }
     setLoadingMsgs(true);
     supabase
-      .from('lead_messages')
-      .select('id, sender_id, content, created_at')
+      .from('messages')
+      .select('id, sender_id, recipient_id, content, created_at')
       .eq('lead_id', selectedLead.id)
       .order('created_at', { ascending: true })
       .then(({ data, error }) => {
         if (error) {
-          console.warn('[RealtorMessages] lead_messages table may not exist:', error.message);
+          console.warn('[RealtorMessages] messages fetch error:', error.message);
           setMessages([]);
         } else {
           setMessages(data || []);
@@ -85,14 +72,19 @@ export default function RealtorMessagesPage() {
 
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!newMsg.trim() || !selectedLead) return;
+    if (!selectedLead) return;
+    if (!newMsg.trim()) {
+      addToast({ type: 'error', title: 'Empty message', desc: 'Please type a message before sending.' });
+      return;
+    }
     setSending(true);
     const { data, error } = await supabase
-      .from('lead_messages')
+      .from('messages')
       .insert({
-        lead_id:   selectedLead.id,
-        sender_id: profile.id,
-        content:   newMsg.trim(),
+        lead_id:      selectedLead.id,
+        sender_id:    profile.id,
+        recipient_id: selectedLead.assigned_director_id || null,
+        content:      newMsg.trim(),
       })
       .select()
       .single();
@@ -106,8 +98,8 @@ export default function RealtorMessagesPage() {
   };
 
   const filteredLeads = leads.filter(l =>
-    l.name?.toLowerCase().includes(search.toLowerCase()) ||
-    l.email?.toLowerCase().includes(search.toLowerCase())
+    l.contact_name?.toLowerCase().includes(search.toLowerCase()) ||
+    l.contact_email?.toLowerCase().includes(search.toLowerCase())
   );
 
   const statusColor = (s) => ({
@@ -118,7 +110,8 @@ export default function RealtorMessagesPage() {
 
   return (
     <AppLayout role="realtor" title="Messages">
-      <div className="flex h-[calc(100vh-64px)]" style={{ background: '#F9FAFB' }}>
+      <div className="p-4 md:p-6 max-w-6xl mx-auto h-[calc(100vh-80px)]">
+        <div className="flex bg-white rounded-2xl overflow-hidden h-full shadow-xl border border-gray-100">
 
         {/* ── Left: Lead list ── */}
         <div
@@ -169,19 +162,14 @@ export default function RealtorMessagesPage() {
                     className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 text-white"
                     style={{ background: `linear-gradient(135deg, ${P}, ${S})` }}
                   >
-                    {getInitials(lead.name)}
+                    {getInitials(lead.contact_name)}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-1 mb-0.5">
-                      <span className="text-sm font-semibold truncate" style={{ color: OS }}>{lead.name || 'Unknown'}</span>
-                      <span
-                        className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full flex-shrink-0"
-                        style={{ background: sc.bg, color: sc.color }}
-                      >
-                        {lead.status}
-                      </span>
+                      <span className="text-sm font-semibold truncate" style={{ color: OS }}>{lead.contact_name || 'Unknown'}</span>
+                      <Badge status={lead.status} label={lead.status} />
                     </div>
-                    <p className="text-xs truncate" style={{ color: LGRAY }}>{lead.email}</p>
+                    <p className="text-xs truncate" style={{ color: LGRAY }}>{lead.contact_email}</p>
                   </div>
                 </button>
               );
@@ -208,19 +196,29 @@ export default function RealtorMessagesPage() {
             <>
               {/* Header */}
               <div
-                className="flex items-center gap-4 px-6 py-4"
+                className="flex items-center justify-between px-6 py-4"
                 style={{ borderBottom: `1px solid ${BORDER}`, background: '#fff' }}
               >
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                  style={{ background: `linear-gradient(135deg, ${P}, ${S})` }}
+                <div className="flex items-center gap-4">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm"
+                    style={{ background: `linear-gradient(135deg, ${P}, ${S})` }}
+                  >
+                    {getInitials(selectedLead.contact_name)}
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm" style={{ color: OS }}>{selectedLead.contact_name}</p>
+                    <p className="text-xs" style={{ color: LGRAY }}>{selectedLead.contact_email}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setDrawerOpen(true)}
+                  className="flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all hover:bg-gray-50 border border-gray-100 shadow-sm"
+                  style={{ color: S }}
                 >
-                  {getInitials(selectedLead.name)}
-                </div>
-                <div>
-                  <p className="font-bold text-sm" style={{ color: OS }}>{selectedLead.name}</p>
-                  <p className="text-xs" style={{ color: LGRAY }}>{selectedLead.email}</p>
-                </div>
+                  <HiUserCircle size={16} />
+                  View Profile
+                </button>
               </div>
 
               {/* Messages */}
@@ -292,7 +290,16 @@ export default function RealtorMessagesPage() {
             </>
           )}
         </div>
+        </div>
       </div>
+
+      <LeadDrawer 
+        lead={leads.find(l => l.id === selectedLead?.id)} 
+        open={drawerOpen} 
+        onClose={() => setDrawerOpen(false)} 
+        updateStatus={updateLeadStatus}
+        addNote={addLeadNote}
+      />
     </AppLayout>
   );
 }

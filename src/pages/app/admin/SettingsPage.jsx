@@ -163,7 +163,7 @@ export default function SettingsPage() {
 
   return (
     <AppLayout role="admin">
-      <div style={{ padding: '28px 32px', minHeight: '100vh', background: SURF }}>
+      <div style={{ padding: 'clamp(16px, 4vw, 32px)', minHeight: '100vh', background: SURF }}>
 
         <div className="flex items-center justify-between mb-6">
           <div>

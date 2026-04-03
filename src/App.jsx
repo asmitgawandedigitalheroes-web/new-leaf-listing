@@ -46,12 +46,17 @@ import AuditLogPage         from './pages/app/admin/AuditLogPage';
 import UsersPage            from './pages/app/admin/UsersPage';
 import SettingsPage         from './pages/app/admin/SettingsPage';
 import AdminPricingPage     from './pages/app/admin/PricingPage';
+import EnquiriesPage        from './pages/app/admin/EnquiriesPage';
+import DisputesPage         from './pages/app/admin/DisputesPage';
+import PayoutsPage          from './pages/app/admin/PayoutsPage';
 
 // ── Director pages ────────────────────────────────────────────────
+import DirectorListingsPage     from './pages/app/director/DirectorListingsPage';
 import DirectorLeadsPage       from './pages/app/director/DirectorLeadsPage';
 import DirectorRealtorsPage    from './pages/app/director/DirectorRealtorsPage';
 import DirectorCommissionsPage from './pages/app/director/DirectorCommissionsPage';
 import DirectorReportsPage     from './pages/app/director/DirectorReportsPage';
+import DirectorContractsPage   from './pages/app/director/DirectorContractsPage';
 
 // ── Realtor pages ─────────────────────────────────────────────────
 import RealtorListingsPage    from './pages/app/realtor/RealtorListingsPage';
@@ -111,6 +116,11 @@ export default function App() {
                 <LeadsPage />
               </ProtectedRoute>
             } />
+            <Route path="/admin/enquiries" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <EnquiriesPage />
+              </ProtectedRoute>
+            } />
             <Route path="/admin/territories" element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <TerritoriesPage />
@@ -135,6 +145,16 @@ export default function App() {
             <Route path="/admin/audit-log" element={<Navigate to="/admin/audit" replace />} />
             {/* H-3 fix: redirect /admin/commissions to the correct route */}
             <Route path="/admin/commissions" element={<Navigate to="/admin/commissions-admin" replace />} />
+            <Route path="/admin/disputes" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <DisputesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/payouts" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <PayoutsPage />
+              </ProtectedRoute>
+            } />
             <Route path="/admin/settings" element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <SettingsPage />
@@ -157,6 +177,11 @@ export default function App() {
                 <DirectorDashboard />
               </ProtectedRoute>
             } />
+            <Route path="/director/listings" element={
+              <ProtectedRoute allowedRoles={['admin', 'director']}>
+                <DirectorListingsPage />
+              </ProtectedRoute>
+            } />
             <Route path="/director/leads" element={
               <ProtectedRoute allowedRoles={['admin', 'director']}>
                 <DirectorLeadsPage />
@@ -175,6 +200,11 @@ export default function App() {
             <Route path="/director/reports" element={
               <ProtectedRoute allowedRoles={['admin', 'director']}>
                 <DirectorReportsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/director/contracts" element={
+              <ProtectedRoute allowedRoles={['admin', 'director']}>
+                <DirectorContractsPage />
               </ProtectedRoute>
             } />
 

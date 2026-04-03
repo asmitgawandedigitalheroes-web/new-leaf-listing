@@ -17,7 +17,7 @@ const PLAN_STYLES = {
 export default function RealtorProfilePage() {
   const { profile, subscription, updateProfile, isLoading: authLoading } = useAuth();
   const { addToast } = useToast();
-  const [form, setForm] = useState({ full_name: '', phone: '' });
+  const [form, setForm] = useState({ full_name: '', phone: '', company: '', city: '', state: '', license_number: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [referralCopied, setReferralCopied] = useState(false);
@@ -28,11 +28,23 @@ export default function RealtorProfilePage() {
       setForm({
         full_name: profile.full_name || '',
         phone: profile.phone || '',
+        company: profile.company || '',
+        city: profile.city || '',
+        state: profile.state || '',
+        license_number: profile.license_number || '',
       });
     }
   }, [profile]);
 
   const handleSave = async () => {
+    if (!form.full_name.trim()) {
+      addToast({ type: 'error', title: 'Name required', desc: 'Please enter your full name.' });
+      return;
+    }
+    if (!form.phone.trim()) {
+      addToast({ type: 'error', title: 'Phone required', desc: 'Please enter your phone number.' });
+      return;
+    }
     setIsSaving(true);
     const { error } = await updateProfile(form);
     setIsSaving(false);
@@ -45,7 +57,14 @@ export default function RealtorProfilePage() {
   };
 
   const handleReset = () => {
-    if (profile) setForm({ full_name: profile.full_name || '', phone: profile.phone || '' });
+    if (profile) setForm({ 
+      full_name: profile.full_name || '', 
+      phone: profile.phone || '',
+      company: profile.company || '',
+      city: profile.city || '',
+      state: profile.state || '',
+      license_number: profile.license_number || '',
+    });
   };
 
   const initials = profile?.full_name
@@ -59,8 +78,8 @@ export default function RealtorProfilePage() {
 
   const referralCode = profile?.full_name
     ? profile.full_name.toUpperCase().replace(/\s+/g, '_').slice(0, 20)
-    : 'MY_REF';
-  const referralLink = `https://nlvlistings.com/join?ref=${referralCode}`;
+    : (profile?.id?.slice(0, 8) || 'MY_REF');
+  const referralLink = `${window.location.origin}/join?ref=${referralCode}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(referralLink).catch(() => {});
@@ -73,7 +92,7 @@ export default function RealtorProfilePage() {
 
   return (
     <AppLayout role="realtor" title="My Profile">
-      <div className="p-4 md:p-6 flex flex-col gap-6 max-w-3xl">
+      <div className="p-4 md:p-6 flex flex-col gap-6 max-w-3xl mx-auto">
 
         {/* Profile Photo + Basic Info */}
         <SectionCard title="Profile">
@@ -151,12 +170,48 @@ export default function RealtorProfilePage() {
                     />
                   </div>
                   <div>
-                    <label className={labelClass}>Territory</label>
+                    <label className={labelClass}>Company / Brokerage</label>
                     <input
-                      value={profile?.territory || 'Not assigned'}
-                      readOnly
-                      className={inputClass + ' bg-gray-50 cursor-not-allowed text-gray-400'}
+                      value={form.company}
+                      onChange={e => setForm(f => ({ ...f, company: e.target.value }))}
+                      className={inputClass}
+                      placeholder="e.g. Century 21"
                     />
+                  </div>
+                  <div>
+                    <label className={labelClass}>City</label>
+                    <input
+                      value={form.city}
+                      onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
+                      className={inputClass}
+                      placeholder="City"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>State</label>
+                    <input
+                      value={form.state}
+                      onChange={e => setForm(f => ({ ...f, state: e.target.value }))}
+                      className={inputClass}
+                      placeholder="State"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>License Number</label>
+                    <input
+                      value={form.license_number}
+                      onChange={e => setForm(f => ({ ...f, license_number: e.target.value }))}
+                      className={inputClass}
+                      placeholder="e.g. RE-123456"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Territory</label>
+                    <div className={inputClass + ' bg-gray-50 text-gray-700 flex items-center min-h-[38px]'}>
+                      {profile?.territory 
+                        ? `${profile.territory.city}, ${profile.territory.state}` 
+                        : (profile?.city || 'Not assigned')}
+                    </div>
                     <p className="text-[11px] text-gray-400 mt-1">Set by your Director. Contact them to change.</p>
                   </div>
                 </>

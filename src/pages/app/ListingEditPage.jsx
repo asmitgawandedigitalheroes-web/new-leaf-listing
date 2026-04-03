@@ -63,8 +63,32 @@ export default function ListingEditPage() {
       addToast({ type: 'error', title: 'Invalid price', desc: 'Listing price must be at least $1,000.' });
       return;
     }
-    if (!form.city) {
-      addToast({ type: 'error', title: 'Missing city', desc: 'Please specify the city for this listing.' });
+    if (!form.description || form.description.trim().length < 10) {
+      addToast({ type: 'error', title: 'Description required', desc: 'Please add a description (at least 10 characters).' });
+      return;
+    }
+    if (!form.bedrooms || Number(form.bedrooms) < 1) {
+      addToast({ type: 'error', title: 'Bedrooms required', desc: 'Please enter the number of bedrooms.' });
+      return;
+    }
+    if (!form.bathrooms || Number(form.bathrooms) < 1) {
+      addToast({ type: 'error', title: 'Bathrooms required', desc: 'Please enter the number of bathrooms.' });
+      return;
+    }
+    if (!form.sqft || Number(form.sqft) < 1) {
+      addToast({ type: 'error', title: 'Square footage required', desc: 'Please enter the property square footage.' });
+      return;
+    }
+    if (!form.state || !form.state.trim()) {
+      addToast({ type: 'error', title: 'State required', desc: 'Please specify the state for this listing.' });
+      return;
+    }
+    if (!form.city || !form.city.trim()) {
+      addToast({ type: 'error', title: 'City required', desc: 'Please specify the city for this listing.' });
+      return;
+    }
+    if (!form.address || !form.address.trim()) {
+      addToast({ type: 'error', title: 'Address required', desc: 'Please enter the property address.' });
       return;
     }
 

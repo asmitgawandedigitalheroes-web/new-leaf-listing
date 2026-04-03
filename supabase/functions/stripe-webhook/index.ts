@@ -6,10 +6,10 @@ const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
   httpClient: Stripe.createFetchHttpClient(),
 });
 
-const supabaseAdmin = createClient(
-  Deno.env.get("SUPABASE_URL") || "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
-);
+const url = Deno.env.get("SUPABASE_URL") || "";
+const serviceKey = Deno.env.get("ADMIN_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+const supabaseAdmin = createClient(url, serviceKey);
 
 // Removed PLAN_AMOUNTS hardcoded constant. Payment amounts now come exclusively
 // from session.amount_total (what Stripe actually charged), so price changes in
@@ -161,17 +161,22 @@ serve(async (req: Request) => {
         const planKey = meta.planKey;
 
         if (userId) {
+          // When subscription has a trial, Stripe fires checkout.session.completed
+          // with amount_total = 0 and subscription status = "trialing".
+          // We store "trialing" now; the invoice.paid event flips it to "active"
+          // when the trial ends and the first real charge succeeds.
+          const hasTrialPeriod = session.amount_total === 0 && !!session.subscription;
+          const subStatus = hasTrialPeriod ? "trialing" : "active";
+
           // BUG-001: Use upsert with onConflict='user_id' so that concurrent
           // webhook retries produce exactly one active subscription row.
-          // The DB partial unique index (uq_subscriptions_user_active) enforces this
-          // at the storage layer even if two requests race past this point.
           const { error: subError } = await supabaseAdmin
             .from("subscriptions")
             .upsert(
               {
                 user_id: userId,
                 plan: planKey || "starter",
-                status: "active",
+                status: subStatus,
                 stripe_customer_id: session.customer as string,
                 stripe_subscription_id: session.subscription as string,
                 updated_at: new Date().toISOString(),
@@ -181,10 +186,13 @@ serve(async (req: Request) => {
 
           if (subError) console.error(`[Webhook Sub Update Error] ${subError.message}`);
 
-          // Activate profile
+          // Activate profile and stamp verified_at.
+          // For admin-invited users the profile starts at status="pending"; this
+          // is the single moment we flip them to active (trial counts as active access).
+          const now = new Date().toISOString();
           await supabaseAdmin
             .from("profiles")
-            .update({ status: "active" })
+            .update({ status: "active", verified_at: now })
             .eq("id", userId);
 
           // Record the checkout payment and trigger commission processing.
@@ -228,7 +236,7 @@ serve(async (req: Request) => {
       }
 
       case "invoice.paid": {
-        const invoice = event.data.object as any;
+        const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
         const subscriptionId = typeof invoice.subscription === "string"
           ? invoice.subscription
@@ -309,14 +317,14 @@ serve(async (req: Request) => {
           .from("subscriptions")
           .update({
             status: subscription.status === "active" ? "active" : "past_due",
-            current_period_end: new Date((subscription as any).current_period_end * 1000).toISOString(),
+            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
           })
           .eq("stripe_subscription_id", subscription.id);
         break;
       }
 
       case "invoice.payment_failed": {
-        const failedInvoice = event.data.object as any;
+        const failedInvoice = event.data.object as Stripe.Invoice;
         const failedCustomerId = failedInvoice.customer as string;
 
         // Look up the subscription by Stripe customer ID

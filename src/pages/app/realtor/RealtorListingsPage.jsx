@@ -7,13 +7,13 @@ import { useAuth } from '../../../context/AuthContext';
 import { useListings } from '../../../hooks/useListings';
 import { useToast } from '../../../context/ToastContext';
 import { supabase } from '../../../lib/supabase';
-import { HiPhoto, HiHome, HiExclamationCircle, HiArrowUpTray, HiXMark } from 'react-icons/hi2';
+import { HiPhoto, HiHome, HiExclamationCircle, HiArrowUpTray, HiXMark, HiTableCells, HiSquares2X2 } from 'react-icons/hi2';
 
 // Upgrade tier display config — prices come from listing_prices table
 const TIER_META = {
   standard: { label: 'Standard',  desc: 'Basic listing visibility', color: '#4B5563', bg: '#F3F4F6' },
-  featured: { label: 'Featured',  desc: 'Higher search ranking + Featured badge', color: '#B8962E', bg: 'rgba(212,175,55,0.12)' },
-  top:      { label: 'Top',       desc: 'Top of search + Homepage spotlight', color: '#5B21B6', bg: '#EDE9FE' },
+  featured: { label: 'Featured',  desc: 'Higher search ranking + Featured badge', color: '#FFFFFF', bg: 'linear-gradient(135deg, #D4AF37 0%, #B8962E 100%)' },
+  top:      { label: 'Top',       desc: 'Top of search + Homepage spotlight', color: '#FFFFFF', bg: 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)' },
 };
 
 const STATUS_TABS = ['all', 'draft', 'pending', 'active', 'rejected', 'sold'];
@@ -46,8 +46,17 @@ export default function RealtorListingsPage() {
   const [selectedTier, setSelectedTier]   = useState('featured');
   const [rejectReason, setRejectReason]   = useState('');
   const [uploading, setUploading]         = useState(false);
+  const [deleteTarget, setDeleteTarget]   = useState(null);
+  const [isDeleting, setIsDeleting]       = useState(false);
+  const [viewMode, setViewMode]           = useState(() => localStorage.getItem('listings_view') || 'card');
+  const [sortField, setSortField]         = useState('created_at');
+  const [sortDir, setSortDir]             = useState('desc');
+  const [filterType, setFilterType]       = useState('');
+  const [filterListingType, setFilterListingType] = useState('');
+  const [filterSearch, setFilterSearch]   = useState('');
+  const [formFieldErrors, setFormFieldErrors] = useState({});
 
-  const { listings: allListings, createListing, updateListing, submitForApproval, isLoading } = useListings({
+  const { listings: allListings, createListing, updateListing, deleteListing, submitForApproval, isLoading } = useListings({
     // Fetch all listings for this realtor to calculate global counts accurately
   });
 
@@ -62,6 +71,22 @@ export default function RealtorListingsPage() {
       });
   }, []);
 
+  // Deep-linking: Handle ?edit={id} from dashboard
+  useEffect(() => {
+    if (isLoading || !allListings.length) return;
+    const params = new URLSearchParams(window.location.search);
+    const editId = params.get('edit');
+    if (editId) {
+      const listing = allListings.find(l => l.id === editId);
+      if (listing) {
+        openEdit(listing);
+        // Clean up URL to prevent re-opening on manual refresh
+        const newUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [isLoading, allListings]);
+
   const tabCounts = useMemo(() => {
     return {
       all:      allListings.length,
@@ -74,9 +99,12 @@ export default function RealtorListingsPage() {
   }, [allListings]);
 
   const filteredListings = useMemo(() => {
-    if (activeTab === 'all') return allListings;
-    return allListings.filter(l => l.status === activeTab);
-  }, [allListings, activeTab]);
+    let list = activeTab === 'all' ? allListings : allListings.filter(l => l.status === activeTab);
+    if (filterType) list = list.filter(l => l.property_type === filterType);
+    if (filterListingType) list = list.filter(l => l.listing_type === filterListingType);
+    if (filterSearch) list = list.filter(l => l.title?.toLowerCase().includes(filterSearch.toLowerCase()));
+    return list;
+  }, [allListings, activeTab, filterType, filterListingType, filterSearch]);
 
   // ── Edit handlers ────────────────────────────────────────────────────────────
 
@@ -105,12 +133,36 @@ export default function RealtorListingsPage() {
       addToast({ type: 'error', title: 'Invalid title', desc: 'Title must be at least 10 characters long.' });
       return;
     }
+    if (!editForm.description?.trim()) {
+      addToast({ type: 'error', title: 'Missing description', desc: 'Please add a description for this listing.' });
+      return;
+    }
     if (Number(editForm.price) < 1000) {
       addToast({ type: 'error', title: 'Invalid price', desc: 'Listing price must be at least $1,000.' });
       return;
     }
-    if (!editForm.city) {
+    if (!editForm.bedrooms || Number(editForm.bedrooms) < 1) {
+      addToast({ type: 'error', title: 'Missing bedrooms', desc: 'Please specify the number of bedrooms.' });
+      return;
+    }
+    if (!editForm.bathrooms || Number(editForm.bathrooms) < 1) {
+      addToast({ type: 'error', title: 'Missing bathrooms', desc: 'Please specify the number of bathrooms.' });
+      return;
+    }
+    if (!editForm.sqft || Number(editForm.sqft) < 1) {
+      addToast({ type: 'error', title: 'Missing sqft', desc: 'Please specify the square footage.' });
+      return;
+    }
+    if (!editForm.state?.trim()) {
+      addToast({ type: 'error', title: 'Missing state', desc: 'Please specify the state.' });
+      return;
+    }
+    if (!editForm.city?.trim()) {
       addToast({ type: 'error', title: 'Missing city', desc: 'Please specify the city for this listing.' });
+      return;
+    }
+    if (!editForm.address?.trim()) {
+      addToast({ type: 'error', title: 'Missing address', desc: 'Please specify the street address.' });
       return;
     }
 
@@ -128,6 +180,19 @@ export default function RealtorListingsPage() {
     } else {
       addToast({ type: 'error', title: 'Update failed', desc: error.message });
     }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    const { error } = await deleteListing(deleteTarget.id);
+    setIsDeleting(false);
+    if (!error) {
+      addToast({ type: 'success', title: 'Listing deleted successfully' });
+    } else {
+      addToast({ type: 'error', title: 'Delete failed', desc: error.message });
+    }
+    setDeleteTarget(null);
   };
 
   // ── Submit for Approval ──────────────────────────────────────────────────────
@@ -206,25 +271,42 @@ export default function RealtorListingsPage() {
 
   // ── Create listing ───────────────────────────────────────────────────────────
 
-  const resetCreate = () => { setStep(0); setForm(defaultForm); };
+  const resetCreate = () => { setStep(0); setForm(defaultForm); setFormFieldErrors({}); };
   const closeCreate = () => { setCreateOpen(false); resetCreate(); };
+
+  const validateCreateStep = (currentStep, f) => {
+    const errs = {};
+    if (currentStep === 0) {
+      if (!f.title || f.title.trim().length < 3) errs.title = 'Title must be at least 3 characters';
+      if (f.title && f.title.length > 100) errs.title = 'Title must be under 100 characters';
+      if (!f.description || f.description.trim().length < 50) errs.description = 'Description must be at least 50 characters';
+      if (!f.price || Number(f.price) <= 0) errs.price = 'Price must be greater than $0';
+      if (!f.property_type) errs.property_type = 'Property type is required';
+    }
+    if (currentStep === 1) {
+      if (!f.address || !f.address.trim()) errs.address = 'Address is required';
+      if (!f.city || !f.city.trim()) errs.city = 'City is required';
+      if (!f.state || !f.state.trim()) errs.state = 'State is required';
+      if (!f.country) errs.country = 'Country is required';
+    }
+    return errs;
+  };
+
   const handleCreate = async () => {
     setIsSubmitting(true);
-    if (!form.title || form.title.length < 10) {
-      addToast({ type: 'error', title: 'Invalid title', desc: 'Title must be at least 10 characters long.' });
+    // Run full validation
+    const allErrs = { ...validateCreateStep(0, form), ...validateCreateStep(1, form) };
+    if (Object.keys(allErrs).length > 0) {
+      setFormFieldErrors(allErrs);
+      // Navigate to first step with error
+      const step0Keys = ['title','description','price','property_type'];
+      const hasStep0Err = step0Keys.some(k => allErrs[k]);
+      if (hasStep0Err) setStep(0); else setStep(1);
+      addToast({ type: 'error', title: 'Please fix the errors below' });
       setIsSubmitting(false);
       return;
     }
-    if (Number(form.price) < 1000) {
-      addToast({ type: 'error', title: 'Invalid price', desc: 'Listing price must be at least $1,000.' });
-      setIsSubmitting(false);
-      return;
-    }
-    if (!form.city) {
-      addToast({ type: 'error', title: 'Missing city', desc: 'Please specify the city for this listing.' });
-      setIsSubmitting(false);
-      return;
-    }
+    setFormFieldErrors({});
 
     // HP-5: Auto-assign territory_id based on city + state
     let territory_id = null;
@@ -316,19 +398,22 @@ export default function RealtorListingsPage() {
         <div className="flex flex-col gap-4">
           <div>
             <label className={labelClass}>Title *</label>
-            <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className={inputClass} placeholder="e.g. 3BR Modern Home in Silver Lake" />
+            <input value={form.title} onChange={e => { setForm(f => ({ ...f, title: e.target.value })); setFormFieldErrors(fe => ({ ...fe, title: '' })); }} className={inputClass + (formFieldErrors.title ? ' border-red-400' : '')} placeholder="e.g. 3BR Modern Home in Silver Lake" />
+            {formFieldErrors.title && <p className="text-xs mt-1 text-red-500">{formFieldErrors.title}</p>}
           </div>
           <div>
-            <label className={labelClass}>Description</label>
-            <textarea rows={2} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className={inputClass + ' resize-none'} placeholder="Describe the property..." />
+            <label className={labelClass}>Description *</label>
+            <textarea rows={2} value={form.description} onChange={e => { setForm(f => ({ ...f, description: e.target.value })); setFormFieldErrors(fe => ({ ...fe, description: '' })); }} className={inputClass + ' resize-none' + (formFieldErrors.description ? ' border-red-400' : '')} placeholder="Describe the property (min 50 characters)..." />
+            {formFieldErrors.description && <p className="text-xs mt-1 text-red-500">{formFieldErrors.description}</p>}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Price ($) *</label>
-              <input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} className={inputClass} placeholder="500000" />
+              <input type="number" value={form.price} onChange={e => { setForm(f => ({ ...f, price: e.target.value })); setFormFieldErrors(fe => ({ ...fe, price: '' })); }} className={inputClass + (formFieldErrors.price ? ' border-red-400' : '')} placeholder="500000" />
+              {formFieldErrors.price && <p className="text-xs mt-1 text-red-500">{formFieldErrors.price}</p>}
             </div>
             <div>
-              <label className={labelClass}>Property Type</label>
+              <label className={labelClass}>Property Type *</label>
               <select value={form.property_type} onChange={e => setForm(f => ({ ...f, property_type: e.target.value }))} className={inputClass}>
                 {['House', 'Condo', 'Townhouse', 'Land', 'Commercial'].map(t => <option key={t}>{t}</option>)}
               </select>
@@ -353,24 +438,27 @@ export default function RealtorListingsPage() {
       case 1: return (
         <div className="flex flex-col gap-4">
           <div>
-            <label className={labelClass}>Country</label>
+            <label className={labelClass}>Country *</label>
             <select value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))} className={inputClass}>
               <option>USA</option><option>Canada</option><option>UK</option><option>Australia</option>
             </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>State</label>
-              <input value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value }))} className={inputClass} placeholder="California" />
+              <label className={labelClass}>State *</label>
+              <input value={form.state} onChange={e => { setForm(f => ({ ...f, state: e.target.value })); setFormFieldErrors(fe => ({ ...fe, state: '' })); }} className={inputClass + (formFieldErrors.state ? ' border-red-400' : '')} placeholder="California" />
+              {formFieldErrors.state && <p className="text-xs mt-1 text-red-500">{formFieldErrors.state}</p>}
             </div>
             <div>
               <label className={labelClass}>City *</label>
-              <input value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} className={inputClass} placeholder="Los Angeles" />
+              <input value={form.city} onChange={e => { setForm(f => ({ ...f, city: e.target.value })); setFormFieldErrors(fe => ({ ...fe, city: '' })); }} className={inputClass + (formFieldErrors.city ? ' border-red-400' : '')} placeholder="Los Angeles" />
+              {formFieldErrors.city && <p className="text-xs mt-1 text-red-500">{formFieldErrors.city}</p>}
             </div>
           </div>
           <div>
-            <label className={labelClass}>Street Address</label>
-            <input value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} className={inputClass} placeholder="123 Main St, Unit 4" />
+            <label className={labelClass}>Street Address *</label>
+            <input value={form.address} onChange={e => { setForm(f => ({ ...f, address: e.target.value })); setFormFieldErrors(fe => ({ ...fe, address: '' })); }} className={inputClass + (formFieldErrors.address ? ' border-red-400' : '')} placeholder="123 Main St, Unit 4" />
+            {formFieldErrors.address && <p className="text-xs mt-1 text-red-500">{formFieldErrors.address}</p>}
           </div>
         </div>
       );
@@ -461,7 +549,7 @@ export default function RealtorListingsPage() {
 
   return (
     <AppLayout role="realtor" title="My Listings">
-      <div className="p-4 md:p-6 flex flex-col gap-6">
+      <div className="p-4 md:p-6 flex flex-col gap-6 max-w-6xl mx-auto">
 
         {/* Subscription warning banner */}
         {!hasActiveSubscription && (
@@ -483,28 +571,146 @@ export default function RealtorListingsPage() {
           <Button variant="primary" onClick={() => setCreateOpen(true)}>+ Create Listing</Button>
         </div>
 
-        {/* Status Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {STATUS_TABS.map(tab => {
-            const count = tab === 'all' ? allListings.length : tabCounts[tab] ?? 0;
-            return (
+        {/* Status Tabs + View toggle */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {STATUS_TABS.map(tab => {
+              const count = tab === 'all' ? allListings.length : tabCounts[tab] ?? 0;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all capitalize"
+                  style={{
+                    background: activeTab === tab ? '#D4AF37' : '#F3F4F6',
+                    color: activeTab === tab ? '#fff' : '#4B5563',
+                  }}
+                >
+                  {tab} ({count})
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-lg flex-shrink-0">
+            {[{ id: 'card', icon: HiSquares2X2 }, { id: 'table', icon: HiTableCells }].map(({ id, icon: Icon }) => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all capitalize"
-                style={{
-                  background: activeTab === tab ? '#D4AF37' : '#F3F4F6',
-                  color: activeTab === tab ? '#fff' : '#4B5563',
-                }}
+                key={id}
+                onClick={() => { setViewMode(id); localStorage.setItem('listings_view', id); }}
+                className="p-1.5 rounded-md transition-all"
+                style={{ background: viewMode === id ? '#fff' : 'transparent', color: viewMode === id ? '#D4AF37' : '#9CA3AF', boxShadow: viewMode === id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+                title={id === 'card' ? 'Card View' : 'Table View'}
               >
-                {tab} ({count})
+                <Icon className="w-4 h-4" />
               </button>
-            );
-          })}
+            ))}
+          </div>
         </div>
 
+        {/* Filter Bar */}
+        <div className="flex flex-wrap gap-3 items-center p-3 bg-gray-50 rounded-xl border border-gray-100">
+          <input
+            type="text"
+            placeholder="Search by title..."
+            value={filterSearch}
+            onChange={e => setFilterSearch(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-yellow-400 bg-white flex-1 min-w-[160px]"
+          />
+          <select
+            value={filterType}
+            onChange={e => setFilterType(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-yellow-400 bg-white"
+          >
+            <option value="">All Types</option>
+            {['House', 'Condo', 'Land', 'Commercial', 'Multi-family'].map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          <select
+            value={filterListingType}
+            onChange={e => setFilterListingType(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-yellow-400 bg-white"
+          >
+            <option value="">All Listing Types</option>
+            {['For Sale', 'For Rent', 'For Lease'].map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          {(filterSearch || filterType || filterListingType) && (
+            <button
+              onClick={() => { setFilterSearch(''); setFilterType(''); setFilterListingType(''); }}
+              className="px-3 py-2 text-sm text-gray-500 hover:text-red-500 font-medium transition-colors"
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
+
+        {/* Count */}
+        <p className="text-sm text-gray-500">Showing {filteredListings.length} of {allListings.length} listings</p>
+
+        {/* Table View */}
+        {viewMode === 'table' && (
+          <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.05)' }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  {[
+                    { key: 'title', label: 'Title' },
+                    { key: 'status', label: 'Status' },
+                    { key: 'property_type', label: 'Type' },
+                    { key: 'price', label: 'Price' },
+                    { key: 'created_at', label: 'Date Created' },
+                  ].map(col => (
+                    <th
+                      key={col.key}
+                      className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-gray-800 select-none"
+                      onClick={() => {
+                        if (sortField === col.key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                        else { setSortField(col.key); setSortDir('asc'); }
+                      }}
+                    >
+                      {col.label} {sortField === col.key ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                  ))}
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...filteredListings].sort((a, b) => {
+                  const av = a[sortField] ?? '';
+                  const bv = b[sortField] ?? '';
+                  if (sortField === 'price') return sortDir === 'asc' ? Number(av) - Number(bv) : Number(bv) - Number(av);
+                  return sortDir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+                }).map(listing => (
+                  <tr key={listing.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 font-medium text-gray-900 max-w-[200px] truncate">{listing.title}</td>
+                    <td className="px-4 py-3"><Badge status={listing.status} /></td>
+                    <td className="px-4 py-3 text-gray-500">{listing.property_type}</td>
+                    <td className="px-4 py-3 font-semibold text-gray-900">${listing.price?.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                      {new Date(listing.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => openEdit(listing)}>Edit</Button>
+                        <Button variant="outline" size="sm" onClick={() => setDeleteTarget(listing)} className="text-red-500">Delete</Button>
+                        {(listing.status === 'draft' || listing.status === 'rejected') && (
+                          <Button variant="green" size="sm" onClick={() => handleSubmitForApproval(listing)}>Submit</Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredListings.length === 0 && (
+                  <tr><td colSpan={6} className="text-center py-10 text-gray-400">No listings found</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Listings Grid */}
-        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
+        {viewMode === 'card' && <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
           {filteredListings.map(listing => {
             const tierMeta = TIER_META[listing.upgrade_type] || TIER_META.standard;
             const isRejected = listing.status === 'rejected';
@@ -555,13 +761,19 @@ export default function RealtorListingsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => listing.status === 'active'
-                        ? addToast({ type: 'warning', title: 'Cannot edit active listing', desc: 'Contact support or expire the listing first.' })
-                        : openEdit(listing)
-                      }
-                      disabled={listing.status === 'active'}
-                      title={listing.status === 'active' ? 'Active listings cannot be edited' : undefined}
+                      onClick={() => openEdit(listing)}
+                      disabled={listing.status === 'under_contract'}
+                      title={listing.status === 'under_contract' ? 'Listings under contract cannot be edited' : undefined}
                     >Edit</Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDeleteTarget(listing)}
+                      disabled={listing.status === 'under_contract'}
+                      title={listing.status === 'under_contract' ? 'Listings under contract cannot be deleted' : undefined}
+                      className="text-red-500 hover:text-white hover:bg-red-500 border-red-200 hover:border-red-500"
+                    >Delete</Button>
 
                     {/* Submit for Approval — shown for draft and rejected listings */}
                     {(isDraft || isRejected) && (
@@ -587,9 +799,9 @@ export default function RealtorListingsPage() {
               </div>
             );
           })}
-        </div>
+        </div>}
 
-        {filteredListings.length === 0 && !isLoading && (
+        {viewMode === 'card' && filteredListings.length === 0 && !isLoading && (
           <div className="py-16 text-center text-gray-400">
             <HiHome className="w-10 h-10 text-gray-200 mx-auto mb-2" />
             <p className="font-medium">No {activeTab !== 'all' ? activeTab : ''} listings</p>
@@ -783,6 +995,32 @@ export default function RealtorListingsPage() {
           })}
         </div>
       </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete Listing?"
+        footer={
+          <div className="flex gap-2 justify-end w-full">
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button
+              variant="primary"
+              onClick={handleDeleteConfirm}
+              isLoading={isDeleting}
+              style={{ background: '#DC2626' }}
+            >
+              Delete
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-gray-600">
+          Are you sure you want to delete <strong>"{deleteTarget?.title}"</strong>?{' '}
+          This action cannot be undone.
+        </p>
+      </Modal>
+
     </AppLayout>
   );
 }

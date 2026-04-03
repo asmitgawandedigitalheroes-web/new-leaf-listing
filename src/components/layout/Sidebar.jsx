@@ -18,6 +18,9 @@ import {
   HiCurrencyDollar,
   HiEnvelope,
   HiSparkles,
+  HiExclamationTriangle,
+  HiArrowDownTray,
+  HiDocumentText,
 } from 'react-icons/hi2';
 
 // Reusable icon wrapper for consistency
@@ -31,19 +34,24 @@ const NAV = {
     { key: 'users',        label: 'Users',         icon: HiUsers,               to: '/admin/users' },
     { key: 'listings',     label: 'Listings',      icon: HiHomeModern,          to: '/admin/listings' },
     { key: 'leads',        label: 'Leads',         icon: HiChatBubbleLeftRight,  to: '/admin/leads' },
+    { key: 'enquiries',   label: 'Enquiries',     icon: HiEnvelope,            to: '/admin/enquiries' },
     { key: 'territories',  label: 'Territories',   icon: HiMap,                 to: '/admin/territories' },
     { key: 'subscriptions',label: 'Subscriptions', icon: HiCreditCard,          to: '/admin/subscriptions' },
     { key: 'commissions',  label: 'Commissions',   icon: HiBanknotes,           to: '/admin/commissions-admin' },
-    { key: 'pricing',      label: 'Pricing',       icon: HiCurrencyDollar,      to: '/admin/pricing' },
+    { key: 'pricing',      label: 'Pricing',       icon: HiCurrencyDollar,        to: '/admin/pricing' },
+    { key: 'payouts',      label: 'Payouts',       icon: HiArrowDownTray,         to: '/admin/payouts' },
+    { key: 'disputes',     label: 'Disputes',      icon: HiExclamationTriangle,   to: '/admin/disputes' },
     { key: 'audit',        label: 'Audit Log',     icon: HiClipboardDocumentList, to: '/admin/audit' },
-    { key: 'settings',     label: 'Settings',      icon: HiCog6Tooth,           to: '/admin/settings' },
+    { key: 'settings',     label: 'Settings',      icon: HiCog6Tooth,             to: '/admin/settings' },
   ],
   director: [
     { key: 'dashboard',    label: 'Dashboard',     icon: HiViewColumns,         to: '/director/dashboard' },
+    { key: 'listings',     label: 'Listings',      icon: HiHomeModern,          to: '/director/listings' },
     { key: 'leads',        label: 'My Leads',      icon: HiChatBubbleLeftRight,  to: '/director/leads' },
     { key: 'realtors',     label: 'My Realtors',   icon: HiIdentification,      to: '/director/realtors' },
     { key: 'commissions',  label: 'My Commissions',icon: HiBanknotes,           to: '/director/commissions' },
     { key: 'reports',      label: 'Reports',       icon: HiChartBar,            to: '/director/reports' },
+    { key: 'contracts',    label: 'Legal & Contracts', icon: HiDocumentText,    to: '/director/contracts' },
   ],
   realtor: [
     { key: 'dashboard',    label: 'Dashboard',     icon: HiViewColumns,         to: '/realtor/dashboard' },

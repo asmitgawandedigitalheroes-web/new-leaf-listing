@@ -49,9 +49,10 @@ const PROPERTY_TYPES = ['Any Type', 'Residential', 'Commercial', 'Luxury', 'Land
 
 const STATUS_COLORS = {
   active:   { bg: SCL,     color: S },
-  featured: { bg: 'rgba(212,175,55,0.12)', color: '#B8962E' },
-  pending:  { bg: SURFMID, color: LGRAY },
-  sold:     { bg: SURFMID, color: LGRAY },
+  featured: { bg: 'linear-gradient(135deg, #D4AF37 0%, #B8962E 100%)', color: '#fff' },
+  top:      { bg: 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)', color: '#fff' },
+  pending:  { bg: '#FFF7ED', color: '#C2410C' },
+  sold:     { bg: '#F3F4F6', color: '#6B7280' },
 };
 
 function ListingCard({ listing }) {
@@ -73,7 +74,6 @@ function ListingCard({ listing }) {
           onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
           onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
         />
-        {/* Status badge */}
         <div
           className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-semibold capitalize"
           style={{ background: sc.bg, color: sc.color, letterSpacing: '0.03em' }}
@@ -83,6 +83,18 @@ function ListingCard({ listing }) {
           )}
           {listing.status}
         </div>
+        {/* Upgrade badge */}
+        {(listing.upgrade_type === 'featured' || listing.upgrade_type === 'top') && (
+          <div
+            className="absolute top-3 right-3 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider text-white"
+            style={{ 
+              background: STATUS_COLORS[listing.upgrade_type]?.bg,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+            }}
+          >
+            {listing.upgrade_type}
+          </div>
+        )}
         {/* Price */}
         <div
           className="absolute bottom-3 right-3 px-3 py-1 rounded-lg text-[12px] font-bold"
