@@ -92,7 +92,7 @@ export default function Button({
   const content = (
     <>
       {isLoading && <span className="spinner" />}
-      <span className="relative z-10">{children}</span>
+      <span className="relative z-10 inline-flex items-center gap-2">{children}</span>
       
       {premium && (
         <span className="w-0 opacity-0 transform -translate-x-3 transition-all duration-300 group-hover:w-5 group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-1.5 flex items-center overflow-hidden">

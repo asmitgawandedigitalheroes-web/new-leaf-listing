@@ -6,12 +6,36 @@ import Button from '../../components/ui/Button';
 import Skeleton from '../../components/ui/Skeleton';
 import { useCommissions } from '../../hooks/useCommissions';
 import { useAuth } from '../../context/AuthContext';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
+
+// Default split percentages — overridden by platform_settings if available
+const DEFAULT_RATES = { realtor: 45, director: 25, admin: 15, platform: 15 };
 
 export default function CommissionsPage() {
   const { profile } = useAuth();
   const { commissions, isLoading, markPayable } = useCommissions();
   const [isRequesting, setIsRequesting] = useState(false);
+  const [rates, setRates] = useState(DEFAULT_RATES);
+
+  // Load commission split rates from platform_settings
+  useEffect(() => {
+    supabase
+      .from('platform_settings')
+      .select('key, value')
+      .in('key', ['commission_realtor_pct', 'commission_director_pct', 'commission_admin_pct', 'commission_platform_pct'])
+      .then(({ data }) => {
+        if (!data?.length) return;
+        const map = {};
+        data.forEach(r => { map[r.key] = Number(r.value) || 0; });
+        setRates({
+          realtor:  map['commission_realtor_pct']  ?? DEFAULT_RATES.realtor,
+          director: map['commission_director_pct'] ?? DEFAULT_RATES.director,
+          admin:    map['commission_admin_pct']    ?? DEFAULT_RATES.admin,
+          platform: map['commission_platform_pct'] ?? DEFAULT_RATES.platform,
+        });
+      });
+  }, []);
 
   const stats = useMemo(() => {
     const paid      = commissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
@@ -24,7 +48,7 @@ export default function CommissionsPage() {
       { label: 'Total Earned YTD', value: `$${paid.toLocaleString()}`, trend: 0, trendLabel: 'confirmed payouts', icon: '💰' },
       { label: 'Pending Payout',   value: `$${pending.toLocaleString()}`, trend: 0, trendLabel: 'awaiting disbursement', icon: '⏳', accentColor: 'green' },
       { label: 'Paid This Month',  value: `$${thisMonth.toLocaleString()}`, trend: 0, trendLabel: 'current cycle', icon: '✅' },
-      { label: 'Avg. Rate',        value: '3.2%', trend: 0, trendLabel: 'platform average', icon: '📊', accentColor: 'green' },
+      { label: 'Your Split',       value: `${rates.realtor}%`, trend: 0, trendLabel: 'of net after platform fee', icon: '📊', accentColor: 'green' },
     ];
   }, [commissions]);
 
@@ -105,9 +129,10 @@ export default function CommissionsPage() {
             <SectionCard title="Split Breakdown">
               <div className="px-5 py-4 flex flex-col gap-4">
                 {[
-                  { label: 'Agent (Me)', pct: 70, color: '#D4AF37' },
-                  { label: 'Director',  pct: 15, color: '#D4AF37' },
-                  { label: 'Brokerage', pct: 15, color: '#4B5563' },
+                  { label: 'You (Realtor)', pct: rates.realtor,  color: '#D4AF37' },
+                  { label: 'Director',      pct: rates.director, color: '#1F4D3A' },
+                  { label: 'Admin Override',pct: rates.admin,    color: '#4B5563' },
+                  { label: 'Platform Fee',  pct: rates.platform, color: '#9CA3AF' },
                 ].map(s => (
                   <div key={s.label}>
                     <div className="flex justify-between text-sm mb-1.5">
@@ -119,6 +144,10 @@ export default function CommissionsPage() {
                     </div>
                   </div>
                 ))}
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Rates are configured by platform administration.{' '}
+                  <a href="/platform-rules" className="underline hover:text-gray-600">Platform rules</a>
+                </p>
 
                 <div className="border-t border-gray-100 pt-4 mt-2">
                   <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Approved & Payable</div>

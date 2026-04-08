@@ -27,12 +27,12 @@ const fadeUp = `
 
 export default function Hero() {
   return (
-    <section id="hero-section" className="relative overflow-hidden flex flex-col lg:block bg-primary-dark lg:bg-jet-black" style={{ minHeight: '100vh' }}>
+    <section id="hero-section" className="relative overflow-hidden flex flex-col lg:block bg-primary-dark" style={{ minHeight: '100vh' }}>
       <style>{`
         ${fadeUp}
         #hero-section { background: var(--color-primary-dark); }
         @media (min-width: 1024px) {
-          #hero-section { background: var(--color-jet-black); }
+          #hero-section { background: var(--color-primary-dark); }
         }
       `}</style>
       
@@ -45,11 +45,11 @@ export default function Hero() {
           style={{ filter: 'brightness(0.8) contrast(1.1) saturate(0.9)' }}
         />
         <div className="absolute inset-0 hidden lg:block" style={{
-          background: `linear-gradient(100deg, var(--color-jet-black) 0%, var(--color-jet-black) 6%, rgba(10,10,10,.94) 20%, rgba(10,10,10,.5) 38%, transparent 58%)`,
+          background: `linear-gradient(100deg, var(--color-primary-dark) 0%, var(--color-primary-dark) 6%, rgba(31,77,58,.94) 20%, rgba(31,77,58,.5) 38%, transparent 58%)`,
         }} />
         {/* Mobile overlay */}
         <div className="absolute inset-0 lg:hidden" style={{ background: `linear-gradient(to bottom, transparent 60%, var(--color-primary-dark))` }} />
-        <div className="absolute inset-x-0 bottom-0 h-32 hidden lg:block" style={{ background: `linear-gradient(to top, var(--color-jet-black), transparent)` }} />
+        <div className="absolute inset-x-0 bottom-0 h-32 hidden lg:block" style={{ background: `linear-gradient(to top, var(--color-primary-dark), transparent)` }} />
       </div>
 
       {/* Left/Bottom: copy */}
@@ -107,7 +107,7 @@ export default function Hero() {
       {/* Floating card */}
       <div className="absolute bottom-14 right-10 hidden xl:block z-10"
         style={{
-          background: 'rgba(10,10,10,.7)', backdropFilter: 'blur(24px)',
+          background: 'rgba(31,77,58,.7)', backdropFilter: 'blur(24px)',
           borderRadius: 4, padding: '18px 24px', minWidth: 240,
           border: '1px solid rgba(201, 164, 92, 0.2)',
           boxShadow: `0 12px 48px rgba(0,0,0,.4)`,

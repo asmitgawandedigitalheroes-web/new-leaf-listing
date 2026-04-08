@@ -233,7 +233,7 @@ export default function ContactPage() {
                   </button>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+                <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
                   <h2 className="font-headline font-bold text-xl mb-1" style={{ color: TX }}>Send Us a Message</h2>
 
                   <div className="grid sm:grid-cols-2 gap-5">
@@ -270,7 +270,8 @@ export default function ContactPage() {
                         type="tel"
                         placeholder="+1 (555) 000-0000"
                         value={form.phone}
-                        onChange={set('phone')}
+                        onChange={e => setForm(p => ({ ...p, phone: e.target.value.replace(/[^0-9+\-\s()]/g, '').slice(0, 20) }))}
+                        maxLength={20}
                         style={inputStyle}
                         onFocus={handleFocus}
                         onBlur={handleBlur}

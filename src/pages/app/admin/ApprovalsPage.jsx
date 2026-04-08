@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AppLayout from '../../../components/layout/AppLayout';
 import Button from '../../../components/ui/Button';
 import Skeleton from '../../../components/ui/Skeleton';
@@ -13,6 +14,8 @@ import {
   HiHomeModern,
   HiClock,
   HiCheckBadge,
+  HiUserGroup,
+  HiArrowRight,
 } from 'react-icons/hi2';
 
 // FIX: CRIT-002 — Created Approvals Queue page (was missing, /admin/approvals redirected to homepage)
@@ -50,11 +53,15 @@ function SectionHeader({ icon: Icon, title, count }) {
 export default function ApprovalsPage() {
   const { addToast } = useToast();
   const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
 
   const [pendingRealtors, setPendingRealtors] = useState([]);
   const [pendingListings, setPendingListings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processing, setProcessing] = useState(new Set());
+  // rejection reason state: { [userId]: string }
+  const [rejectReasons, setRejectReasons] = useState({});
+  const [showRejectInput, setShowRejectInput] = useState(new Set());
 
   const fetchApprovals = useCallback(async () => {
     setIsLoading(true);
@@ -62,7 +69,7 @@ export default function ApprovalsPage() {
       const [realtorsRes, listingsRes] = await Promise.all([
         supabase
           .from('profiles')
-          .select('id, full_name, email, role, created_at, territory:territories!profiles_territory_id_fkey(city, state)')
+          .select('id, full_name, email, role, created_at, assigned_director_id, territory:territories!profiles_territory_id_fkey(city, state)')
           .eq('status', 'pending')
           .order('created_at', { ascending: false }),
         supabase
@@ -87,6 +94,7 @@ export default function ApprovalsPage() {
   // ── Approve / reject a realtor ────────────────────────────────────────────────
   const handleRealtorAction = async (userId, action) => {
     const newStatus = action === 'approve' ? 'active' : 'suspended';
+    const reason    = rejectReasons[userId] || '';
     setProcessing(prev => new Set(prev).add(userId));
     try {
       const { error } = await supabase
@@ -97,6 +105,7 @@ export default function ApprovalsPage() {
       if (error) throw error;
 
       setPendingRealtors(prev => prev.filter(r => r.id !== userId));
+      setShowRejectInput(prev => { const s = new Set(prev); s.delete(userId); return s; });
       addToast({
         type: action === 'approve' ? 'success' : 'error',
         title: action === 'approve' ? 'Realtor Approved' : 'Realtor Rejected',
@@ -112,13 +121,21 @@ export default function ApprovalsPage() {
         entity_type: 'profile',
         entity_id: userId,
         timestamp: new Date().toISOString(),
-        metadata: { new_status: newStatus },
+        metadata: { new_status: newStatus, ...(reason ? { reject_reason: reason } : {}) },
       });
     } catch (err) {
       addToast({ type: 'error', title: 'Action failed', desc: err.message });
     } finally {
       setProcessing(prev => { const s = new Set(prev); s.delete(userId); return s; });
     }
+  };
+
+  const toggleRejectInput = (userId) => {
+    setShowRejectInput(prev => {
+      const s = new Set(prev);
+      if (s.has(userId)) { s.delete(userId); } else { s.add(userId); }
+      return s;
+    });
   };
 
   // ── Approve / reject a listing ────────────────────────────────────────────────
@@ -208,60 +225,142 @@ export default function ApprovalsPage() {
               {[...Array(3)].map((_, i) => <Skeleton key={i} height="56px" />)}
             </div>
           ) : pendingRealtors.length === 0 ? (
-            <div style={{ padding: '32px 0', textAlign: 'center', color: LGRAY }}>
-              <HiCheckBadge size={32} color={`${S}`} style={{ margin: '0 auto 8px' }} />
-              <p style={{ fontSize: 13, fontWeight: 500 }}>No pending realtor applications</p>
+            <div style={{ padding: '24px 0', textAlign: 'center', color: LGRAY }}>
+              <HiCheckBadge size={36} color={S} style={{ margin: '0 auto 10px' }} />
+              <p style={{ fontSize: 14, fontWeight: 600, color: OS, marginBottom: 4 }}>All realtor applications reviewed</p>
+              <p style={{ fontSize: 12, color: LGRAY, marginBottom: 20 }}>
+                New applications appear here when a realtor signs up and awaits approval.
+              </p>
+              <button
+                onClick={() => navigate('/admin/users?filter=pending')}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '9px 18px', borderRadius: 10, border: `1.5px solid ${S}`,
+                  background: '#fff', color: S, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = S; e.currentTarget.style.color = '#fff'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = S; }}
+              >
+                <HiUsers size={16} /> Manage All Realtors <HiArrowRight size={14} />
+              </button>
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
-                    {['Name', 'Email', 'Territory', 'Applied', 'Actions'].map(h => (
+                    {['Realtor', 'Territory', 'Source', 'Applied', 'Actions'].map(h => (
                       <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: LGRAY, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {pendingRealtors.map(r => (
-                    <tr key={r.id} style={{ borderBottom: `1px solid ${BORDER}` }}>
-                      <td style={{ padding: '12px', fontWeight: 600, color: OS }}>{r.full_name || '—'}</td>
-                      <td style={{ padding: '12px', color: OSV }}>{r.email}</td>
-                      <td style={{ padding: '12px', color: LGRAY }}>
-                        {r.territory ? `${r.territory.city}, ${r.territory.state}` : 'Unassigned'}
-                      </td>
-                      <td style={{ padding: '12px', color: LGRAY, whiteSpace: 'nowrap' }}>{formatDate(r.created_at)}</td>
-                      <td style={{ padding: '12px' }}>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button
-                            onClick={() => handleRealtorAction(r.id, 'approve')}
-                            disabled={processing.has(r.id)}
-                            style={{
-                              padding: '6px 14px', borderRadius: 8, border: 'none',
-                              background: '#DCFCE7', color: '#166534',
-                              fontSize: 12, fontWeight: 700, cursor: processing.has(r.id) ? 'not-allowed' : 'pointer',
-                              opacity: processing.has(r.id) ? 0.6 : 1,
-                              display: 'flex', alignItems: 'center', gap: 4,
-                            }}
-                          >
-                            <HiCheck size={14} /> Approve
-                          </button>
-                          <button
-                            onClick={() => handleRealtorAction(r.id, 'reject')}
-                            disabled={processing.has(r.id)}
-                            style={{
-                              padding: '6px 14px', borderRadius: 8, border: 'none',
-                              background: '#FEE2E2', color: '#991B1B',
-                              fontSize: 12, fontWeight: 700, cursor: processing.has(r.id) ? 'not-allowed' : 'pointer',
-                              opacity: processing.has(r.id) ? 0.6 : 1,
-                              display: 'flex', alignItems: 'center', gap: 4,
-                            }}
-                          >
-                            <HiXMark size={14} /> Reject
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    <React.Fragment key={r.id}>
+                      <tr style={{ borderBottom: showRejectInput.has(r.id) ? 'none' : `1px solid ${BORDER}` }}>
+                        <td style={{ padding: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{
+                              width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+                              background: `linear-gradient(135deg, ${P}, ${S})`,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              color: '#fff', fontSize: 12, fontWeight: 700,
+                            }}>
+                              {(r.full_name || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, color: OS, fontSize: 13 }}>{r.full_name || '—'}</div>
+                              <div style={{ fontSize: 11, color: LGRAY }}>{r.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px', color: LGRAY }}>
+                          {r.territory ? `${r.territory.city}, ${r.territory.state}` : 'Unassigned'}
+                        </td>
+                        <td style={{ padding: '12px' }}>
+                          {r.assigned_director_id ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, background: '#E8F3EE', color: S, fontSize: 11, fontWeight: 700 }}>
+                              <HiUserGroup size={11} /> Invited
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: 11, color: LGRAY }}>Self-signup</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px', color: LGRAY, whiteSpace: 'nowrap' }}>{formatDate(r.created_at)}</td>
+                        <td style={{ padding: '12px' }}>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                              onClick={() => handleRealtorAction(r.id, 'approve')}
+                              disabled={processing.has(r.id)}
+                              style={{
+                                padding: '7px 16px', borderRadius: 8, border: 'none',
+                                background: processing.has(r.id) ? '#E5E7EB' : '#16A34A',
+                                color: processing.has(r.id) ? LGRAY : '#fff',
+                                fontSize: 12, fontWeight: 700,
+                                cursor: processing.has(r.id) ? 'not-allowed' : 'pointer',
+                                opacity: processing.has(r.id) ? 0.7 : 1,
+                                display: 'flex', alignItems: 'center', gap: 5,
+                                boxShadow: processing.has(r.id) ? 'none' : '0 2px 6px rgba(22,163,74,0.3)',
+                                transition: 'all 0.15s',
+                              }}
+                              onMouseEnter={e => { if (!processing.has(r.id)) e.currentTarget.style.background = '#15803D'; }}
+                              onMouseLeave={e => { if (!processing.has(r.id)) e.currentTarget.style.background = '#16A34A'; }}
+                            >
+                              <HiCheck size={14} /> Approve
+                            </button>
+                            <button
+                              onClick={() => toggleRejectInput(r.id)}
+                              disabled={processing.has(r.id)}
+                              style={{
+                                padding: '7px 14px', borderRadius: 8, border: `1px solid #FECACA`,
+                                background: showRejectInput.has(r.id) ? '#FEE2E2' : '#fff', color: '#991B1B',
+                                fontSize: 12, fontWeight: 700, cursor: processing.has(r.id) ? 'not-allowed' : 'pointer',
+                                opacity: processing.has(r.id) ? 0.6 : 1,
+                                display: 'flex', alignItems: 'center', gap: 4,
+                                transition: 'all 0.15s',
+                              }}
+                            >
+                              <HiXMark size={14} /> Reject
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {/* Reject reason input row */}
+                      {showRejectInput.has(r.id) && (
+                        <tr style={{ borderBottom: `1px solid ${BORDER}`, background: '#FFF5F5' }}>
+                          <td colSpan={6} style={{ padding: '10px 12px' }}>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                              <input
+                                type="text"
+                                placeholder="Reason for rejection (optional)…"
+                                value={rejectReasons[r.id] || ''}
+                                onChange={e => setRejectReasons(prev => ({ ...prev, [r.id]: e.target.value }))}
+                                style={{ flex: 1, padding: '7px 12px', border: `1px solid #FCA5A5`, borderRadius: 8, fontSize: 13, color: OS, background: '#fff' }}
+                              />
+                              <button
+                                onClick={() => handleRealtorAction(r.id, 'reject')}
+                                disabled={processing.has(r.id)}
+                                style={{
+                                  padding: '7px 16px', borderRadius: 8, border: 'none',
+                                  background: '#991B1B', color: '#fff',
+                                  fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                                  display: 'flex', alignItems: 'center', gap: 4,
+                                }}
+                              >
+                                <HiXMark size={14} /> Confirm Reject
+                              </button>
+                              <button
+                                onClick={() => toggleRejectInput(r.id)}
+                                style={{ padding: '7px 12px', borderRadius: 8, border: `1px solid ${BORDER}`, background: '#fff', fontSize: 12, cursor: 'pointer', color: LGRAY }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

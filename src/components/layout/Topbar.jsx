@@ -182,12 +182,19 @@ export default function Topbar({ title, user, onMenuClick }) {
   const userMenuRef = useRef(null);
   const navigate = useNavigate();
 
-  // Resolve display user from props or AuthContext
-  const displayUser = user || {
-    name: profile?.full_name || 'User',
-    role: role || 'realtor',
-    initials: (profile?.full_name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
-  };
+  // BUG-004: Always derive initials from the live profile so they reflect the
+  // real name (e.g. "Sarah King" → "SK") even when caller passes stale initials.
+  const profileInitials = profile?.full_name
+    ? profile.full_name.trim().split(/\s+/).map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : (user?.initials || 'U');
+
+  const displayUser = user
+    ? { ...user, initials: profileInitials }
+    : {
+        name: profile?.full_name || 'User',
+        role: role || 'realtor',
+        initials: profileInitials,
+      };
 
   // Close dropdowns on outside click
   useEffect(() => {

@@ -52,6 +52,29 @@ export function AuthProvider({ children }) {
       return;
     }
 
+    // BUG-005: Retry with exponential backoff — 2 retries: 500ms then 1000ms
+    const MAX_RETRIES = 2;
+    const RETRY_DELAYS = [500, 1000];
+
+    // Restore cached profile immediately so the UI isn't blank during retries
+    const CACHE_KEY = `nlv_profile_${authUser.id}`;
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const cachedProfile = JSON.parse(cached);
+        setProfile(cachedProfile);
+        setRole(cachedProfile?.role ?? null);
+      }
+    } catch (_) { /* ignore parse errors */ }
+
+    let lastError = null;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        console.warn(`[AuthContext] Retry attempt ${attempt} after ${RETRY_DELAYS[attempt - 1]}ms...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS[attempt - 1]));
+      }
+
     try {
       // Helper for timeout
       const withTimeout = (promise, ms) => {
@@ -61,10 +84,10 @@ export function AuthProvider({ children }) {
         ]);
       };
 
-      // 1. Fetch profile and subscription in parallel with a 30s timeout
-      console.log(`[AuthContext] loadUserData: fetching data for ${authUser.id}...`);
+      // 1. Fetch profile and subscription in parallel with a 10s timeout
+      console.log(`[AuthContext] loadUserData: fetching data for ${authUser.id} (attempt ${attempt + 1})...`);
       const start = Date.now();
-      
+
       const [profileRes, subRes] = await withTimeout(Promise.all([
         supabase
           .from('profiles')
@@ -101,6 +124,7 @@ export function AuthProvider({ children }) {
         setProfile(null);
         setRole(null);
         setSubscription(null);
+        loadingRef.current = false;
         return null;
       }
 
@@ -122,7 +146,64 @@ export function AuthProvider({ children }) {
         }
       }
 
-      // BUG-009: REMOVED metadata role fallback.
+      // Recovery: if profile is still missing after both lookups, attempt to create it.
+      // Case A — has pending_profile metadata (new signups after this fix):
+      //   Use all stored profile data.
+      // Case B — has only full_name in metadata (signups before this fix, e.g. existing orphan users):
+      //   Create a minimal pending realtor profile so they appear in the admin queue.
+      // Both cases happen when email confirmation was required and the INSERT failed at
+      // signup time because auth.uid() was NULL (no session = RLS blocked the INSERT).
+      const hasPendingMeta = !finalProfile && authUser.user_metadata?.pending_profile;
+      const hasOrphanMeta  = !finalProfile && !authUser.user_metadata?.pending_profile
+                             && authUser.user_metadata?.full_name;
+
+      // Only attempt the INSERT when an active session exists (auth.uid() will be non-null).
+      // Without a session the Supabase client sends an anon-key request and the
+      // `profiles_insert_own` RLS policy (TO authenticated) will deny it.
+      // This scenario occurs right after signup when email confirmation is required
+      // — the user must confirm their email first, at which point SIGNED_IN fires
+      // with a real session and this recovery path succeeds.
+      const { data: { session: activeSession } } = await supabase.auth.getSession();
+
+      if ((hasPendingMeta || hasOrphanMeta) && activeSession) {
+        console.info('[AuthContext] No profile found — attempting recovery from signup metadata...');
+        const meta = authUser.user_metadata?.pending_profile ?? {};
+        // Security: force 'realtor' for any self-service signup recovery.
+        // Director accounts are invite-only and will already have a profile row.
+        const { data: recoveredProfile, error: recoverErr } = await supabase
+          .from('profiles')
+          .insert({
+            id: authUser.id,
+            email: authUser.email,
+            full_name: meta.full_name || authUser.user_metadata?.full_name || '',
+            company: meta.company || null,
+            role: 'realtor',
+            phone: meta.phone || null,
+            country: meta.country || null,
+            state: meta.state || null,
+            city: meta.city || null,
+            territory_id: meta.territory_id || null,
+            assigned_director_id: meta.assigned_director_id || null,
+            license_number: meta.license_number || null,
+            license_state: meta.license_state || null,
+            license_expiry: meta.license_expiry || null,
+            status: meta.invite_approved ? 'active' : 'pending',
+            accepted_terms_at: new Date().toISOString(),
+          })
+          .select()
+          .maybeSingle();
+
+        if (recoverErr) {
+          console.error('[AuthContext] Profile recovery failed:', recoverErr.message);
+        } else if (recoveredProfile) {
+          console.info('[AuthContext] Profile successfully recovered from signup metadata.');
+          finalProfile = recoveredProfile;
+          // Clear pending_profile from metadata — no longer needed
+          supabase.auth.updateUser({ data: { pending_profile: null } }).catch(() => {});
+        }
+      }
+
+      // NOTE: role is intentionally not read from user_metadata.
       // authUser.user_metadata is writable by the client at signup time.
       // Trusting it for role resolution allows privilege escalation.
       // If no DB profile exists the user is treated as unauthenticated until
@@ -134,13 +215,17 @@ export function AuthProvider({ children }) {
       if (profileRes.error && !finalProfile && profileRes.error.code !== 'PGRST116') {
         console.error('[AuthContext] Profile fetch error:', profileRes.error);
       } else {
-        console.log(`[AuthContext] Setting profile and role:`, { 
-          id: authUser.id, 
-          email: authUser.email, 
-          role: finalProfile?.role 
+        console.log(`[AuthContext] Setting profile and role:`, {
+          id: authUser.id,
+          email: authUser.email,
+          role: finalProfile?.role
         });
         setProfile(finalProfile);
         setRole(finalProfile?.role ?? null);
+        // Cache the profile so a future timeout doesn't cause a blank UI
+        if (finalProfile) {
+          try { localStorage.setItem(CACHE_KEY, JSON.stringify(finalProfile)); } catch (_) {}
+        }
       }
 
       if (subRes.error) {
@@ -148,14 +233,20 @@ export function AuthProvider({ children }) {
       } else {
         setSubscription(subRes.data);
       }
+      loadingRef.current = false;
       return finalProfile;
     } catch (err) {
       const isTimeout = err.message === 'Timeout';
-      console.error('[AuthContext] loadUserData error:', isTimeout ? `Request timed out after 10s` : err);
-      return null;
-    } finally {
-      loadingRef.current = false;
+      lastError = err;
+      console.warn(`[AuthContext] loadUserData attempt ${attempt + 1} failed:`, isTimeout ? 'timed out after 10s' : err?.message);
+      if (!isTimeout) break; // Don't retry on non-timeout errors
     }
+    } // end retry loop
+
+    // All retries exhausted
+    console.error('[AuthContext] loadUserData failed after all retries. Last error:', lastError?.message);
+    loadingRef.current = false;
+    return null;
   }, []);
 
   /** Bootstrap: check existing session on mount and listen to auth state changes. */
@@ -249,18 +340,54 @@ export function AuthProvider({ children }) {
    * @param {string} [signupData.role] - default 'realtor'
    * @param {string} [signupData.phone]
    * @param {string} [signupData.company]
+   * @param {string} [signupData.territory_id] - pre-assigned territory (from invite)
+   * @param {string} [signupData.assigned_director_id] - director who invited the realtor
+   * @param {string} [signupData.license_number]
+   * @param {string} [signupData.license_state]
+   * @param {string} [signupData.license_expiry]
    * @returns {Promise<{data: any, error: Error|null}>}
    */
-  const signup = async ({ email, password, full_name, company = null, phone = null, country = null, state = null, city = null, role = 'realtor' }) => {
+  const signup = async ({
+    email, password, full_name, company = null, phone = null,
+    country = null, state = null, city = null, role = 'realtor',
+    territory_id = null, assigned_director_id = null,
+    license_number = null, license_state = null, license_expiry = null,
+    invite_token = null,
+  }) => {
     setIsLoading(true);
+
+    // Store all profile fields in user_metadata as a fallback.
+    // When Supabase email confirmation is required, authData.session is null
+    // at signup time, meaning auth.uid() returns NULL in Postgres and every
+    // RLS INSERT policy on `profiles` is silently blocked. By storing the
+    // profile data here, loadUserData() can recover and create the row on
+    // the user's first successful login (when a real session exists).
+    const pendingProfile = {
+      full_name,
+      company,
+      phone,
+      country,
+      state,
+      city,
+      role,
+      territory_id: territory_id || null,
+      assigned_director_id: assigned_director_id || null,
+      license_number: license_number || null,
+      license_state: license_state || null,
+      license_expiry: license_expiry || null,
+      invite_approved: !!invite_token,
+    };
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        // BUG-009 prevention: do NOT store role in user_metadata.
-        // Only non-privileged display fields go here.
-        data: { full_name },
+        data: {
+          full_name,
+          // pending_profile is only used for recovery — never trusted for
+          // role-based access decisions (role is hardcoded to 'realtor' in loadUserData).
+          pending_profile: pendingProfile,
+        },
       },
     });
 
@@ -271,7 +398,16 @@ export function AuthProvider({ children }) {
 
     // Create profile row
     if (authData.user) {
+      // Set user immediately so ProtectedRoute doesn't see null and redirect to /login.
+      // onAuthStateChange only fires SIGNED_IN when a session exists (i.e. when email
+      // confirmation is disabled). Setting user here covers the confirmation-required case.
+      setUser(authData.user);
+
       console.log(`[AuthContext] Creating profile for ${email} with role: ${role}`);
+      // Directors are pre-approved (invite-only); admin-invited users (invite_token) are
+      // also auto-approved regardless of role; realtors need admin approval otherwise.
+      const initialStatus = (role === 'director' || !!invite_token) ? 'active' : 'pending';
+
       const { error: profileError } = await supabase
         .from('profiles')
         .insert({
@@ -279,17 +415,42 @@ export function AuthProvider({ children }) {
           email,
           full_name,
           company,
-          role,  // Support flexible roles (defaults to realtor)
+          role,
           phone,
           country,
           state,
           city,
-          status: 'pending',
+          territory_id: territory_id || null,
+          assigned_director_id: assigned_director_id || null,
+          license_number: license_number || null,
+          license_state: license_state || null,
+          license_expiry: license_expiry || null,
+          status: initialStatus,
           accepted_terms_at: new Date().toISOString(),
         });
 
       if (profileError) {
-        console.error('[AuthContext] Profile creation failed:', profileError);
+        // This is expected when Supabase email confirmation is enabled:
+        // the session is null at signup time, so auth.uid() = NULL and
+        // RLS blocks the INSERT. The profile will be created on first login
+        // via the pending_profile metadata recovery in loadUserData().
+        console.warn('[AuthContext] Profile INSERT failed at signup (likely no session yet):', profileError.message);
+      }
+
+      // Mark invitation as accepted (non-fatal — profile already created above)
+      if (invite_token && !profileError) {
+        const { error: inviteErr } = await supabase
+          .from('user_invitations')
+          .update({
+            status: 'accepted',
+            accepted_at: new Date().toISOString(),
+            accepted_by: authData.user.id,
+          })
+          .eq('token', invite_token)
+          .eq('status', 'pending');
+        if (inviteErr) {
+          console.warn('[AuthContext] Could not mark invitation as accepted:', inviteErr.message);
+        }
       }
 
       await loadUserData(authData.user);

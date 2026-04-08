@@ -86,6 +86,7 @@ export function useLeads() {
    * This is a public-facing action (status = 'new').
    */
   const createInquiry = async (inquiryData) => {
+    try {
     // Priority: Explicit assigned_realtor_id > listing-owner > null (unassigned)
     let assignedRealtorId = inquiryData.assigned_realtor_id || null;
     let territoryId = inquiryData.territory_id || null;
@@ -96,14 +97,15 @@ export function useLeads() {
         .select('realtor_id, territory_id')
         .eq('id', inquiryData.listing_id)
         .single();
-      
+
       if (listing) {
         assignedRealtorId = listing.realtor_id;
         territoryId = listing.territory_id;
       }
     }
 
-    try {
+    // BUG-001: inner try replaced with outer try — all code paths are now covered
+    {
       let { data, error: insertError } = await supabase
         .from('leads')
         .insert({
@@ -158,8 +160,9 @@ export function useLeads() {
       }
       
       return { data, error: null };
+    }
     } catch (err) {
-      console.error('[useLeads] Create inquiry error:', err);
+      console.error('[useLeads] Create inquiry error:', err?.message ?? err, err?.details ?? '');
       return { data: null, error: err };
     }
   };

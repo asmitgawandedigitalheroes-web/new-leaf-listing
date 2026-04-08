@@ -70,9 +70,27 @@ export default function LoginPage() {
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
-  const fillDemoCredentials = (email, password) => {
+  // BUG-002: Auto-submit with the supplied credentials — state updates are async,
+  // so we pass the values directly into auth.login instead of reading from state.
+  const fillDemoCredentials = async (email, password) => {
     setForm({ email, password });
-    addToast({ type: 'info', title: 'Demo filled', desc: `Credentials for ${email.split('@')[0]} loaded.` });
+    setLoading(true);
+    const { error, profile: loggedInProfile } = await auth.login(email, password);
+    setLoading(false);
+    if (error) {
+      addToast({ type: 'error', title: 'Demo login failed', desc: error.message });
+      return;
+    }
+    addToast({ type: 'success', title: 'Welcome back!', desc: 'Signed in successfully.' });
+    const userRole   = loggedInProfile?.role;
+    const userStatus = loggedInProfile?.status;
+    if (userRole === 'admin') {
+      navigate('/admin/dashboard');
+    } else if (userRole === 'director') {
+      navigate(userStatus === 'pending' ? '/onboarding/pending' : '/director/dashboard');
+    } else {
+      navigate(userStatus === 'pending' ? '/onboarding/pending' : '/realtor/dashboard');
+    }
   };
 
   const handleForgotPassword = async (e) => {
@@ -106,10 +124,15 @@ export default function LoginPage() {
     addToast({ type: 'success', title: 'Welcome back!', desc: 'Signed in successfully.' });
     
     // Use the profile returned by login for immediate redirection
-    const userRole = loggedInProfile?.role;
-    if (userRole === 'admin')         navigate('/admin/dashboard');
-    else if (userRole === 'director') navigate('/director/dashboard');
-    else                              navigate('/realtor/dashboard');
+    const userRole   = loggedInProfile?.role;
+    const userStatus = loggedInProfile?.status;
+    if (userRole === 'admin') {
+      navigate('/admin/dashboard');
+    } else if (userRole === 'director') {
+      navigate(userStatus === 'pending' ? '/onboarding/pending' : '/director/dashboard');
+    } else {
+      navigate(userStatus === 'pending' ? '/onboarding/pending' : '/realtor/dashboard');
+    }
   };
 
   return (

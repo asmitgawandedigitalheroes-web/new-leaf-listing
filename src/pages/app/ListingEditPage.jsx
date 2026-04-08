@@ -135,6 +135,9 @@ export default function ListingEditPage() {
           value={form[key]}
           onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
           className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none"
+          {...(opts.min !== undefined && { min: opts.min })}
+          {...(opts.max !== undefined && { max: opts.max })}
+          {...(opts.step !== undefined && { step: opts.step })}
         />
       )}
     </div>
@@ -175,7 +178,7 @@ export default function ListingEditPage() {
               <h3 className="text-sm font-semibold text-gray-700">Basic Info</h3>
               {field('Title', 'title')}
               {field('Description', 'description', 'text', { textarea: true })}
-              {field('Price ($)', 'price', 'number')}
+              {field('Price ($)', 'price', 'number', { min: 0, step: 1 })}
               {field('Property Type', 'property_type', 'text', { select: PROPERTY_TYPES })}
             </div>
 
@@ -194,9 +197,9 @@ export default function ListingEditPage() {
             <div className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col gap-4">
               <h3 className="text-sm font-semibold text-gray-700">Details</h3>
               <div className="grid grid-cols-3 gap-4">
-                {field('Bedrooms', 'bedrooms', 'number')}
-                {field('Bathrooms', 'bathrooms', 'number')}
-                {field('Sq Ft', 'sqft', 'number')}
+                {field('Bedrooms', 'bedrooms', 'number', { min: 0, step: 1 })}
+                {field('Bathrooms', 'bathrooms', 'number', { min: 0, step: 0.5 })}
+                {field('Sq Ft', 'sqft', 'number', { min: 0, step: 1 })}
               </div>
             </div>
 

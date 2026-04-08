@@ -149,7 +149,11 @@ export default function AuditLogPage() {
                   ))
                 ) : paginated.map(log => (
                   <React.Fragment key={log.id}>
-                    <tr className="cursor-pointer" onClick={() => setExpanded(expanded === log.id ? null : log.id)}>
+                    {/* BUG-009: row click toggles expanded detail; chevron button is the visual affordance */}
+                    <tr
+                      className="cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={() => setExpanded(expanded === log.id ? null : log.id)}
+                    >
                       <td className="text-gray-500 text-xs whitespace-nowrap">{formatTS(log.timestamp)}</td>
                       <td>
                         <div className="text-sm text-gray-700 font-medium">{log.userName}</div>
@@ -161,7 +165,15 @@ export default function AuditLogPage() {
                         <span className="text-gray-400 text-xs ml-1">{log.entityId}</span>
                       </td>
                       <td className="text-gray-500 text-sm max-w-xs truncate">{log.details}</td>
-                      <td><span className="text-xs text-gray-400">{expanded === log.id ? '▲' : '▼'}</span></td>
+                      <td>
+                        <button
+                          onClick={e => { e.stopPropagation(); setExpanded(expanded === log.id ? null : log.id); }}
+                          className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                          aria-label={expanded === log.id ? 'Collapse row' : 'Expand row'}
+                        >
+                          {expanded === log.id ? '▲' : '▼'}
+                        </button>
+                      </td>
                     </tr>
                     {expanded === log.id && (
                       <tr key={`${log.id}-meta`} className="bg-gray-50">
