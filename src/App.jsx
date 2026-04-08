@@ -45,7 +45,8 @@ import CommissionsAdminPage from './pages/app/admin/CommissionsAdminPage';
 import AuditLogPage         from './pages/app/admin/AuditLogPage';
 import UsersPage            from './pages/app/admin/UsersPage';
 import ApprovalsPage        from './pages/app/admin/ApprovalsPage';
-import InviteDirectorPage   from './pages/app/admin/InviteDirectorPage';
+import AddUserPage          from './pages/app/admin/AddUserPage';
+import AcceptInvitePage     from './pages/onboarding/AcceptInvitePage';
 import SettingsPage         from './pages/app/admin/SettingsPage';
 import AdminPricingPage     from './pages/app/admin/PricingPage';
 import EnquiriesPage        from './pages/app/admin/EnquiriesPage';
@@ -108,6 +109,8 @@ export default function App() {
             <Route path="/login"          element={<LoginPage />} />
             <Route path="/signup"         element={<SignupPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            {/* Accept admin invite — public, user is not yet authenticated */}
+            <Route path="/accept-invite"  element={<AcceptInvitePage />} />
 
             {/* ── Onboarding (post-signup status pages) ───────── */}
             <Route path="/onboarding/pending"   element={<PendingApprovalPage />} />
@@ -200,11 +203,14 @@ export default function App() {
                 <ApprovalsPage />
               </ProtectedRoute>
             } />
-            <Route path="/admin/invite-director" element={
+            {/* Add User — unified invite page (replaces invite-director) */}
+            <Route path="/admin/add-user" element={
               <ProtectedRoute allowedRoles={['admin']}>
-                <InviteDirectorPage />
+                <AddUserPage />
               </ProtectedRoute>
             } />
+            {/* Backwards compat: old invite-director URL redirects to add-user */}
+            <Route path="/admin/invite-director" element={<Navigate to="/admin/add-user" replace />} />
 
             {/* ── Director routes ──────────────────────────────── */}
             <Route path="/director/dashboard" element={

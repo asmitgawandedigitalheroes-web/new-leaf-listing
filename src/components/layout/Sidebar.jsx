@@ -35,7 +35,7 @@ const NAV = {
     { key: 'dashboard',    label: 'Dashboard',    icon: HiViewColumns,         to: '/admin/dashboard' },
     { key: 'users',        label: 'Users',         icon: HiUsers,               to: '/admin/users' },
     { key: 'approvals',   label: 'Approvals',     icon: HiCheckBadge,          to: '/admin/approvals' },
-    { key: 'invite-director', label: 'Invite Director', icon: HiUserPlus,       to: '/admin/invite-director' },
+    { key: 'add-user',        label: 'Add User',         icon: HiUserPlus,       to: '/admin/add-user' },
     { key: 'listings',     label: 'Listings',      icon: HiHomeModern,          to: '/admin/listings' },
     { key: 'leads',        label: 'Leads',         icon: HiChatBubbleLeftRight,  to: '/admin/leads' },
     { key: 'enquiries',   label: 'Enquiries',     icon: HiEnvelope,            to: '/admin/enquiries' },

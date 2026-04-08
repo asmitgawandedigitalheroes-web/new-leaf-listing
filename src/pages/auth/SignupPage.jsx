@@ -118,8 +118,14 @@ export default function SignupPage() {
   const roleParam         = searchParams.get('role')         || '';
   const isDirectorInvite  = roleParam === 'director';
 
-  // If role is forced by URL, skip the role-selection step (start at step 1)
-  const [step, setStep] = useState(isDirectorInvite ? 1 : 0);
+  // Admin invite token (Flow 2 — quick link)
+  const inviteToken = searchParams.get('invite_token') || '';
+  const [inviteData,    setInviteData]    = useState(null);
+  const [inviteError,   setInviteError]   = useState('');
+  const [inviteLoading, setInviteLoading] = useState(!!inviteToken);
+
+  // If role is forced by URL or invite token present, skip the role-selection step
+  const [step, setStep] = useState((isDirectorInvite || !!inviteToken) ? 1 : 0);
   const [form, setForm] = useState({
     name: '', email: '', password: '', company: '',
     country: '', state: '', city: '',
@@ -166,6 +172,40 @@ export default function SignupPage() {
         }
       });
   }, []);
+
+  // Validate admin invite token (Flow 2)
+  useEffect(() => {
+    if (!inviteToken) return;
+    setInviteLoading(true);
+    supabase
+      .from('user_invitations')
+      .select('role, territory_id, email, full_name, status, expires_at')
+      .eq('token', inviteToken)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        setInviteLoading(false);
+        if (error || !data) {
+          setInviteError('This invite link is invalid or has been revoked. Please request a new one from your admin.');
+          return;
+        }
+        if (data.status === 'accepted') {
+          setInviteError('This invite link has already been used. Please sign in or request a new invite.');
+          return;
+        }
+        if (data.status !== 'pending' || new Date(data.expires_at) < new Date()) {
+          setInviteError('This invite link has expired. Please ask your admin for a new one.');
+          return;
+        }
+        setInviteData(data);
+        // Pre-fill role and any pre-provided fields from the invite
+        setForm(prev => ({
+          ...prev,
+          role: data.role,
+          email: data.email || prev.email,
+          name:  data.full_name || prev.name,
+        }));
+      });
+  }, [inviteToken]);
 
   const update = key => e => setForm(p => ({ ...p, [key]: e.target.value }));
 
@@ -223,11 +263,12 @@ export default function SignupPage() {
       state:                form.state,
       city:                 form.city,
       role:                 form.role,
-      territory_id:         inviteTerritoryId || null,
+      territory_id:         inviteData?.territory_id || inviteTerritoryId || null,
       assigned_director_id: inviteDirectorId  || null,
       license_number:       form.licenseNumber || null,
       license_state:        form.licenseState  || null,
       license_expiry:       form.licenseExpiry || null,
+      invite_token:         inviteToken || null,
     });
     setLoading(false);
     if (error) {
@@ -236,20 +277,55 @@ export default function SignupPage() {
     }
     addToast({ type: 'success', title: 'Account created!', desc: 'Welcome to New Leaf Listings.' });
     setTimeout(() => {
-      navigate(isDirector ? '/director/dashboard' : '/onboarding/pending');
+      // Admin-invited users (inviteToken) and directors go straight to their dashboard
+      const goToDirectorDash = isDirector || inviteData?.role === 'director';
+      if (inviteToken) {
+        navigate(goToDirectorDash ? '/director/dashboard' : '/realtor/dashboard');
+      } else {
+        navigate(isDirector ? '/director/dashboard' : '/onboarding/pending');
+      }
     }, 500);
   };
 
   const goBack = () => {
     if (step === 1) {
-      // Only go back to role selection if it wasn't forced by URL
-      if (!isDirectorInvite) setStep(0);
+      // Only go back to role selection if it wasn't forced by URL or invite token
+      if (!isDirectorInvite && !inviteToken) setStep(0);
     } else if (step === 2) {
       setStep(1);
     } else if (step === 3) {
       setStep(isDirector ? 1 : 2);
     }
   };
+
+  // Show loading/error state while validating invite token
+  if (inviteToken && inviteLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: SURFBG }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 36, height: 36, border: '3px solid #E5E7EB', borderTopColor: '#D4AF37', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+          <p style={{ fontSize: 14, color: LGRAY }}>Validating invite link…</p>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      </div>
+    );
+  }
+
+  if (inviteToken && !inviteLoading && inviteError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: SURFBG }}>
+        <div style={{ maxWidth: 400, width: '100%', background: '#fff', borderRadius: 20, padding: '40px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', border: '1px solid #E5E7EB', textAlign: 'center' }}>
+          <div className="flex justify-center mb-6"><NLVLogo mode="light" size="sm" /></div>
+          <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+            <HiRocketLaunch size={24} color="#DC2626" />
+          </div>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: OS, marginBottom: 8 }}>Invite Link Issue</h2>
+          <p style={{ fontSize: 14, color: OSV, lineHeight: 1.6, marginBottom: 24 }}>{inviteError}</p>
+          <a href="mailto:support@nlvlistings.com" style={{ fontSize: 13, color: LGRAY }}>Contact support@nlvlistings.com</a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 md:px-6 py-8 md:py-12" style={{ background: SURFBG }}>
@@ -398,13 +474,29 @@ export default function SignupPage() {
               )}
 
               {/* Realtor invite banner */}
-              {!isDirectorInvite && inviteTerritoryId && inviteDirectorId && (
+              {!isDirectorInvite && !inviteToken && inviteTerritoryId && inviteDirectorId && (
                 <div className="flex items-start gap-3 p-4 rounded-xl mb-5" style={{ background: SCL, border: '1px solid rgba(31,77,58,0.2)' }}>
                   <HiCheckBadge size={18} color={S} style={{ flexShrink: 0, marginTop: 1 }} />
                   <div>
                     <div className="text-[11px] font-black uppercase tracking-wider mb-0.5" style={{ color: S }}>Director Invite</div>
                     <p className="text-xs leading-relaxed" style={{ color: '#2D5A4A' }}>
                       You've been invited to join a territory. After signing up, you will be placed in the director's approval queue and automatically assigned to their territory.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Admin invite token banner (Flow 2) */}
+              {inviteData && (
+                <div className="flex items-start gap-3 p-4 rounded-xl mb-5" style={{ background: SCL, border: '1px solid rgba(31,77,58,0.2)' }}>
+                  <HiCheckBadge size={18} color={S} style={{ flexShrink: 0, marginTop: 1 }} />
+                  <div>
+                    <div className="text-[11px] font-black uppercase tracking-wider mb-0.5" style={{ color: S }}>
+                      {inviteData.role === 'director' ? 'Director Invite' : 'Realtor Invite'} — Admin
+                    </div>
+                    <p className="text-xs leading-relaxed" style={{ color: '#2D5A4A' }}>
+                      You've been invited to join as a <strong>{inviteData.role === 'director' ? 'Regional Director' : 'Realtor'}</strong>.
+                      Your account will be <strong>instantly activated</strong> — no approval wait required.
                     </p>
                   </div>
                 </div>
@@ -430,7 +522,7 @@ export default function SignupPage() {
               )}
 
               <div className="flex gap-3">
-                {!isDirectorInvite && (
+                {!isDirectorInvite && !inviteToken && (
                   <Button type="button" variant="outline" onClick={goBack} className="flex-shrink-0">
                     <HiArrowLeft size={15} />
                   </Button>

@@ -187,7 +187,7 @@ export function AuthProvider({ children }) {
             license_number: meta.license_number || null,
             license_state: meta.license_state || null,
             license_expiry: meta.license_expiry || null,
-            status: 'pending',
+            status: meta.invite_approved ? 'active' : 'pending',
             accepted_terms_at: new Date().toISOString(),
           })
           .select()
@@ -352,6 +352,7 @@ export function AuthProvider({ children }) {
     country = null, state = null, city = null, role = 'realtor',
     territory_id = null, assigned_director_id = null,
     license_number = null, license_state = null, license_expiry = null,
+    invite_token = null,
   }) => {
     setIsLoading(true);
 
@@ -374,6 +375,7 @@ export function AuthProvider({ children }) {
       license_number: license_number || null,
       license_state: license_state || null,
       license_expiry: license_expiry || null,
+      invite_approved: !!invite_token,
     };
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -402,8 +404,9 @@ export function AuthProvider({ children }) {
       setUser(authData.user);
 
       console.log(`[AuthContext] Creating profile for ${email} with role: ${role}`);
-      // Directors are pre-approved (invite-only); realtors need admin approval.
-      const initialStatus = role === 'director' ? 'active' : 'pending';
+      // Directors are pre-approved (invite-only); admin-invited users (invite_token) are
+      // also auto-approved regardless of role; realtors need admin approval otherwise.
+      const initialStatus = (role === 'director' || !!invite_token) ? 'active' : 'pending';
 
       const { error: profileError } = await supabase
         .from('profiles')
@@ -432,6 +435,22 @@ export function AuthProvider({ children }) {
         // RLS blocks the INSERT. The profile will be created on first login
         // via the pending_profile metadata recovery in loadUserData().
         console.warn('[AuthContext] Profile INSERT failed at signup (likely no session yet):', profileError.message);
+      }
+
+      // Mark invitation as accepted (non-fatal — profile already created above)
+      if (invite_token && !profileError) {
+        const { error: inviteErr } = await supabase
+          .from('user_invitations')
+          .update({
+            status: 'accepted',
+            accepted_at: new Date().toISOString(),
+            accepted_by: authData.user.id,
+          })
+          .eq('token', invite_token)
+          .eq('status', 'pending');
+        if (inviteErr) {
+          console.warn('[AuthContext] Could not mark invitation as accepted:', inviteErr.message);
+        }
       }
 
       await loadUserData(authData.user);
