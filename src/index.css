@@ -27,7 +27,7 @@
   --color-brand-600:  #1F4D3A;
  
   /* Luxury Dark & Ivory */
-  --color-jet-black: #0A0A0A;
+  --color-jet-black: #1F4D3A;
   --color-ivory:     #F7F6F2;
 
   /* Surfaces */
@@ -41,7 +41,7 @@
   --color-primary-muted:            rgba(31, 77, 58, 0.08);
 
   /* Dark */
-  --color-dark-900: #1A202C;
+  --color-dark-900: #0F2A1E;
   --color-dark-800: #2D3748;
   --color-dark-700: #4B5563;
 }
@@ -84,7 +84,7 @@ body {
 
 /* ── App Shell ── */
 .sidebar {
-  width: 240px; min-width: 240px; background: #1A202C;
+  width: 240px; min-width: 240px; background: var(--color-dark-900);
   border-right: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column;
   height: 100vh; overflow-y: auto;
 }
@@ -202,7 +202,7 @@ body {
 
 /* ── Hero bg ── */
 .hero-bg {
-  background-image: linear-gradient(rgba(10,10,10,.72), rgba(10,10,10,.88)),
+  background-image: linear-gradient(rgba(31,77,58,.72), rgba(31,77,58,.88)),
     url('https://images.unsplash.com/photo-1613977257363-707ba9348227?w=1600&q=80');
   background-size: cover; background-position: center;
 }

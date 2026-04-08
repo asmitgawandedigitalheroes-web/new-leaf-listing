@@ -381,6 +381,9 @@ export function useListings(filters = {}) {
     }
   };
 
+  // BUG-003: featureListing was missing — ListingDetail.jsx destructures it but it was never exported.
+  const featureListing = (id) => setUpgradeType(id, 'featured');
+
   return {
     listings,
     isLoading,
@@ -396,6 +399,7 @@ export function useListings(filters = {}) {
     markUnderContract,        // active → under_contract
     markSold,                 // active/under_contract → sold
     archiveListing,           // active → expired
+    featureListing,           // active → featured upgrade type (admin/director only)
     setUpgradeType,           // set upgrade tier (admin/director) or initiate Stripe (realtor)
     deleteListing,            // permanently remove a listing
   };

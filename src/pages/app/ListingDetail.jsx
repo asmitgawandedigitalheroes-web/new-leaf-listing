@@ -142,17 +142,17 @@ export default function ListingDetail() {
       const { error: leadError } = await createInquiry({
         listing_id: listing.id,
         source: 'listing_detail',
-        contact_name: contactForm.name,
-        contact_email: contactForm.email,
-        contact_phone: contactForm.phone,
+        name: contactForm.name,
+        email: contactForm.email,
+        phone: contactForm.phone,
         message: contactForm.message,
-        interest_type: contactForm.interest,
+        interest: contactForm.interest,
         territory_id: listing.territory_id,
         status: 'new',
       });
 
       if (leadError) throw leadError;
-      
+
       addToast({
         type: 'success',
         title: 'Request sent',
@@ -162,7 +162,8 @@ export default function ListingDetail() {
       // Reset non-auth fields
       setContactForm(prev => ({ ...prev, message: '', phone: '' }));
     } catch (err) {
-      addToast({ type: 'error', title: 'Could not send request', desc: err?.message || 'Please try again.' });
+      console.error('Contact agent error:', err);
+      addToast({ type: 'error', title: 'Could not send request', desc: 'Unable to send your inquiry. Please try again or contact support.' });
     } finally {
       setIsContactLoading(false);
     }
@@ -399,12 +400,13 @@ export default function ListingDetail() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Phone Number</label>
-                <input 
-                  type="tel" 
+                <input
+                  type="tel"
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none text-sm"
                   value={contactForm.phone}
-                  onChange={e => setContactForm({...contactForm, phone: e.target.value})}
+                  onChange={e => setContactForm({...contactForm, phone: e.target.value.replace(/[^0-9+\-\s()]/g, '').slice(0, 20)})}
                   placeholder="(555) 000-0000"
+                  maxLength={20}
                 />
               </div>
               <div>

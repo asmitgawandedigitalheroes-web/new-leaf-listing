@@ -409,7 +409,7 @@ export default function RealtorListingsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Price ($) *</label>
-              <input type="number" value={form.price} onChange={e => { setForm(f => ({ ...f, price: e.target.value })); setFormFieldErrors(fe => ({ ...fe, price: '' })); }} className={inputClass + (formFieldErrors.price ? ' border-red-400' : '')} placeholder="500000" />
+              <input type="number" min="0" step="1" value={form.price} onChange={e => { setForm(f => ({ ...f, price: e.target.value })); setFormFieldErrors(fe => ({ ...fe, price: '' })); }} className={inputClass + (formFieldErrors.price ? ' border-red-400' : '')} placeholder="500000" />
               {formFieldErrors.price && <p className="text-xs mt-1 text-red-500">{formFieldErrors.price}</p>}
             </div>
             <div>
@@ -422,15 +422,15 @@ export default function RealtorListingsPage() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className={labelClass}>Beds</label>
-              <input type="number" value={form.bedrooms} onChange={e => setForm(f => ({ ...f, bedrooms: e.target.value }))} className={inputClass} placeholder="3" />
+              <input type="number" min="0" step="1" value={form.bedrooms} onChange={e => setForm(f => ({ ...f, bedrooms: e.target.value }))} className={inputClass} placeholder="3" />
             </div>
             <div>
               <label className={labelClass}>Baths</label>
-              <input type="number" step="0.5" value={form.bathrooms} onChange={e => setForm(f => ({ ...f, bathrooms: e.target.value }))} className={inputClass} placeholder="2" />
+              <input type="number" min="0" step="0.5" value={form.bathrooms} onChange={e => setForm(f => ({ ...f, bathrooms: e.target.value }))} className={inputClass} placeholder="2" />
             </div>
             <div>
               <label className={labelClass}>Sqft</label>
-              <input type="number" value={form.sqft} onChange={e => setForm(f => ({ ...f, sqft: e.target.value }))} className={inputClass} placeholder="1500" />
+              <input type="number" min="0" step="1" value={form.sqft} onChange={e => setForm(f => ({ ...f, sqft: e.target.value }))} className={inputClass} placeholder="1500" />
             </div>
           </div>
         </div>
@@ -831,7 +831,14 @@ export default function RealtorListingsPage() {
               {step > 0 && <Button variant="ghost" onClick={() => setStep(s => s - 1)}>Back</Button>}
               <Button variant="ghost" onClick={closeCreate}>Cancel</Button>
               {step < STEPS.length - 1 ? (
-                <Button variant="primary" onClick={() => setStep(s => s + 1)}>Next</Button>
+                <Button variant="primary" onClick={() => {
+                  const errs = validateCreateStep(step, form);
+                  if (Object.keys(errs).length > 0) {
+                    setFormFieldErrors(fe => ({ ...fe, ...errs }));
+                    return;
+                  }
+                  setStep(s => s + 1);
+                }}>Next</Button>
               ) : (
                 <Button variant="primary" onClick={handleCreate} isLoading={isSubmitting}>
                   Save as Draft
@@ -869,7 +876,7 @@ export default function RealtorListingsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Price ($)</label>
-              <input type="number" value={editForm.price} onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))} className={inputClass} />
+              <input type="number" min="0" step="1" value={editForm.price} onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))} className={inputClass} />
             </div>
             <div>
               <label className={labelClass}>Property Type</label>
@@ -881,15 +888,15 @@ export default function RealtorListingsPage() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className={labelClass}>Beds</label>
-              <input type="number" value={editForm.bedrooms} onChange={e => setEditForm(f => ({ ...f, bedrooms: e.target.value }))} className={inputClass} />
+              <input type="number" min="0" step="1" value={editForm.bedrooms} onChange={e => setEditForm(f => ({ ...f, bedrooms: e.target.value }))} className={inputClass} />
             </div>
             <div>
               <label className={labelClass}>Baths</label>
-              <input type="number" step="0.5" value={editForm.bathrooms} onChange={e => setEditForm(f => ({ ...f, bathrooms: e.target.value }))} className={inputClass} />
+              <input type="number" min="0" step="0.5" value={editForm.bathrooms} onChange={e => setEditForm(f => ({ ...f, bathrooms: e.target.value }))} className={inputClass} />
             </div>
             <div>
               <label className={labelClass}>Sqft</label>
-              <input type="number" value={editForm.sqft} onChange={e => setEditForm(f => ({ ...f, sqft: e.target.value }))} className={inputClass} />
+              <input type="number" min="0" step="1" value={editForm.sqft} onChange={e => setEditForm(f => ({ ...f, sqft: e.target.value }))} className={inputClass} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">

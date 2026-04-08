@@ -20,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSubscriptions } from '../../hooks/useSubscriptions';
 import { useNavigate } from 'react-router-dom';
 import { pricingService } from '../../../services/pricing.service';
+import { useToast } from '../../context/ToastContext';
 
 // NLV Brand Colors
 const PRIMARY   = '#D4AF37';
@@ -38,7 +39,7 @@ const BORDER    = '#E5E7EB';
 // Removed legacy Ico function
 
 const FAQ = [
-  { q: 'Can I switch plans at any time?', a: 'Yes — upgrade or downgrade whenever you like. Changes apply at the next billing cycle.' },
+  { q: 'Can I switch plans at any time?', a: 'Yes — upgrade or downgrade whenever you like. Changes apply at the next billing cycle. Note: the Starter plan requires a 12-month minimum commitment; early cancellation does not waive the remaining monthly fees.' },
   { q: 'Is there a free trial?', a: 'All paid plans include a 14-day free trial. No credit card required to start.' },
   { q: 'How does commission tracking work?', a: 'Commissions are calculated automatically from your configured split percentages. All parties are notified instantly upon disbursement.' },
   { q: 'What payment methods do you accept?', a: 'We accept all major credit cards, ACH transfers, and wire payments for Enterprise plans.' },
@@ -67,6 +68,7 @@ function PlanCard({ plan, annual, adjPrice, isInvited }) {
   const { user } = useAuth();
   const { subscription, createCheckoutSession, isLoading } = useSubscriptions();
   const navigate = useNavigate();
+  const { addToast } = useToast();
 
   const cfg   = TIER_CONFIG[plan.name] || TIER_CONFIG.Free;
   const isG   = plan.name === 'Professional';
@@ -80,7 +82,7 @@ function PlanCard({ plan, annual, adjPrice, isInvited }) {
       return;
     }
     if (isCurrent) return;
-    
+
     if (plan.name === 'Enterprise') {
       window.location.href = 'mailto:sales@nlvlistings.com';
       return;
@@ -91,7 +93,10 @@ function PlanCard({ plan, annual, adjPrice, isInvited }) {
       return;
     }
 
-    await createCheckoutSession(plan.name.toLowerCase(), { invitedFlow: isInvited });
+    const result = await createCheckoutSession(plan.name.toLowerCase(), { invitedFlow: isInvited });
+    if (result?.error) {
+      addToast({ type: 'error', title: 'Checkout unavailable', desc: 'Unable to start checkout. Please try again or contact support.' });
+    }
   };
 
   return (
@@ -151,6 +156,12 @@ function PlanCard({ plan, annual, adjPrice, isInvited }) {
             ? 'Billed annually · Save 20%'
             : plan.period}
         </p>
+        {plan.slug === 'starter' && (
+          <div className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+            style={{ background: '#FEF9C3', color: '#92400E' }}>
+            12-month minimum commitment
+          </div>
+        )}
       </div>
 
       {/* Body */}
