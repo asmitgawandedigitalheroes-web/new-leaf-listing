@@ -82,6 +82,34 @@ export function useLeads() {
   }, [fetchLeads, user]);
 
   /**
+   * Fetch leads assigned to the current director (queued for realtor assignment).
+   * Directors call this to see: assigned_director_id = auth.uid() AND assigned_realtor_id IS NULL
+   */
+  const fetchDirectorQueue = useCallback(async () => {
+    if (role !== 'director') return { data: [], error: null };
+
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('leads')
+        .select(`
+          *,
+          listing:listings(title, address, city, state),
+          assigned_realtor:profiles!leads_assigned_realtor_id_fkey(full_name, email),
+          assigned_director:profiles!leads_assigned_director_id_fkey(full_name, email)
+        `)
+        .eq('assigned_director_id', user.id)
+        .is('assigned_realtor_id', null)
+        .order('created_at', { ascending: false });
+
+      if (fetchError) throw fetchError;
+      return { data: data || [], error: null };
+    } catch (err) {
+      console.error('[useLeads] Fetch director queue error:', err);
+      return { data: [], error: err };
+    }
+  }, [user, role]);
+
+  /**
    * Create a new lead from a website inquiry.
    * This is a public-facing action (status = 'new').
    */
@@ -290,6 +318,43 @@ export function useLeads() {
     }
   }, []);
 
+  /**
+   * Assign a lead to a director (admin only).
+   * Director will then manually assign to one of their realtors.
+   * No 180-day lock applied yet (lock applies when director assigns to realtor).
+   */
+  const assignLeadToDirector = async (id, directorId) => {
+    try {
+      const { data, error: updateError } = await supabase
+        .from('leads')
+        .update({
+          assigned_director_id: directorId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select('*, listing:listings(title, address, city, state), assigned_director:profiles!leads_assigned_director_id_fkey(full_name, email)')
+        .single();
+
+      if (updateError) throw updateError;
+
+      audit(user.id, 'lead.assigned_to_director', id, { director_id: directorId }).catch(() => {});
+
+      // Notify director of new lead assignment
+      notificationService.notifyDirectorLead(id, directorId).catch(console.error);
+
+      // Update state with full lead data including director info
+      if (data) {
+        setLeads(prev => prev.map(l => l.id === id ? data : l));
+      } else {
+        setLeads(prev => prev.map(l => l.id === id ? { ...l, assigned_director_id: directorId } : l));
+      }
+      return { data, error: null };
+    } catch (err) {
+      console.error('[useLeads] Assign to director error:', err);
+      return { data: null, error: err };
+    }
+  };
+
   return {
     leads,
     isLoading,
@@ -300,6 +365,8 @@ export function useLeads() {
     reassignLead,
     addLeadNote,
     fetchAvailableRealtors,
+    fetchDirectorQueue,
+    assignLeadToDirector,
   };
 }
 

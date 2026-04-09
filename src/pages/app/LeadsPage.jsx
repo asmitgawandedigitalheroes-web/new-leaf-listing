@@ -233,7 +233,7 @@ export default function LeadsPage() {
                             size="sm"
                             onClick={e => { e.stopPropagation(); openReassign(lead); }}
                           >
-                            Reassign
+                            {!lead.assigned_realtor_id && !lead.assigned_director_id ? 'Assign' : 'Reassign'}
                           </Button>
                         )}
                       </div>

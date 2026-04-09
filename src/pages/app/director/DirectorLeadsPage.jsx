@@ -8,6 +8,7 @@ import { useLeads } from '../../../hooks/useLeads';
 import { useToast } from '../../../context/ToastContext';
 import { HiCheckCircle, HiUserGroup, HiXMark } from 'react-icons/hi2';
 import LeadDrawer from '../../../components/shared/LeadDrawer';
+import { supabase } from '../../../lib/supabase';
 
 const SCORE_COLOR = (s) => s >= 80 ? '#1F4D3A' : s >= 50 ? '#D4AF37' : '#DC2626';
 
@@ -26,7 +27,7 @@ const toColumn = (status) => {
 export default function DirectorLeadsPage() {
   const { profile } = useAuth();
   const { addToast } = useToast();
-  const { leads, isLoading, reassignLead, fetchAvailableRealtors, updateLeadStatus, addLeadNote } = useLeads();
+  const { leads, isLoading, reassignLead, fetchAvailableRealtors, updateLeadStatus, addLeadNote, fetchDirectorQueue } = useLeads();
 
   const [assignOpen, setAssignOpen]     = useState(false);
   const [assignTarget, setAssignTarget] = useState(null);
@@ -41,6 +42,47 @@ export default function DirectorLeadsPage() {
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [bulkAssignTo, setBulkAssignTo]   = useState('');
   const [bulkAssigning, setBulkAssigning] = useState(false);
+
+  // Director queue state
+  const [directorQueue, setDirectorQueue] = useState([]);
+  const [queueLoading, setQueueLoading] = useState(false);
+
+  // Fetch director queue with real-time updates
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    const refreshQueue = async () => {
+      setQueueLoading(true);
+      const { data } = await fetchDirectorQueue();
+      setDirectorQueue(data || []);
+      setQueueLoading(false);
+    };
+
+    // Initial fetch
+    refreshQueue();
+
+    // Subscribe to real-time changes on leads table
+    const subscription = supabase
+      .channel(`leads-${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'leads',
+          filter: `assigned_director_id=eq.${profile.id}`,
+        },
+        (payload) => {
+          // Refetch director queue when any change happens
+          refreshQueue();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [profile?.id, fetchDirectorQueue]);
 
   // Pass territory_id so only territory realtors appear in assign dropdown
   useEffect(() => {
