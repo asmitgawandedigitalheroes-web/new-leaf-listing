@@ -142,6 +142,14 @@ export function useAdminSubscriptions() {
     .filter(s => s.status === 'active' || s.status === 'trialing')
     .reduce((sum, s) => sum + (planPrices[s.plan] || 0), 0);
 
+  /**
+   * Change the plan of a subscription (DB-only; for Stripe-linked subs the
+   * next webhook cycle will reconcile the billing).
+   */
+  const changePlan = async (id, newPlan) => {
+    return updateSubscription(id, { plan: newPlan });
+  };
+
   return {
     subscriptions,
     planPrices,
@@ -151,6 +159,7 @@ export function useAdminSubscriptions() {
     refresh: fetchSubscriptions,
     cancelSubscription,
     reactivateSubscription,
+    changePlan,
   };
 }
 

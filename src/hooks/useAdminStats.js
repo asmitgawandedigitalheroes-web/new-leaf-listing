@@ -10,7 +10,9 @@ export function useAdminStats() {
     activeLeads: 0,
     monthlyRevenue: 0,
     pendingApprovals: 0,
-    historicalChart: []
+    historicalChart: [],
+    commissionLiability: 0,
+    payoutsThisMonth: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -28,7 +30,12 @@ export function useAdminStats() {
       sevenMonthsAgo.setDate(1);
       sevenMonthsAgo.setHours(0, 0, 0, 0);
 
-      const [listingsRes, leadsRes, revenueRes, pendingRes, chartRes] = await Promise.all([
+      // Start of current month for payouts-this-month query
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const [listingsRes, leadsRes, revenueRes, pendingRes, chartRes, liabilityRes, payoutsRes] = await Promise.all([
         // Total listings count
         supabase.from('listings').select('*', { count: 'exact', head: true }),
         // Active leads (exclude terminal statuses)
@@ -39,6 +46,10 @@ export function useAdminStats() {
         supabase.from('listings').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         // Listings for historical chart (last 7 months)
         supabase.from('listings').select('created_at').gte('created_at', sevenMonthsAgo.toISOString()),
+        // Commission liability = sum of approved + payable commissions (outstanding obligation)
+        supabase.from('commissions').select('amount').in('status', ['approved', 'payable']),
+        // Payouts processed this month
+        supabase.from('payout_requests').select('amount').eq('status', 'processed').gte('processed_at', startOfMonth.toISOString()),
       ]);
 
       // Calculate monthly revenue total
@@ -71,12 +82,17 @@ export function useAdminStats() {
         value: chartRows.filter(l => l.created_at && l.created_at.startsWith(m.key)).length,
       }));
 
+      const commissionLiability = (liabilityRes.data || []).reduce((sum, c) => sum + Number(c.amount || 0), 0);
+      const payoutsThisMonth    = (payoutsRes.data   || []).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
       setStats({
         totalListings: listingsRes.count || 0,
         activeLeads: leadsRes.count || 0,
         monthlyRevenue: finalRevenue,
         pendingApprovals: pendingRes.count || 0,
         historicalChart,
+        commissionLiability,
+        payoutsThisMonth,
       });
     } catch (err) {
       console.error('[useAdminStats] Error:', err);

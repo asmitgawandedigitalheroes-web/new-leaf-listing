@@ -44,14 +44,23 @@ import SubscriptionsPage    from './pages/app/admin/SubscriptionsPage';
 import CommissionsAdminPage from './pages/app/admin/CommissionsAdminPage';
 import AuditLogPage         from './pages/app/admin/AuditLogPage';
 import UsersPage            from './pages/app/admin/UsersPage';
+import ApprovalsPage        from './pages/app/admin/ApprovalsPage';
+import AddUserPage          from './pages/app/admin/AddUserPage';
+import AcceptInvitePage     from './pages/onboarding/AcceptInvitePage';
 import SettingsPage         from './pages/app/admin/SettingsPage';
 import AdminPricingPage     from './pages/app/admin/PricingPage';
+import EnquiriesPage        from './pages/app/admin/EnquiriesPage';
+import DisputesPage         from './pages/app/admin/DisputesPage';
+import PayoutsPage          from './pages/app/admin/PayoutsPage';
 
 // ── Director pages ────────────────────────────────────────────────
+import DirectorListingsPage     from './pages/app/director/DirectorListingsPage';
 import DirectorLeadsPage       from './pages/app/director/DirectorLeadsPage';
 import DirectorRealtorsPage    from './pages/app/director/DirectorRealtorsPage';
 import DirectorCommissionsPage from './pages/app/director/DirectorCommissionsPage';
 import DirectorReportsPage     from './pages/app/director/DirectorReportsPage';
+import DirectorContractsPage   from './pages/app/director/DirectorContractsPage';
+import DirectorBillingPage     from './pages/app/director/DirectorBillingPage';
 
 // ── Realtor pages ─────────────────────────────────────────────────
 import RealtorListingsPage    from './pages/app/realtor/RealtorListingsPage';
@@ -60,6 +69,10 @@ import RealtorCommissionsPage from './pages/app/realtor/RealtorCommissionsPage';
 import RealtorProfilePage     from './pages/app/realtor/RealtorProfilePage';
 import RealtorMessagesPage    from './pages/app/realtor/RealtorMessagesPage';
 import RealtorReferralsPage   from './pages/app/realtor/RealtorReferralsPage';
+
+// ── Onboarding pages ─────────────────────────────────────────────
+import PendingApprovalPage from './pages/onboarding/PendingApprovalPage';
+import NotFoundPage from './pages/NotFoundPage';
 
 // ── Listing detail + edit ─────────────────────────────────────────
 import ListingDetail   from './pages/app/ListingDetail';
@@ -82,6 +95,8 @@ export default function App() {
             <Route path="/about"   element={<AboutPage />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/terms-of-service" element={<TermsOfService />} />
+            {/* BUG-002: /terms short URL redirect */}
+            <Route path="/terms" element={<Navigate to="/terms-of-service" replace />} />
             <Route path="/privacy-policy"   element={<PrivacyPolicy />} />
             <Route path="/platform-rules"   element={<PlatformRules />} />
             <Route path="/full-contracts"   element={
@@ -94,6 +109,23 @@ export default function App() {
             <Route path="/login"          element={<LoginPage />} />
             <Route path="/signup"         element={<SignupPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            {/* Accept admin invite — public, user is not yet authenticated */}
+            <Route path="/accept-invite"  element={<AcceptInvitePage />} />
+
+            {/* ── Onboarding (post-signup status pages) ───────── */}
+            <Route path="/onboarding/pending"   element={<PendingApprovalPage />} />
+            <Route path="/onboarding/suspended" element={
+              <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+                <div className="max-w-md text-center bg-white p-10 rounded-2xl shadow-md border border-gray-100">
+                  <div className="text-5xl mb-4">🚫</div>
+                  <h1 className="text-2xl font-black text-gray-800 mb-3">Account Suspended</h1>
+                  <p className="text-sm text-gray-500 mb-6">Your account has been suspended. Please contact support for assistance.</p>
+                  <a href="mailto:support@nlvlistings.com" className="inline-block px-6 py-2.5 bg-gray-800 text-white text-sm font-bold rounded-lg hover:bg-gray-700">
+                    Contact Support
+                  </a>
+                </div>
+              </div>
+            } />
 
             {/* ── Admin routes ─────────────────────────────────── */}
             <Route path="/admin/dashboard" element={
@@ -109,6 +141,11 @@ export default function App() {
             <Route path="/admin/leads" element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <LeadsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/enquiries" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <EnquiriesPage />
               </ProtectedRoute>
             } />
             <Route path="/admin/territories" element={
@@ -133,6 +170,18 @@ export default function App() {
             } />
             {/* Alias so legacy navigate('/admin/audit-log') still works */}
             <Route path="/admin/audit-log" element={<Navigate to="/admin/audit" replace />} />
+            {/* H-3 fix: redirect /admin/commissions to the correct route */}
+            <Route path="/admin/commissions" element={<Navigate to="/admin/commissions-admin" replace />} />
+            <Route path="/admin/disputes" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <DisputesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/payouts" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <PayoutsPage />
+              </ProtectedRoute>
+            } />
             <Route path="/admin/settings" element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <SettingsPage />
@@ -148,72 +197,103 @@ export default function App() {
                 <UsersPage />
               </ProtectedRoute>
             } />
+            {/* FIX: CRIT-002 — Added missing /admin/approvals route */}
+            <Route path="/admin/approvals" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <ApprovalsPage />
+              </ProtectedRoute>
+            } />
+            {/* Add User — unified invite page (replaces invite-director) */}
+            <Route path="/admin/add-user" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AddUserPage />
+              </ProtectedRoute>
+            } />
+            {/* Backwards compat: old invite-director URL redirects to add-user */}
+            <Route path="/admin/invite-director" element={<Navigate to="/admin/add-user" replace />} />
 
             {/* ── Director routes ──────────────────────────────── */}
             <Route path="/director/dashboard" element={
-              <ProtectedRoute allowedRoles={['admin', 'director']}>
+              <ProtectedRoute allowedRoles={['director']}>
                 <DirectorDashboard />
               </ProtectedRoute>
             } />
+            <Route path="/director/listings" element={
+              <ProtectedRoute allowedRoles={['director']}>
+                <DirectorListingsPage />
+              </ProtectedRoute>
+            } />
             <Route path="/director/leads" element={
-              <ProtectedRoute allowedRoles={['admin', 'director']}>
+              <ProtectedRoute allowedRoles={['director']}>
                 <DirectorLeadsPage />
               </ProtectedRoute>
             } />
             <Route path="/director/realtors" element={
-              <ProtectedRoute allowedRoles={['admin', 'director']}>
+              <ProtectedRoute allowedRoles={['director']}>
                 <DirectorRealtorsPage />
               </ProtectedRoute>
             } />
             <Route path="/director/commissions" element={
-              <ProtectedRoute allowedRoles={['admin', 'director']}>
+              <ProtectedRoute allowedRoles={['director']}>
                 <DirectorCommissionsPage />
               </ProtectedRoute>
             } />
             <Route path="/director/reports" element={
-              <ProtectedRoute allowedRoles={['admin', 'director']}>
+              <ProtectedRoute allowedRoles={['director']}>
                 <DirectorReportsPage />
               </ProtectedRoute>
             } />
+            <Route path="/director/contracts" element={
+              <ProtectedRoute allowedRoles={['director']}>
+                <DirectorContractsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/director/billing" element={
+              <ProtectedRoute allowedRoles={['director']}>
+                <DirectorBillingPage />
+              </ProtectedRoute>
+            } />
+            {/* BUG-005: /director/legal → /director/contracts redirect */}
+            <Route path="/director/legal" element={<Navigate to="/director/contracts" replace />} />
 
             {/* ── Realtor routes ───────────────────────────────── */}
             <Route path="/realtor/dashboard" element={
-              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+              <ProtectedRoute allowedRoles={['director', 'realtor']}>
                 <RealtorDashboard />
               </ProtectedRoute>
             } />
             <Route path="/realtor/listings" element={
-              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+              <ProtectedRoute allowedRoles={['director', 'realtor']}>
                 <RealtorListingsPage />
               </ProtectedRoute>
             } />
             <Route path="/realtor/leads" element={
-              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+              <ProtectedRoute allowedRoles={['director', 'realtor']}>
                 <RealtorLeadsPage />
               </ProtectedRoute>
             } />
             <Route path="/realtor/commissions" element={
-              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+              <ProtectedRoute allowedRoles={['director', 'realtor']}>
                 <RealtorCommissionsPage />
               </ProtectedRoute>
             } />
             <Route path="/realtor/billing" element={
-              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+              <ProtectedRoute allowedRoles={['director', 'realtor']}>
                 <BillingPage />
               </ProtectedRoute>
             } />
             <Route path="/realtor/profile" element={
-              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+              <ProtectedRoute allowedRoles={['director', 'realtor']}>
                 <RealtorProfilePage />
               </ProtectedRoute>
             } />
             <Route path="/realtor/messages" element={
-              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+              <ProtectedRoute allowedRoles={['director', 'realtor']}>
                 <RealtorMessagesPage />
               </ProtectedRoute>
             } />
             <Route path="/realtor/referrals" element={
-              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+              <ProtectedRoute allowedRoles={['director', 'realtor']}>
                 <RealtorReferralsPage />
               </ProtectedRoute>
             } />
@@ -246,7 +326,7 @@ export default function App() {
             <Route path="/app/dashboard"      element={<Navigate to="/realtor/dashboard" replace />} />
 
             {/* ── Catch-all 404 ────────────────────────────────── */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFoundPage />} />
 
             </Routes>
           </BrowserRouter>

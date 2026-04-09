@@ -5,191 +5,26 @@ import { useAuth } from '../../../context/AuthContext';
 import { pricingService } from '../../../../services/pricing.service';
 import Button from '../../../components/ui/Button';
 import Skeleton from '../../../components/ui/Skeleton';
+import PlanEditModal from '../../../components/modals/PlanEditModal';
+import ListingPriceEditModal from '../../../components/modals/ListingPriceEditModal';
 import {
   HiCurrencyDollar,
   HiCheckCircle,
   HiXCircle,
   HiPencil,
-  HiCheck,
-  HiXMark,
   HiHomeModern,
+  HiChevronRight,
+  HiCog6Tooth
 } from 'react-icons/hi2';
 
 const P      = '#D4AF37';
 const DEEP   = '#1F4D3A';
 const OS     = '#111111';
+const OSV    = '#6B7280';
 const LGRAY  = '#6B7280';
 const BORDER = '#E5E7EB';
 const SURF   = '#F9FAFB';
 
-// ── Inline editable cell ──────────────────────────────────────────────────────
-function EditablePrice({ value, onSave, prefix = '$' }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-
-  const commit = () => {
-    const num = parseFloat(draft);
-    if (!isNaN(num) && num >= 0) { onSave(num); }
-    setEditing(false);
-  };
-
-  if (editing) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <span style={{ fontSize: 13, color: LGRAY }}>{prefix}</span>
-        <input
-          autoFocus
-          type="number"
-          min="0"
-          step="0.01"
-          value={draft}
-          onChange={e => setDraft(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
-          style={{
-            width: 80, padding: '3px 6px', border: `1px solid ${P}`,
-            borderRadius: 6, fontSize: 13, outline: 'none',
-          }}
-        />
-        <button onClick={commit} style={{ color: '#22C55E', background: 'none', border: 'none', cursor: 'pointer' }}>
-          <HiCheck size={16} />
-        </button>
-        <button onClick={() => setEditing(false)} style={{ color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer' }}>
-          <HiXMark size={16} />
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <button
-      onClick={() => { setDraft(value); setEditing(true); }}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 5,
-        background: 'none', border: 'none', cursor: 'pointer',
-        fontSize: 15, fontWeight: 700, color: OS, padding: 0,
-      }}
-      title="Click to edit"
-    >
-      {prefix}{typeof value === 'number' ? value.toFixed(2) : value}
-      <HiPencil size={12} color={LGRAY} />
-    </button>
-  );
-}
-
-function EditableText({ value, onSave, multiline = false }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-
-  const commit = () => { if (draft.trim()) onSave(draft.trim()); setEditing(false); };
-
-  if (editing) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {multiline ? (
-          <textarea
-            autoFocus
-            rows={3}
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            style={{ padding: '4px 8px', border: `1px solid ${P}`, borderRadius: 6, fontSize: 13, resize: 'vertical', outline: 'none', width: '100%' }}
-          />
-        ) : (
-          <input
-            autoFocus
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
-            style={{ padding: '3px 8px', border: `1px solid ${P}`, borderRadius: 6, fontSize: 13, outline: 'none' }}
-          />
-        )}
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button onClick={commit} style={{ color: '#22C55E', background: 'none', border: 'none', cursor: 'pointer' }}><HiCheck size={15} /></button>
-          <button onClick={() => setEditing(false)} style={{ color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer' }}><HiXMark size={15} /></button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <button
-      onClick={() => { setDraft(value); setEditing(true); }}
-      style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'inline-flex', alignItems: 'flex-start', gap: 4, padding: 0 }}
-      title="Click to edit"
-    >
-      <span style={{ fontSize: 13, color: OS }}>{value}</span>
-      <HiPencil size={11} color={LGRAY} style={{ flexShrink: 0, marginTop: 2 }} />
-    </button>
-  );
-}
-
-function Toggle({ value, onChange, disabled }) {
-  return (
-    <button
-      disabled={disabled}
-      onClick={() => onChange(!value)}
-      style={{
-        width: 40, height: 22, borderRadius: 11,
-        background: value ? '#22C55E' : '#D1D5DB',
-        border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
-        position: 'relative', transition: 'background 0.2s', flexShrink: 0,
-        opacity: disabled ? 0.5 : 1,
-      }}
-    >
-      <span style={{
-        position: 'absolute', top: 2, left: value ? 20 : 2, width: 18, height: 18,
-        borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-      }} />
-    </button>
-  );
-}
-
-// ── Features editor ───────────────────────────────────────────────────────────
-function FeaturesEditor({ features, onChange }) {
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState(features.join('\n'));
-
-  const save = () => {
-    const arr = draft.split('\n').map(s => s.trim()).filter(Boolean);
-    onChange(arr);
-    setOpen(false);
-  };
-
-  return (
-    <div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
-        {features.slice(0, 3).map((f, i) => (
-          <span key={i} style={{ fontSize: 11, background: '#F3F4F6', color: LGRAY, borderRadius: 4, padding: '2px 6px' }}>
-            {f}
-          </span>
-        ))}
-        {features.length > 3 && (
-          <span style={{ fontSize: 11, color: LGRAY }}>+{features.length - 3} more</span>
-        )}
-      </div>
-      {!open ? (
-        <button onClick={() => setOpen(true)} style={{ fontSize: 11, color: P, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-          Edit features
-        </button>
-      ) : (
-        <div style={{ marginTop: 4 }}>
-          <textarea
-            autoFocus
-            rows={6}
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            placeholder="One feature per line"
-            style={{ width: '100%', padding: '6px 8px', border: `1px solid ${P}`, borderRadius: 6, fontSize: 12, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
-          />
-          <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-            <button onClick={save} style={{ fontSize: 12, color: '#fff', background: '#22C55E', border: 'none', borderRadius: 5, padding: '3px 10px', cursor: 'pointer' }}>Save</button>
-            <button onClick={() => setOpen(false)} style={{ fontSize: 12, color: LGRAY, background: '#F3F4F6', border: 'none', borderRadius: 5, padding: '3px 10px', cursor: 'pointer' }}>Cancel</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function AdminPricingPage() {
@@ -200,7 +35,11 @@ export default function AdminPricingPage() {
   const [plans, setPlans] = useState([]);
   const [listingPrices, setListingPrices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [saving, setSaving] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Modal states
+  const [editingPlan, setEditingPlan] = useState(null);
+  const [editingListingPrice, setEditingListingPrice] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -216,31 +55,33 @@ export default function AdminPricingPage() {
     load();
   }, []);
 
-  // ── Plan field save ──────────────────────────────────────────────────────
-  const savePlanField = async (plan, field, value) => {
-    const key = `plan-${plan.id}-${field}`;
-    setSaving(s => ({ ...s, [key]: true }));
-    const { error } = await pricingService.updatePricingPlan(plan.id, { [field]: value }, actorId);
-    setSaving(s => ({ ...s, [key]: false }));
+  const handleUpdatePlan = async (updates) => {
+    if (!editingPlan) return;
+    setIsSubmitting(true);
+    const { data, error } = await pricingService.updatePricingPlan(editingPlan.id, updates, actorId);
+    setIsSubmitting(false);
+
     if (error) {
-      addToast({ type: 'error', title: 'Save failed', desc: error });
+      addToast({ type: 'error', title: 'Update failed', desc: error });
     } else {
-      setPlans(ps => ps.map(p => p.id === plan.id ? { ...p, [field]: value } : p));
-      addToast({ type: 'success', title: 'Saved', desc: `${plan.name} ${field.replace(/_/g, ' ')} updated.` });
+      setPlans(prev => prev.map(p => p.id === editingPlan.id ? { ...p, ...updates } : p));
+      setEditingPlan(null);
+      addToast({ type: 'success', title: 'Plan Updated', desc: 'Subscription plan changes have been saved.' });
     }
   };
 
-  // ── Listing price field save ──────────────────────────────────────────────
-  const saveListingField = async (lp, field, value) => {
-    const key = `lp-${lp.id}-${field}`;
-    setSaving(s => ({ ...s, [key]: true }));
-    const { error } = await pricingService.updateListingPrice(lp.id, { [field]: value }, actorId);
-    setSaving(s => ({ ...s, [key]: false }));
+  const handleUpdateListingPrice = async (updates) => {
+    if (!editingListingPrice) return;
+    setIsSubmitting(true);
+    const { data, error } = await pricingService.updateListingPrice(editingListingPrice.id, updates, actorId);
+    setIsSubmitting(false);
+
     if (error) {
-      addToast({ type: 'error', title: 'Save failed', desc: error });
+      addToast({ type: 'error', title: 'Update failed', desc: error });
     } else {
-      setListingPrices(ps => ps.map(p => p.id === lp.id ? { ...p, [field]: value } : p));
-      addToast({ type: 'success', title: 'Saved', desc: `${lp.label} ${field.replace(/_/g, ' ')} updated.` });
+      setListingPrices(prev => prev.map(p => p.id === editingListingPrice.id ? { ...p, ...updates } : p));
+      setEditingListingPrice(null);
+      addToast({ type: 'success', title: 'Pricing Updated', desc: 'Listing upgrade price has been updated.' });
     }
   };
 
@@ -253,7 +94,7 @@ export default function AdminPricingPage() {
 
   return (
     <AppLayout role="admin" title="Pricing Management">
-      <div style={{ padding: '28px 32px', minHeight: '100vh', background: SURF }}>
+      <div style={{ padding: 'clamp(16px, 4vw, 32px)', minHeight: '100vh', background: SURF }}>
 
         {/* Header */}
         <div style={{ marginBottom: 28 }}>
@@ -300,21 +141,24 @@ export default function AdminPricingPage() {
                     {/* Card header */}
                     <div style={{ padding: '14px 18px', background: plan.is_active ? accent.bg : '#F9FAFB', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div>
-                        <EditableText
-                          value={plan.name}
-                          onSave={v => savePlanField(plan, 'name', v)}
-                        />
+                        <h3 style={{ fontSize: 15, fontWeight: 700, color: OS, margin: 0 }}>{plan.name}</h3>
                         <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: accent.badge, display: 'block', marginTop: 2 }}>
                           {plan.slug}
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 11, color: LGRAY }}>{plan.is_active ? 'Active' : 'Inactive'}</span>
-                        <Toggle
-                          value={plan.is_active}
-                          onChange={v => savePlanField(plan, 'is_active', v)}
-                          disabled={!!saving[`plan-${plan.id}-is_active`]}
-                        />
+                        <span style={{ 
+                          fontSize: 9, fontWeight: 800, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4,
+                          background: plan.is_active ? '#22C55E' : '#D1D5DB', color: '#fff' 
+                        }}>
+                          {plan.is_active ? 'Active' : 'Hidden'}
+                        </span>
+                        <button 
+                          onClick={() => setEditingPlan(plan)}
+                          style={{ padding: 6, borderRadius: 6, border: `1px solid ${BORDER}`, background: '#fff', color: OSV, cursor: 'pointer' }}
+                        >
+                          <HiCog6Tooth size={14} />
+                        </button>
                       </div>
                     </div>
 
@@ -324,37 +168,39 @@ export default function AdminPricingPage() {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
                         <div>
                           <div style={{ fontSize: 10, fontWeight: 700, color: LGRAY, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Monthly</div>
-                          {plan.slug === 'sponsor' ? (
-                            <span style={{ fontSize: 13, color: LGRAY, fontStyle: 'italic' }}>Custom</span>
-                          ) : (
-                            <EditablePrice
-                              value={plan.monthly_price}
-                              onSave={v => savePlanField(plan, 'monthly_price', v)}
-                            />
-                          )}
+                          <span style={{ fontSize: 15, fontWeight: 700, color: OS }}>
+                            {plan.slug === 'sponsor' ? 'Custom' : `$${plan.monthly_price}`}
+                          </span>
                         </div>
                         <div>
                           <div style={{ fontSize: 10, fontWeight: 700, color: LGRAY, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Annual</div>
-                          {plan.slug === 'sponsor' ? (
-                            <span style={{ fontSize: 13, color: LGRAY, fontStyle: 'italic' }}>Custom</span>
-                          ) : (
-                            <EditablePrice
-                              value={plan.annual_price}
-                              onSave={v => savePlanField(plan, 'annual_price', v)}
-                            />
-                          )}
+                          <span style={{ fontSize: 15, fontWeight: 700, color: OS }}>
+                            {plan.slug === 'sponsor' ? 'Custom' : `$${plan.annual_price}`}
+                          </span>
                         </div>
                       </div>
 
-                      {/* Features */}
+                      {/* Features preview */}
                       <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 12 }}>
                         <div style={{ fontSize: 10, fontWeight: 700, color: LGRAY, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
                           Features ({plan.features.length})
                         </div>
-                        <FeaturesEditor
-                          features={plan.features}
-                          onChange={v => savePlanField(plan, 'features', v)}
-                        />
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {plan.features.slice(0, 3).map((f, i) => (
+                            <span key={i} style={{ fontSize: 10, background: '#F3F4F6', color: LGRAY, borderRadius: 4, padding: '2px 6px' }}>
+                              {f}
+                            </span>
+                          ))}
+                          {plan.features.length > 3 && (
+                            <span style={{ fontSize: 10, color: LGRAY }}>+{plan.features.length - 3}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: 16 }}>
+                        <Button variant="outline" size="sm" fullWidth onClick={() => setEditingPlan(plan)}>
+                          Edit Details
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -377,7 +223,8 @@ export default function AdminPricingPage() {
                 {[1,2,3].map(i => <Skeleton key={i} width="100%" height="52px" className="mb-3" />)}
               </div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${BORDER}`, background: SURF }}>
                     {['Type', 'Label', 'Price', 'Billing', 'Description', 'Active'].map(h => (
@@ -386,52 +233,57 @@ export default function AdminPricingPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {listingPrices.map((lp, i) => (
-                    <tr
-                      key={lp.id}
-                      style={{
-                        borderBottom: i < listingPrices.length - 1 ? `1px solid ${BORDER}` : 'none',
-                        background: i % 2 === 0 ? '#fff' : SURF,
-                        opacity: lp.is_active ? 1 : 0.6,
-                      }}
-                    >
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{
-                          fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
-                          padding: '3px 8px', borderRadius: 4,
-                          background: lp.type === 'top' ? '#EDE9FE' : lp.type === 'featured' ? 'rgba(212,175,55,0.12)' : '#F3F4F6',
-                          color: lp.type === 'top' ? '#7C3AED' : lp.type === 'featured' ? '#B8962E' : '#4B5563',
-                        }}>
-                          {lp.type}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <EditableText value={lp.label} onSave={v => saveListingField(lp, 'label', v)} />
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <EditablePrice value={lp.price} onSave={v => saveListingField(lp, 'price', v)} />
-                      </td>
-                      <td style={{ padding: '12px 16px', fontSize: 12, color: LGRAY }}>
-                        {lp.billing_cycle === 'monthly' ? '/mo' : 'One-time'}
-                      </td>
-                      <td style={{ padding: '12px 16px', maxWidth: 240 }}>
-                        <EditableText
-                          value={lp.description ?? ''}
-                          onSave={v => saveListingField(lp, 'description', v)}
-                          multiline
-                        />
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <Toggle
-                          value={lp.is_active}
-                          onChange={v => saveListingField(lp, 'is_active', v)}
-                          disabled={!!saving[`lp-${lp.id}-is_active`]}
-                        />
-                      </td>
-                    </tr>
-                  ))}
+                    {listingPrices.map((lp, i) => (
+                      <tr
+                        key={lp.id}
+                        style={{
+                          borderBottom: i < listingPrices.length - 1 ? `1px solid ${BORDER}` : 'none',
+                          background: i % 2 === 0 ? '#fff' : SURF,
+                          opacity: lp.is_active ? 1 : 0.6,
+                        }}
+                      >
+                        <td style={{ padding: '12px 16px' }}>
+                          <span style={{
+                            fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+                            padding: '3px 8px', borderRadius: 4,
+                            background: lp.type === 'top' ? '#EDE9FE' : lp.type === 'featured' ? 'rgba(212,175,55,0.12)' : '#F3F4F6',
+                            color: lp.type === 'top' ? '#7C3AED' : lp.type === 'featured' ? '#B8962E' : '#4B5563',
+                          }}>
+                            {lp.type}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: OS }}>
+                          {lp.label}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 700, color: OS }}>
+                          ${lp.price}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: 12, color: LGRAY }}>
+                          {lp.billing_cycle === 'monthly' ? 'Monthly' : 'One-time'}
+                        </td>
+                        <td style={{ padding: '12px 16px', maxWidth: 300 }}>
+                          <div style={{ fontSize: 12, color: LGRAY, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {lp.description || '-'}
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: lp.is_active ? '#22C55E' : DEEP, opacity: 0.8 }}>
+                              {lp.is_active ? 'ACTIVE' : 'OFF'}
+                            </span>
+                            <button 
+                              onClick={() => setEditingListingPrice(lp)}
+                              style={{ padding: 6, borderRadius: 6, background: '#fff', border: `1px solid ${BORDER}`, color: OSV, cursor: 'pointer' }}
+                            >
+                              <HiCog6Tooth size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </div>
@@ -439,9 +291,26 @@ export default function AdminPricingPage() {
         {/* Info footer */}
         <div style={{ marginTop: 24, padding: '12px 16px', background: 'rgba(212,175,55,0.08)', border: `1px solid rgba(212,175,55,0.25)`, borderRadius: 8 }}>
           <p style={{ fontSize: 12, color: '#92400E', margin: 0 }}>
-            <strong>Note:</strong> Price changes are saved immediately to the database. Stripe price IDs must be updated separately in the Stripe dashboard and configured via environment variables or the CRM Settings section.
+            <strong>Note:</strong> Price changes are saved immediately to the database. Stripe price IDs must be updated separately in the Stripe dashboard and configured via the Edit modal if they change.
           </p>
         </div>
+
+        {/* Modals */}
+        <PlanEditModal
+          open={!!editingPlan}
+          onClose={() => setEditingPlan(null)}
+          plan={editingPlan}
+          isLoading={isSubmitting}
+          onSave={handleUpdatePlan}
+        />
+
+        <ListingPriceEditModal
+          open={!!editingListingPrice}
+          onClose={() => setEditingListingPrice(null)}
+          listingPrice={editingListingPrice}
+          isLoading={isSubmitting}
+          onSave={handleUpdateListingPrice}
+        />
 
       </div>
     </AppLayout>

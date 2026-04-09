@@ -16,12 +16,14 @@ import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState, useMemo } from 'react';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
-import { 
-  HiHome, 
-  HiUsers, 
-  HiBanknotes, 
+import {
+  HiHome,
+  HiUsers,
+  HiBanknotes,
   HiCheckBadge,
-  HiArrowPath 
+  HiArrowPath,
+  HiArrowDownTray,
+  HiCreditCard,
 } from 'react-icons/hi2';
 
 export default function AdminDashboard() {
@@ -136,25 +138,43 @@ export default function AdminDashboard() {
 
   // 4. Data for KPIs
   const kpis = [
-    { 
-      label: 'Total Listings', 
-      value: stats.totalListings.toString(), 
-      icon: <HiHome className="text-blue-600" /> 
+    {
+      label: 'Total Listings',
+      value: stats.totalListings.toString(),
+      icon: <HiHome className="text-blue-600" />,
+      onClick: () => navigate('/admin/listings'),
     },
-    { 
-      label: 'Active Leads', 
-      value: stats.activeLeads.toString(), 
-      icon: <HiUsers className="text-purple-600" /> 
+    {
+      label: 'Active Leads',
+      value: stats.activeLeads.toString(),
+      icon: <HiUsers className="text-purple-600" />,
+      onClick: () => navigate('/admin/leads'),
     },
-    { 
-      label: 'Monthly Revenue', 
-      value: `$${stats.monthlyRevenue.toLocaleString()}`, 
-      icon: <HiBanknotes className="text-green-600" /> 
+    {
+      label: 'Monthly Revenue',
+      value: `$${stats.monthlyRevenue.toLocaleString()}`,
+      icon: <HiBanknotes className="text-green-600" />,
+      onClick: () => navigate('/admin/subscriptions'),
     },
-    { 
-      label: 'Pending Approvals', 
-      value: stats.pendingApprovals.toString(), 
-      icon: <HiCheckBadge className="text-yellow-600" /> 
+    {
+      label: 'Pending Approvals',
+      value: stats.pendingApprovals.toString(),
+      icon: <HiCheckBadge className="text-yellow-600" />,
+      onClick: () => navigate('/admin/approvals'),
+    },
+    {
+      label: 'Commission Liability',
+      value: `$${(stats.commissionLiability || 0).toLocaleString()}`,
+      icon: <HiBanknotes className="text-amber-500" />,
+      trendLabel: 'approved + payable, outstanding',
+      onClick: () => navigate('/admin/commissions-admin'),
+    },
+    {
+      label: 'Payouts This Month',
+      value: `$${(stats.payoutsThisMonth || 0).toLocaleString()}`,
+      icon: <HiArrowDownTray className="text-emerald-600" />,
+      trendLabel: 'processed this month',
+      onClick: () => navigate('/admin/payouts'),
     },
   ];
 
@@ -189,9 +209,9 @@ export default function AdminDashboard() {
         </div>
 
         {/* KPIs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-4">
           {isStatsLoading ? (
-            [...Array(4)].map((_, i) => (
+            [...Array(6)].map((_, i) => (
               <div key={i} className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm">
                 <Skeleton width="100px" height="12px" className="mb-2" />
                 <Skeleton width="60px" height="24px" className="mb-1" />
@@ -201,6 +221,22 @@ export default function AdminDashboard() {
           ) : (
             kpis.map(k => <KPICard key={k.label} {...k} />)
           )}
+        </div>
+
+        {/* Quick Links */}
+        <div className="flex flex-wrap gap-3">
+          <button onClick={() => navigate('/admin/commissions-admin')}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+            <HiBanknotes size={15} className="text-amber-500" /> Commissions
+          </button>
+          <button onClick={() => navigate('/admin/payouts')}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+            <HiArrowDownTray size={15} className="text-emerald-600" /> Payouts
+          </button>
+          <button onClick={() => navigate('/admin/subscriptions')}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+            <HiCreditCard size={15} className="text-blue-500" /> Subscriptions
+          </button>
         </div>
 
         {/* Charts & Activity */}

@@ -1,4 +1,5 @@
 import { useMemo, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import AppLayout from '../../components/layout/AppLayout';
 import KPICard from '../../components/shared/KPICard';
@@ -24,47 +25,60 @@ import {
 
 export default function DirectorDashboard() {
   useDocumentTitle('Director Dashboard');
+  const navigate = useNavigate();
   const { profile } = useAuth();
   const { addToast } = useToast();
   const { leads, isLoading: leadsLoading, reassignLead } = useLeads();
   const { users, isLoading: usersLoading } = useUsers();
 
+  const [territoryIds, setTerritoryIds] = useState([]);
   const [listingsCount, setListingsCount] = useState(0);
   const [availableRealtors, setAvailableRealtors] = useState([]);
   const [activities, setActivities] = useState([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
 
-  // Fetch data for this territory
+  // Fetch data for all territories this director manages
   useEffect(() => {
     async function fetchTerritoryData() {
-      if (!profile?.territory_id) return;
+      if (!profile?.id) return;
 
-      // 1. Listings count
+      // 0. Resolve all territory IDs for this director
+      const { data: territories } = await supabase
+        .from('territories')
+        .select('id')
+        .eq('director_id', profile.id);
+
+      const ids = (territories || []).map(t => t.id);
+      setTerritoryIds(ids);
+
+      if (ids.length === 0) return;
+
+      // 1. Listings count across all territories
       const { count } = await supabase
         .from('listings')
         .select('id', { count: 'exact', head: true })
-        .eq('territory_id', profile.territory_id);
+        .in('territory_id', ids);
       setListingsCount(count || 0);
 
-      // 2. Available realtors in this territory
+      // 2. Available realtors across all territories
       const { data: realtorData } = await supabase
         .from('profiles')
         .select('id, full_name')
         .eq('role', 'realtor')
         .eq('status', 'active')
-        .eq('territory_id', profile.territory_id)
+        .in('territory_id', ids)
         .order('full_name');
       setAvailableRealtors(realtorData || []);
 
-      // 3. Recent activity for this territory
+      // 3. Recent activity
       setActivitiesLoading(true);
       const { data: actData } = await supabase
         .from('audit_logs')
         .select('*')
-        .eq('entity_type', 'lead') // Mostly interested in lead movements for directors
+        .eq('entity_type', 'lead')
         .order('timestamp', { ascending: false })
         .limit(6);
-      
+
       const mapped = (actData || []).map(a => ({
         type: a.action.includes('lead') ? 'lead' : a.action.includes('listing') ? 'listing' : 'signup',
         text: `${a.action.replace(/\./g, ' ')} #${a.entity_id?.slice(-4)}`,
@@ -74,11 +88,11 @@ export default function DirectorDashboard() {
       setActivitiesLoading(false);
     }
     fetchTerritoryData();
-  }, [profile?.territory_id]);
+  }, [profile?.id]);
 
   const realtors = useMemo(
-    () => users.filter(u => u.role === 'realtor' && (!profile?.territory_id || u.territory_id === profile.territory_id)),
-    [users, profile?.territory_id]
+    () => users.filter(u => u.role === 'realtor' && (territoryIds.length === 0 || territoryIds.includes(u.territory_id))),
+    [users, territoryIds]
   );
 
   const unassigned = useMemo(
@@ -104,10 +118,10 @@ export default function DirectorDashboard() {
   }, [leads]);
 
   const kpis = [
-    { label: 'Region Listings',  value: listingsCount.toString(), trend: null, trendLabel: '', icon: <HiHome className="text-blue-600" /> },
-    { label: 'Unassigned Leads', value: unassigned.length.toString(), trend: null, trendLabel: '', icon: <HiInboxArrowDown className="text-green-600" /> },
-    { label: 'Active Realtors',  value: realtors.filter(r => r.status === 'active').length.toString(), trend: null, trendLabel: '', icon: <HiUser className="text-purple-600" /> },
-    { label: 'Total Leads',      value: leads.length.toString(), trend: null, trendLabel: '', icon: <HiChartBar className="text-yellow-600" /> },
+    { label: 'Region Listings',  value: listingsCount.toString(),                                    trend: null, trendLabel: '', icon: <HiHome className="text-blue-600" />,           onClick: () => navigate('/director/listings') },
+    { label: 'Unassigned Leads', value: unassigned.length.toString(),                                trend: null, trendLabel: '', icon: <HiInboxArrowDown className="text-green-600" />, onClick: () => navigate('/director/leads') },
+    { label: 'Active Realtors',  value: realtors.filter(r => r.status === 'active').length.toString(), trend: null, trendLabel: '', icon: <HiUser className="text-purple-600" />,         onClick: () => navigate('/director/realtors') },
+    { label: 'Total Leads',      value: leads.length.toString(),                                     trend: null, trendLabel: '', icon: <HiChartBar className="text-yellow-600" />,       onClick: () => navigate('/director/leads') },
   ];
 
   const handleAssign = async (leadId, realtorId) => {

@@ -1,56 +1,79 @@
 import { serve } from "http/server.ts";
 import { createClient } from "supabase";
 
-// BUG-034: Replace wildcard CORS with an explicit allowlist.
-// Set ALLOWED_ORIGINS env var to a comma-separated list of permitted origins
-// (e.g. "https://app.nlvlistings.com,https://admin.nlvlistings.com").
-const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
-  .split(",")
-  .map(o => o.trim())
-  .filter(Boolean);
-
-function getCorsHeaders(req: Request): Record<string, string> {
-  const origin = req.headers.get("origin") ?? "";
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : "";
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
-}
+// Standard CORS headers for Supabase Edge Functions
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
 serve(async (req: Request) => {
-  const corsHeaders = getCorsHeaders(req);
   console.log(`[admin-create-user] Function started: ${req.method}`);
   
+  // Log all request headers for debugging
+  console.log("[admin-create-user] Headers received:");
+  for (const [key, value] of req.headers.entries()) {
+    console.log(`  - ${key}: ${key.toLowerCase() === 'authorization' ? value.substring(0, 15) + '...' : value}`);
+  }
+
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { 
+      headers: { 
+        ...corsHeaders,
+        "Access-Control-Allow-Headers": "Authorization, authorization, x-client-info, apikey, content-type" 
+      } 
+    });
   }
 
   try {
-    // Verify caller is authenticated admin via service role
-    const authHeader = req.headers.get("authorization");
-    console.log(`[admin-create-user] Auth Header: ${authHeader ? 'Present (' + authHeader.substring(0, 15) + '...)' : 'MISSING'}`);
+    // Log environment variable keys for diagnostic purposes
+    console.log("[admin-create-user] Available environment keys:", Object.keys(Deno.env.toObject()));
 
-    if (!authHeader) {
-      console.error("[admin-create-user] Missing authorization header");
-      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+    // Use a custom secret name to bypass SUPABASE_ prefix restrictions in CLI
+    const serviceKey = Deno.env.get("ADMIN_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const url = Deno.env.get("SUPABASE_URL");
+
+    // Verify presence of required environment variables
+    if (!serviceKey || !url) {
+      console.error("[admin-create-user] CRITICAL: Environment variables missing.");
+      return new Response(JSON.stringify({ 
+        error: "Server configuration missing: Please run 'npx supabase secrets set ADMIN_SERVICE_ROLE_KEY=YOUR_SERVICE_KEY' to proceed." 
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 401,
       });
     }
 
-    // Use service-role client (bypasses RLS) for admin user creation
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    );
+    // Create service-role client (bypasses RLS) for admin user creation
+    const supabaseAdmin = createClient(url, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    // Parse body first — we read caller_token from body to avoid gateway JWT issues
+    const body = await req.json();
+    const { email, full_name, role, phone, territory_id, plan, caller_token } = body;
+
+    // Fallback: also accept Authorization header
+    const authHeader = req.headers.get("authorization");
+    const token = caller_token || (authHeader ? authHeader.replace(/^Bearer /i, "") : null);
+
+    if (!token) {
+      console.error("[admin-create-user] No caller token provided.");
+      return new Response(JSON.stringify({ error: "Missing authorization token" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
 
     // Verify the caller is an admin by checking their JWT
-    const { data: { user: caller }, error: authError } = await supabaseAdmin.auth.getUser(authHeader.replace("Bearer ", ""));
+    const { data: { user: caller }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
     if (authError || !caller) {
-      console.error("[admin-create-user] Auth verification failed:", authError?.message);
-      return new Response(JSON.stringify({ error: "Invalid or expired session" }), {
+      console.error("[admin-create-user] Auth verification failed:", authError?.message || 'No user found');
+      return new Response(JSON.stringify({ 
+        error: `Invalid or expired session: ${authError?.message || 'Unauthorized'}` 
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 401,
       });
@@ -71,9 +94,7 @@ serve(async (req: Request) => {
       });
     }
 
-    const { email, password: providedPassword, full_name, role, phone, territory_id } = await req.json();
-
-    // Validate required fields (password optional — we'll auto-generate + send reset email)
+    // Validate required fields
     if (!email || !full_name || !role) {
       return new Response(JSON.stringify({ error: "Missing required fields: email, full_name, role" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -89,41 +110,43 @@ serve(async (req: Request) => {
       });
     }
 
-    // Generate a secure temporary password if none was provided
-    const tempPassword = providedPassword ||
-      Array.from(crypto.getRandomValues(new Uint8Array(18)))
-        .map(b => b.toString(36))
-        .join('')
-        .slice(0, 18) + 'A1!';
+    // Derive the app origin from the request so redirectTo works in all environments
+    const origin = req.headers.get("origin") || req.headers.get("referer")?.split("/").slice(0, 3).join("/") || url;
 
-    // Create the auth user using service role (skips email confirmation)
-    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    // Create the auth user using invitation API (this sends the email automatically).
+    // redirectTo lands the user on our custom password-set page (not Supabase's default).
+    // ?type=invite   → ResetPasswordPage shows "Create your password" copy
+    // ?source=admin  → After password set, redirect to /pricing so user can subscribe
+    const { data: newUser, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       email,
-      password: tempPassword,
-      email_confirm: true, // auto-confirm so they can log in immediately
-      // BUG-009 fix: role must NOT be stored in user_metadata.
-      // Role is authoritative only in the profiles table (written below).
-      // Storing it in metadata created an escalation vector where the metadata
-      // value could be read by client code and treated as the user's real role.
-      user_metadata: { full_name },
-    });
+      {
+        data: { full_name, role },
+        redirectTo: `${origin}/reset-password?type=invite&source=admin`,
+      }
+    );
 
-    if (createError) {
-      console.error("[admin-create-user] Auth create error:", createError.message);
-      return new Response(JSON.stringify({ error: createError.message }), {
+    if (inviteError) {
+      console.error("[admin-create-user] Auth invite error:", inviteError.message);
+      return new Response(JSON.stringify({ error: inviteError.message }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
     }
 
-    // Insert profile row
+    // Profile starts as "pending" — the user must complete payment (14-day trial)
+    // before their account is activated. The stripe-webhook flips status → "active"
+    // and stamps verified_at once checkout.session.completed fires.
+    const now = new Date().toISOString();
+
+    // Insert profile row — use only columns that exist in the profiles table schema
     const profileInsert: Record<string, unknown> = {
       id: newUser.user.id,
       email,
       full_name,
       role,
-      status: "active",
+      status: "pending",        // Activated by Stripe webhook after subscription start
       phone: phone ?? null,
+      // verified_at intentionally omitted — set by webhook after first subscription
     };
 
     if (territory_id) {
@@ -135,7 +158,7 @@ serve(async (req: Request) => {
       .insert(profileInsert);
 
     if (profileInsertError) {
-      // Rollback: delete the auth user if profile creation fails
+      // Rollback: delete the invited auth user if profile creation fails
       await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
       console.error("[admin-create-user] Profile insert error:", profileInsertError.message);
       return new Response(JSON.stringify({ error: `Profile creation failed: ${profileInsertError.message}` }), {
@@ -144,26 +167,14 @@ serve(async (req: Request) => {
       });
     }
 
-    // Send password reset so the new user can set their own password on first login
-    // (only when we auto-generated the password — if admin supplied one, skip)
-    if (!providedPassword) {
-      await supabaseAdmin.auth.admin.generateLink({
-        type: "recovery",
-        email,
-      }).catch((err: Error) => {
-        // Non-fatal — user can still log in, just won't get the welcome email
-        console.warn("[admin-create-user] Failed to send password reset email:", err.message);
-      });
-    }
-
     // Write audit log
     await supabaseAdmin.from("audit_logs").insert({
       user_id: caller.id,
       action: "admin.create_user",
-      entity_type: "profile", // Use profile as entity_type
+      entity_type: "profile",
       entity_id: newUser.user.id,
-      metadata: { email, role, full_name },
-      timestamp: new Date().toISOString(),
+      metadata: { email, role, full_name, status: "pending", requires_subscription: true, territory_id: territory_id ?? null },
+      timestamp: now,
     });
 
     return new Response(

@@ -10,7 +10,7 @@ import {
 } from 'react-icons/hi2';
 import PublicNav from '../../components/layout/PublicNav';
 import PublicFooter from '../../components/layout/PublicFooter';
-import { useLeads } from '../../hooks/useLeads';
+import { useEnquiries } from '../../hooks/useEnquiries';
 import { useToast } from '../../context/ToastContext';
 
 const G  = '#D4AF37';
@@ -76,7 +76,7 @@ const inputStyle = {
 };
 
 export default function ContactPage() {
-  const { createInquiry } = useLeads();
+  const { submitContactForm } = useEnquiries();
   const { addToast } = useToast();
   const [form, setForm] = useState({ name: '', email: '', phone: '', subject: '', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,13 +95,29 @@ export default function ContactPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.name.trim()) {
+      addToast({ type: 'error', title: 'Name required', desc: 'Please enter your full name.' });
+      return;
+    }
+    if (!form.email.trim()) {
+      addToast({ type: 'error', title: 'Email required', desc: 'Please enter your email address.' });
+      return;
+    }
+    if (!form.phone.trim()) {
+      addToast({ type: 'error', title: 'Phone required', desc: 'Please enter your phone number.' });
+      return;
+    }
+    if (!form.subject) {
+      addToast({ type: 'error', title: 'Subject required', desc: 'Please select a subject.' });
+      return;
+    }
+    if (!form.message.trim()) {
+      addToast({ type: 'error', title: 'Message required', desc: 'Please enter your message.' });
+      return;
+    }
     setIsSubmitting(true);
-    
-    const { error } = await createInquiry({
-      ...form,
-      interest: form.subject,
-      source: 'Website Contact Form'
-    });
+
+    const { error } = await submitContactForm(form);
 
     if (error) {
       addToast({
@@ -217,7 +233,7 @@ export default function ContactPage() {
                   </button>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+                <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
                   <h2 className="font-headline font-bold text-xl mb-1" style={{ color: TX }}>Send Us a Message</h2>
 
                   <div className="grid sm:grid-cols-2 gap-5">
@@ -248,12 +264,14 @@ export default function ContactPage() {
                   </div>
 
                   <div className="grid sm:grid-cols-2 gap-5">
-                    <Field label="Phone (optional)">
+                    <Field label="Phone">
                       <input
+                        required
                         type="tel"
                         placeholder="+1 (555) 000-0000"
                         value={form.phone}
-                        onChange={set('phone')}
+                        onChange={e => setForm(p => ({ ...p, phone: e.target.value.replace(/[^0-9+\-\s()]/g, '').slice(0, 20) }))}
+                        maxLength={20}
                         style={inputStyle}
                         onFocus={handleFocus}
                         onBlur={handleBlur}

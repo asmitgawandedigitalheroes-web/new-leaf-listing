@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   HiStar,
   HiCheck,
@@ -20,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSubscriptions } from '../../hooks/useSubscriptions';
 import { useNavigate } from 'react-router-dom';
 import { pricingService } from '../../../services/pricing.service';
+import { useToast } from '../../context/ToastContext';
 
 // NLV Brand Colors
 const PRIMARY   = '#D4AF37';
@@ -38,7 +39,7 @@ const BORDER    = '#E5E7EB';
 // Removed legacy Ico function
 
 const FAQ = [
-  { q: 'Can I switch plans at any time?', a: 'Yes — upgrade or downgrade whenever you like. Changes apply at the next billing cycle.' },
+  { q: 'Can I switch plans at any time?', a: 'Yes — upgrade or downgrade whenever you like. Changes apply at the next billing cycle. Note: the Starter plan requires a 12-month minimum commitment; early cancellation does not waive the remaining monthly fees.' },
   { q: 'Is there a free trial?', a: 'All paid plans include a 14-day free trial. No credit card required to start.' },
   { q: 'How does commission tracking work?', a: 'Commissions are calculated automatically from your configured split percentages. All parties are notified instantly upon disbursement.' },
   { q: 'What payment methods do you accept?', a: 'We accept all major credit cards, ACH transfers, and wire payments for Enterprise plans.' },
@@ -63,11 +64,12 @@ const TIER_CONFIG = {
   Enterprise:   { accent: '#1A202C', headerBg: '#0F2318', popular: false },
 };
 
-function PlanCard({ plan, annual, adjPrice }) {
+function PlanCard({ plan, annual, adjPrice, isInvited }) {
   const { user } = useAuth();
   const { subscription, createCheckoutSession, isLoading } = useSubscriptions();
   const navigate = useNavigate();
-  
+  const { addToast } = useToast();
+
   const cfg   = TIER_CONFIG[plan.name] || TIER_CONFIG.Free;
   const isG   = plan.name === 'Professional';
   const isEnt = plan.name === 'Enterprise';
@@ -80,7 +82,7 @@ function PlanCard({ plan, annual, adjPrice }) {
       return;
     }
     if (isCurrent) return;
-    
+
     if (plan.name === 'Enterprise') {
       window.location.href = 'mailto:sales@nlvlistings.com';
       return;
@@ -91,7 +93,10 @@ function PlanCard({ plan, annual, adjPrice }) {
       return;
     }
 
-    await createCheckoutSession(plan.name.toLowerCase());
+    const result = await createCheckoutSession(plan.name.toLowerCase(), { invitedFlow: isInvited });
+    if (result?.error) {
+      addToast({ type: 'error', title: 'Checkout unavailable', desc: 'Unable to start checkout. Please try again or contact support.' });
+    }
   };
 
   return (
@@ -151,6 +156,12 @@ function PlanCard({ plan, annual, adjPrice }) {
             ? 'Billed annually · Save 20%'
             : plan.period}
         </p>
+        {plan.slug === 'starter' && (
+          <div className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+            style={{ background: '#FEF9C3', color: '#92400E' }}>
+            12-month minimum commitment
+          </div>
+        )}
       </div>
 
       {/* Body */}
@@ -210,6 +221,10 @@ function dbPlanToCard(p) {
 }
 
 export default function PricingPage() {
+  const [searchParams]                = useSearchParams();
+  const isInvited = searchParams.get('invited') === 'true';
+  const wasCancelled = searchParams.get('status') === 'cancelled';
+
   const [annual,      setAnnual]      = useState(false);
   const [openFaq,     setOpenFaq]     = useState(null);
   const [showCompare, setShowCompare] = useState(false);
@@ -291,11 +306,36 @@ export default function PricingPage() {
         </div>
       </section>
 
+      {/* ── Invite banner (shown when redirected from admin invite flow) ── */}
+      {isInvited && (
+        <section className="px-4 md:px-8 pb-2" style={{ background: '#fff' }}>
+          <div className="max-w-3xl mx-auto rounded-2xl px-6 py-5 flex flex-col sm:flex-row items-center gap-4"
+            style={{ background: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)', border: '1.5px solid #D4AF37' }}>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: '#D4AF37' }}>
+              <HiSparkles size={20} color="#fff" />
+            </div>
+            <div className="flex-1 text-center sm:text-left">
+              <p className="font-bold text-sm" style={{ color: '#92400E' }}>
+                {wasCancelled ? 'No plan selected yet — your account is waiting!' : 'Step 2 of 2 — Activate your account'}
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: '#B45309' }}>
+                Select a plan below to get started. Your <strong>14-day free trial</strong> begins immediately — no charge until the trial ends.
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0"
+              style={{ background: '#D4AF37', color: '#fff' }}>
+              <HiCheckCircle size={13} /> Trial included
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ── Plans ── */}
       <section className="pb-20 px-4 md:px-8" style={{ background: '#fff' }}>
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 items-stretch">
           {activePlans.map(plan => (
-            <PlanCard key={plan.name} plan={plan} annual={annual} adjPrice={adjPrice} />
+            <PlanCard key={plan.name} plan={plan} annual={annual} adjPrice={adjPrice} isInvited={isInvited} />
           ))}
         </div>
 
@@ -430,9 +470,7 @@ export default function PricingPage() {
       {/* ── Enterprise CTA ── */}
       <section className="py-20 px-8 relative overflow-hidden" style={{ background: DEEP }}>
         {/* Ambient green glow */}
-        <div className="absolute inset-0 pointer-events-none" style={{
-          background: `radial-gradient(ellipse 60% 60% at 50% 100%, rgba(212,175,55,0.12), transparent)`,
-        }} />
+        <div className="absolute inset-0 pointer-events-none" />
         <div className="max-w-3xl mx-auto text-center relative">
           <p className="text-[11px] font-semibold uppercase tracking-widest mb-3" style={{ color: PRIMARY }}>Enterprise</p>
           <h2 className="font-headline text-4xl font-black text-white mb-4">

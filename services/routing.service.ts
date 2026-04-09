@@ -258,7 +258,7 @@ export const routingService = {
     await supabase.from('leads').update(updates).eq('id', leadId);
 
     await auditService.log(
-      result.assigned_realtor_id ?? 'system',
+      result.assigned_realtor_id ?? null,
       'lead.assigned',
       'lead',
       leadId,

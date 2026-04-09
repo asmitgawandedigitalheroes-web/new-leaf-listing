@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import AppLayout from '../../../components/layout/AppLayout';
 import KPICard from '../../../components/shared/KPICard';
 import { SectionCard } from '../../../components/ui/Card';
+import SearchableSelect from '../../../components/ui/SearchableSelect';
 import Badge from '../../../components/ui/Badge';
 import Button from '../../../components/ui/Button';
 import Modal from '../../../components/ui/Modal';
@@ -9,6 +10,8 @@ import Avatar from '../../../components/ui/Avatar';
 import Skeleton from '../../../components/ui/Skeleton';
 import { useToast } from '../../../context/ToastContext';
 import { useTerritories } from '../../../hooks/useTerritories';
+import { ActionPill } from '../../../components/shared/TableActions';
+import MobileCard, { MobileCardRow, MobileCardActions } from '../../../components/shared/MobileCard';
 import { 
   HiGlobeAlt, 
   HiMapPin, 
@@ -58,8 +61,8 @@ export default function TerritoriesPage() {
   };
 
   const handleAddTerritory = async () => {
-    if (!form.city || !form.state) {
-      addToast({ type: 'error', title: 'Missing fields', desc: 'Please fill in city and state.' });
+    if (!form.country || !form.state.trim() || !form.city.trim()) {
+      addToast({ type: 'error', title: 'Missing fields', desc: 'Please fill in country, state, and city.' });
       return;
     }
     setIsSubmitting(true);
@@ -100,12 +103,12 @@ export default function TerritoriesPage() {
       <div className="p-4 md:p-6 flex flex-col gap-6">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Territories</h1>
             <p className="text-sm text-gray-400">Manage market regions and director assignments.</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 self-start sm:self-auto">
             <button onClick={refresh} title="Refresh" className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors">
               <HiArrowPath size={16} className="text-gray-500" />
             </button>
@@ -131,91 +134,132 @@ export default function TerritoriesPage() {
           <select
             value={filterCountry}
             onChange={e => handleCountryChange(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white"
+            className="flex-1 min-w-[130px] px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white"
           >
             {countries.map(c => <option key={c}>{c}</option>)}
           </select>
           <select
             value={filterState}
             onChange={e => setFilterState(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white"
+            className="flex-1 min-w-[130px] px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white"
           >
             {states.map(s => <option key={s}>{s}</option>)}
           </select>
         </div>
 
-        {/* List Table */}
-        <SectionCard title={`Territories (${filtered.length})`}>
-          <div className="data-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Territory</th>
-                  <th>Director</th>
-                  <th>Realtors</th>
-                  <th>Listings</th>
-                  <th>Leads</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  [...Array(5)].map((_, i) => (
-                    <tr key={i}>
-                      <td><Skeleton width="140px" height="14px" /><Skeleton width="80px" height="10px" className="mt-1" /></td>
-                      <td><Skeleton variant="circle" width="32px" height="32px" /></td>
-                      <td><Skeleton width="40px" height="12px" /></td>
-                      <td><Skeleton width="40px" height="12px" /></td>
-                      <td><Skeleton width="40px" height="12px" /></td>
-                      <td><Skeleton width="60px" height="20px" /></td>
-                      <td><Skeleton width="120px" height="28px" /></td>
-                    </tr>
-                  ))
-                ) : filtered.length > 0 ? (
-                  filtered.map(t => (
-                    <tr key={t.id}>
-                      <td>
-                        <div className="font-medium text-gray-900">{t.city}</div>
-                        <div className="text-xs text-gray-400">{t.state}, {t.country}</div>
-                      </td>
-                      <td>
-                        {t.directorName ? (
-                          <div className="flex items-center gap-2">
-                            <Avatar initials={t.directorInitials} size="sm" color="green" />
-                            <span className="text-sm text-gray-700">{t.directorName}</span>
+        {/* List Table - Desktop */}
+        <div className="hidden md:block">
+          <SectionCard title={`Territories (${filtered.length})`}>
+            <div className="data-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Territory</th>
+                    <th>Director</th>
+                    <th>Realtors</th>
+                    <th>Listings</th>
+                    <th>Leads</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoading ? (
+                    [...Array(5)].map((_, i) => (
+                      <tr key={i}>
+                        <td><Skeleton width="140px" height="14px" /><Skeleton width="80px" height="10px" className="mt-1" /></td>
+                        <td><Skeleton variant="circle" width="32px" height="32px" /></td>
+                        <td><Skeleton width="40px" height="12px" /></td>
+                        <td><Skeleton width="40px" height="12px" /></td>
+                        <td><Skeleton width="40px" height="12px" /></td>
+                        <td><Skeleton width="60px" height="20px" /></td>
+                        <td><Skeleton width="120px" height="28px" /></td>
+                      </tr>
+                    ))
+                  ) : filtered.length > 0 ? (
+                    filtered.map(t => (
+                      <tr key={t.id}>
+                        <td>
+                          <div className="font-medium text-gray-900">{t.city}</div>
+                          <div className="text-xs text-gray-400">{t.state}, {t.country}</div>
+                        </td>
+                        <td>
+                          {t.directorName ? (
+                            <div className="flex items-center gap-2">
+                              <Avatar initials={t.directorInitials} size="sm" color="green" />
+                              <span className="text-sm text-gray-700">{t.directorName}</span>
+                            </div>
+                          ) : (
+                            <Badge status="draft" label="Unassigned" />
+                          )}
+                        </td>
+                        <td className="text-gray-600 font-medium">{t.realtorsCount}</td>
+                        <td className="text-gray-600 font-medium">{t.listingsCount}</td>
+                        <td className="text-gray-600 font-medium">{t.leadsCount}</td>
+                        <td>
+                          <Badge status={t.status === 'unassigned' ? 'draft' : 'active'} label={t.status === 'unassigned' ? 'Unassigned' : 'Active'} />
+                        </td>
+                        <td>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => { setAssignTarget(t); setAssignDirectorId(t.director_id || ''); setAssignOpen(true); }}>
+                              {t.director_id ? 'Reassign' : 'Assign Director'}
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => {
+                              if (window.confirm(`Delete territory ${t.city}?`)) {
+                                deleteTerritory(t.id);
+                              }
+                            }}>Delete</Button>
                           </div>
-                        ) : (
-                          <Badge status="draft" label="Unassigned" />
-                        )}
-                      </td>
-                      <td className="text-gray-600 font-medium">{t.realtorsCount}</td>
-                      <td className="text-gray-600 font-medium">{t.listingsCount}</td>
-                      <td className="text-gray-600 font-medium">{t.leadsCount}</td>
-                      <td>
-                        <Badge status={t.status === 'unassigned' ? 'draft' : 'active'} label={t.status === 'unassigned' ? 'Unassigned' : 'Active'} />
-                      </td>
-                      <td>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => { setAssignTarget(t); setAssignDirectorId(t.director_id || ''); setAssignOpen(true); }}>
-                            {t.director_id ? 'Reassign' : 'Assign Director'}
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => {
-                            if (window.confirm(`Delete territory ${t.city}?`)) {
-                              deleteTerritory(t.id);
-                            }
-                          }}>Delete</Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr><td colSpan={7} className="py-16 text-center text-gray-400">No territories found</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </SectionCard>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan={7} className="py-16 text-center text-gray-400">No territories found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </SectionCard>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden flex flex-col gap-3">
+          {isLoading ? [...Array(3)].map((_, i) => (
+            <MobileCard key={i}>
+              <Skeleton variant="text" width="60%" className="mb-2" />
+              <Skeleton variant="text" width="40%" />
+            </MobileCard>
+          )) : filtered.length > 0 ? filtered.map(t => (
+            <MobileCard key={t.id}>
+              <div style={{ fontWeight: 600, fontSize: 14, color: '#111' }}>{t.city}</div>
+              <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 8 }}>{t.state}, {t.country}</div>
+              <MobileCardRow label="Director">{t.directorName || 'Unassigned'}</MobileCardRow>
+              <MobileCardRow label="Realtors">{t.realtorsCount}</MobileCardRow>
+              <MobileCardRow label="Listings">{t.listingsCount}</MobileCardRow>
+              <MobileCardRow label="Status">
+                <Badge status={t.status === 'unassigned' ? 'draft' : 'active'} label={t.status === 'unassigned' ? 'Unassigned' : 'Active'} />
+              </MobileCardRow>
+              <MobileCardActions>
+                <ActionPill
+                  label={t.director_id ? 'Reassign' : 'Assign Director'}
+                  color="#fff"
+                  bg="#D4AF37"
+                  onClick={() => { setAssignTarget(t); setAssignDirectorId(t.director_id || ''); setAssignOpen(true); }}
+                />
+                <ActionPill
+                  label="Delete"
+                  color="#DC2626"
+                  bg="rgba(254,226,226,0.8)"
+                  onClick={() => { if (window.confirm(`Delete territory ${t.city}?`)) { deleteTerritory(t.id); } }}
+                />
+              </MobileCardActions>
+            </MobileCard>
+          )) : (
+            <div className="py-16 text-center text-gray-400">
+              <p className="font-medium">No territories found</p>
+            </div>
+          )}
+        </div>
 
       </div>
 
@@ -246,10 +290,17 @@ export default function TerritoriesPage() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Initial Director (optional)</label>
-            <select value={form.director_id} onChange={e => setForm(f => ({ ...f, director_id: e.target.value }))} className={inputClass}>
-              <option value="">— Select Director —</option>
-              {directors.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-            </select>
+            <SearchableSelect
+              value={form.director_id}
+              onChange={val => setForm(f => ({ ...f, director_id: val }))}
+              options={directors.map(d => ({
+                value: d.id,
+                label: d.full_name,
+                sublabel: d.email
+              }))}
+              emptyLabel="— Select Director —"
+              placeholder="Search directors..."
+            />
           </div>
         </div>
       </Modal>
@@ -272,10 +323,17 @@ export default function TerritoriesPage() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Select Director</label>
-            <select value={assignDirectorId} onChange={e => setAssignDirectorId(e.target.value)} className={inputClass}>
-              <option value="">— None —</option>
-              {directors.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-            </select>
+            <SearchableSelect
+              value={assignDirectorId}
+              onChange={val => setAssignDirectorId(val)}
+              options={directors.map(d => ({
+                value: d.id,
+                label: d.full_name,
+                sublabel: d.email
+              }))}
+              emptyLabel="— None —"
+              placeholder="Search directors..."
+            />
           </div>
         </div>
       </Modal>

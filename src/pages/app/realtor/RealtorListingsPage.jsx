@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AppLayout from '../../../components/layout/AppLayout';
 import Button from '../../../components/ui/Button';
 import Badge from '../../../components/ui/Badge';
@@ -7,13 +8,14 @@ import { useAuth } from '../../../context/AuthContext';
 import { useListings } from '../../../hooks/useListings';
 import { useToast } from '../../../context/ToastContext';
 import { supabase } from '../../../lib/supabase';
-import { HiPhoto, HiHome, HiExclamationCircle, HiArrowUpTray, HiXMark } from 'react-icons/hi2';
+import { HiPhoto, HiHome, HiExclamationCircle, HiArrowUpTray, HiXMark, HiEye, HiMapPin, HiPencilSquare, HiArrowUpCircle } from 'react-icons/hi2';
+import { ActionPill, ActionMenu } from '../../../components/shared/TableActions';
 
 // Upgrade tier display config — prices come from listing_prices table
 const TIER_META = {
   standard: { label: 'Standard',  desc: 'Basic listing visibility', color: '#4B5563', bg: '#F3F4F6' },
-  featured: { label: 'Featured',  desc: 'Higher search ranking + Featured badge', color: '#B8962E', bg: 'rgba(212,175,55,0.12)' },
-  top:      { label: 'Top',       desc: 'Top of search + Homepage spotlight', color: '#5B21B6', bg: '#EDE9FE' },
+  featured: { label: 'Featured',  desc: 'Higher search ranking + Featured badge', color: '#FFFFFF', bg: 'linear-gradient(135deg, #D4AF37 0%, #B8962E 100%)' },
+  top:      { label: 'Top',       desc: 'Top of search + Homepage spotlight', color: '#FFFFFF', bg: 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)' },
 };
 
 const STATUS_TABS = ['all', 'draft', 'pending', 'active', 'rejected', 'sold'];
@@ -27,9 +29,13 @@ const defaultForm = {
 
 const STEPS = ['Basic Info', 'Location', 'Media', 'Review'];
 
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400&q=80';
+
+
 export default function RealtorListingsPage() {
   const { profile, subscription } = useAuth();
   const { addToast } = useToast();
+  const navigate = useNavigate();
 
   const [activeTab, setActiveTab]   = useState('all');
   const [createOpen, setCreateOpen] = useState(false);
@@ -46,8 +52,15 @@ export default function RealtorListingsPage() {
   const [selectedTier, setSelectedTier]   = useState('featured');
   const [rejectReason, setRejectReason]   = useState('');
   const [uploading, setUploading]         = useState(false);
+  const [deleteTarget, setDeleteTarget]   = useState(null);
+  const [isDeleting, setIsDeleting]       = useState(false);
+  const [filterType, setFilterType]       = useState('');
+  const [filterListingType, setFilterListingType] = useState('');
+  const [filterSearch, setFilterSearch]   = useState('');
+  const [formFieldErrors, setFormFieldErrors] = useState({});
+  const [openMenuId, setOpenMenuId]       = useState(null);
 
-  const { listings: allListings, createListing, updateListing, submitForApproval, isLoading } = useListings({
+  const { listings: allListings, createListing, updateListing, deleteListing, submitForApproval, isLoading } = useListings({
     // Fetch all listings for this realtor to calculate global counts accurately
   });
 
@@ -62,6 +75,22 @@ export default function RealtorListingsPage() {
       });
   }, []);
 
+  // Deep-linking: Handle ?edit={id} from dashboard
+  useEffect(() => {
+    if (isLoading || !allListings.length) return;
+    const params = new URLSearchParams(window.location.search);
+    const editId = params.get('edit');
+    if (editId) {
+      const listing = allListings.find(l => l.id === editId);
+      if (listing) {
+        openEdit(listing);
+        // Clean up URL to prevent re-opening on manual refresh
+        const newUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [isLoading, allListings]);
+
   const tabCounts = useMemo(() => {
     return {
       all:      allListings.length,
@@ -74,9 +103,12 @@ export default function RealtorListingsPage() {
   }, [allListings]);
 
   const filteredListings = useMemo(() => {
-    if (activeTab === 'all') return allListings;
-    return allListings.filter(l => l.status === activeTab);
-  }, [allListings, activeTab]);
+    let list = activeTab === 'all' ? allListings : allListings.filter(l => l.status === activeTab);
+    if (filterType) list = list.filter(l => l.property_type === filterType);
+    if (filterListingType) list = list.filter(l => l.listing_type === filterListingType);
+    if (filterSearch) list = list.filter(l => l.title?.toLowerCase().includes(filterSearch.toLowerCase()));
+    return list;
+  }, [allListings, activeTab, filterType, filterListingType, filterSearch]);
 
   // ── Edit handlers ────────────────────────────────────────────────────────────
 
@@ -105,12 +137,36 @@ export default function RealtorListingsPage() {
       addToast({ type: 'error', title: 'Invalid title', desc: 'Title must be at least 10 characters long.' });
       return;
     }
+    if (!editForm.description?.trim()) {
+      addToast({ type: 'error', title: 'Missing description', desc: 'Please add a description for this listing.' });
+      return;
+    }
     if (Number(editForm.price) < 1000) {
       addToast({ type: 'error', title: 'Invalid price', desc: 'Listing price must be at least $1,000.' });
       return;
     }
-    if (!editForm.city) {
+    if (!editForm.bedrooms || Number(editForm.bedrooms) < 1) {
+      addToast({ type: 'error', title: 'Missing bedrooms', desc: 'Please specify the number of bedrooms.' });
+      return;
+    }
+    if (!editForm.bathrooms || Number(editForm.bathrooms) < 1) {
+      addToast({ type: 'error', title: 'Missing bathrooms', desc: 'Please specify the number of bathrooms.' });
+      return;
+    }
+    if (!editForm.sqft || Number(editForm.sqft) < 1) {
+      addToast({ type: 'error', title: 'Missing sqft', desc: 'Please specify the square footage.' });
+      return;
+    }
+    if (!editForm.state?.trim()) {
+      addToast({ type: 'error', title: 'Missing state', desc: 'Please specify the state.' });
+      return;
+    }
+    if (!editForm.city?.trim()) {
       addToast({ type: 'error', title: 'Missing city', desc: 'Please specify the city for this listing.' });
+      return;
+    }
+    if (!editForm.address?.trim()) {
+      addToast({ type: 'error', title: 'Missing address', desc: 'Please specify the street address.' });
       return;
     }
 
@@ -128,6 +184,19 @@ export default function RealtorListingsPage() {
     } else {
       addToast({ type: 'error', title: 'Update failed', desc: error.message });
     }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    const { error } = await deleteListing(deleteTarget.id);
+    setIsDeleting(false);
+    if (!error) {
+      addToast({ type: 'success', title: 'Listing deleted successfully' });
+    } else {
+      addToast({ type: 'error', title: 'Delete failed', desc: error.message });
+    }
+    setDeleteTarget(null);
   };
 
   // ── Submit for Approval ──────────────────────────────────────────────────────
@@ -206,25 +275,42 @@ export default function RealtorListingsPage() {
 
   // ── Create listing ───────────────────────────────────────────────────────────
 
-  const resetCreate = () => { setStep(0); setForm(defaultForm); };
+  const resetCreate = () => { setStep(0); setForm(defaultForm); setFormFieldErrors({}); };
   const closeCreate = () => { setCreateOpen(false); resetCreate(); };
+
+  const validateCreateStep = (currentStep, f) => {
+    const errs = {};
+    if (currentStep === 0) {
+      if (!f.title || f.title.trim().length < 3) errs.title = 'Title must be at least 3 characters';
+      if (f.title && f.title.length > 100) errs.title = 'Title must be under 100 characters';
+      if (!f.description || f.description.trim().length < 50) errs.description = 'Description must be at least 50 characters';
+      if (!f.price || Number(f.price) <= 0) errs.price = 'Price must be greater than $0';
+      if (!f.property_type) errs.property_type = 'Property type is required';
+    }
+    if (currentStep === 1) {
+      if (!f.address || !f.address.trim()) errs.address = 'Address is required';
+      if (!f.city || !f.city.trim()) errs.city = 'City is required';
+      if (!f.state || !f.state.trim()) errs.state = 'State is required';
+      if (!f.country) errs.country = 'Country is required';
+    }
+    return errs;
+  };
+
   const handleCreate = async () => {
     setIsSubmitting(true);
-    if (!form.title || form.title.length < 10) {
-      addToast({ type: 'error', title: 'Invalid title', desc: 'Title must be at least 10 characters long.' });
+    // Run full validation
+    const allErrs = { ...validateCreateStep(0, form), ...validateCreateStep(1, form) };
+    if (Object.keys(allErrs).length > 0) {
+      setFormFieldErrors(allErrs);
+      // Navigate to first step with error
+      const step0Keys = ['title','description','price','property_type'];
+      const hasStep0Err = step0Keys.some(k => allErrs[k]);
+      if (hasStep0Err) setStep(0); else setStep(1);
+      addToast({ type: 'error', title: 'Please fix the errors below' });
       setIsSubmitting(false);
       return;
     }
-    if (Number(form.price) < 1000) {
-      addToast({ type: 'error', title: 'Invalid price', desc: 'Listing price must be at least $1,000.' });
-      setIsSubmitting(false);
-      return;
-    }
-    if (!form.city) {
-      addToast({ type: 'error', title: 'Missing city', desc: 'Please specify the city for this listing.' });
-      setIsSubmitting(false);
-      return;
-    }
+    setFormFieldErrors({});
 
     // HP-5: Auto-assign territory_id based on city + state
     let territory_id = null;
@@ -280,7 +366,11 @@ export default function RealtorListingsPage() {
 
     setUpgrading(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
         body: {
           type: 'listing_upgrade',
           listingId: upgradeTarget.id,
@@ -316,19 +406,22 @@ export default function RealtorListingsPage() {
         <div className="flex flex-col gap-4">
           <div>
             <label className={labelClass}>Title *</label>
-            <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className={inputClass} placeholder="e.g. 3BR Modern Home in Silver Lake" />
+            <input value={form.title} onChange={e => { setForm(f => ({ ...f, title: e.target.value })); setFormFieldErrors(fe => ({ ...fe, title: '' })); }} className={inputClass + (formFieldErrors.title ? ' border-red-400' : '')} placeholder="e.g. 3BR Modern Home in Silver Lake" />
+            {formFieldErrors.title && <p className="text-xs mt-1 text-red-500">{formFieldErrors.title}</p>}
           </div>
           <div>
-            <label className={labelClass}>Description</label>
-            <textarea rows={2} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className={inputClass + ' resize-none'} placeholder="Describe the property..." />
+            <label className={labelClass}>Description *</label>
+            <textarea rows={2} value={form.description} onChange={e => { setForm(f => ({ ...f, description: e.target.value })); setFormFieldErrors(fe => ({ ...fe, description: '' })); }} className={inputClass + ' resize-none' + (formFieldErrors.description ? ' border-red-400' : '')} placeholder="Describe the property (min 50 characters)..." />
+            {formFieldErrors.description && <p className="text-xs mt-1 text-red-500">{formFieldErrors.description}</p>}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Price ($) *</label>
-              <input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} className={inputClass} placeholder="500000" />
+              <input type="number" min="0" step="1" value={form.price} onChange={e => { setForm(f => ({ ...f, price: e.target.value })); setFormFieldErrors(fe => ({ ...fe, price: '' })); }} className={inputClass + (formFieldErrors.price ? ' border-red-400' : '')} placeholder="500000" />
+              {formFieldErrors.price && <p className="text-xs mt-1 text-red-500">{formFieldErrors.price}</p>}
             </div>
             <div>
-              <label className={labelClass}>Property Type</label>
+              <label className={labelClass}>Property Type *</label>
               <select value={form.property_type} onChange={e => setForm(f => ({ ...f, property_type: e.target.value }))} className={inputClass}>
                 {['House', 'Condo', 'Townhouse', 'Land', 'Commercial'].map(t => <option key={t}>{t}</option>)}
               </select>
@@ -337,15 +430,15 @@ export default function RealtorListingsPage() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className={labelClass}>Beds</label>
-              <input type="number" value={form.bedrooms} onChange={e => setForm(f => ({ ...f, bedrooms: e.target.value }))} className={inputClass} placeholder="3" />
+              <input type="number" min="0" step="1" value={form.bedrooms} onChange={e => setForm(f => ({ ...f, bedrooms: e.target.value }))} className={inputClass} placeholder="3" />
             </div>
             <div>
               <label className={labelClass}>Baths</label>
-              <input type="number" step="0.5" value={form.bathrooms} onChange={e => setForm(f => ({ ...f, bathrooms: e.target.value }))} className={inputClass} placeholder="2" />
+              <input type="number" min="0" step="0.5" value={form.bathrooms} onChange={e => setForm(f => ({ ...f, bathrooms: e.target.value }))} className={inputClass} placeholder="2" />
             </div>
             <div>
               <label className={labelClass}>Sqft</label>
-              <input type="number" value={form.sqft} onChange={e => setForm(f => ({ ...f, sqft: e.target.value }))} className={inputClass} placeholder="1500" />
+              <input type="number" min="0" step="1" value={form.sqft} onChange={e => setForm(f => ({ ...f, sqft: e.target.value }))} className={inputClass} placeholder="1500" />
             </div>
           </div>
         </div>
@@ -353,24 +446,27 @@ export default function RealtorListingsPage() {
       case 1: return (
         <div className="flex flex-col gap-4">
           <div>
-            <label className={labelClass}>Country</label>
+            <label className={labelClass}>Country *</label>
             <select value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))} className={inputClass}>
               <option>USA</option><option>Canada</option><option>UK</option><option>Australia</option>
             </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>State</label>
-              <input value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value }))} className={inputClass} placeholder="California" />
+              <label className={labelClass}>State *</label>
+              <input value={form.state} onChange={e => { setForm(f => ({ ...f, state: e.target.value })); setFormFieldErrors(fe => ({ ...fe, state: '' })); }} className={inputClass + (formFieldErrors.state ? ' border-red-400' : '')} placeholder="California" />
+              {formFieldErrors.state && <p className="text-xs mt-1 text-red-500">{formFieldErrors.state}</p>}
             </div>
             <div>
               <label className={labelClass}>City *</label>
-              <input value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} className={inputClass} placeholder="Los Angeles" />
+              <input value={form.city} onChange={e => { setForm(f => ({ ...f, city: e.target.value })); setFormFieldErrors(fe => ({ ...fe, city: '' })); }} className={inputClass + (formFieldErrors.city ? ' border-red-400' : '')} placeholder="Los Angeles" />
+              {formFieldErrors.city && <p className="text-xs mt-1 text-red-500">{formFieldErrors.city}</p>}
             </div>
           </div>
           <div>
-            <label className={labelClass}>Street Address</label>
-            <input value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} className={inputClass} placeholder="123 Main St, Unit 4" />
+            <label className={labelClass}>Street Address *</label>
+            <input value={form.address} onChange={e => { setForm(f => ({ ...f, address: e.target.value })); setFormFieldErrors(fe => ({ ...fe, address: '' })); }} className={inputClass + (formFieldErrors.address ? ' border-red-400' : '')} placeholder="123 Main St, Unit 4" />
+            {formFieldErrors.address && <p className="text-xs mt-1 text-red-500">{formFieldErrors.address}</p>}
           </div>
         </div>
       );
@@ -459,9 +555,26 @@ export default function RealtorListingsPage() {
 
   const hasActiveSubscription = subscription?.status === 'active' || subscription?.status === 'trialing';
 
+  const buildMenuItems = (listing) => {
+    const items = [];
+    if (listing.status === 'draft' || listing.status === 'rejected') {
+      items.push({
+        icon: HiArrowUpCircle, label: 'Submit for Approval', color: '#16a34a',
+        onClick: () => handleSubmitForApproval(listing),
+      });
+    }
+    if (listing.status === 'active' && listing.upgrade_type !== 'top') {
+      items.push({
+        icon: HiArrowUpCircle, label: 'Upgrade Listing', color: '#D4AF37',
+        onClick: () => openUpgrade(listing),
+      });
+    }
+    return items;
+  };
+
   return (
     <AppLayout role="realtor" title="My Listings">
-      <div className="p-4 md:p-6 flex flex-col gap-6">
+      <div className="p-4 md:p-6 flex flex-col gap-6 max-w-6xl mx-auto">
 
         {/* Subscription warning banner */}
         {!hasActiveSubscription && (
@@ -503,22 +616,144 @@ export default function RealtorListingsPage() {
           })}
         </div>
 
-        {/* Listings Grid */}
-        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
-          {filteredListings.map(listing => {
+        {/* Filter Bar */}
+        <div className="flex flex-wrap gap-3 items-center p-3 bg-gray-50 rounded-xl border border-gray-100">
+          <input
+            type="text"
+            placeholder="Search by title..."
+            value={filterSearch}
+            onChange={e => setFilterSearch(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-yellow-400 bg-white flex-1 min-w-[160px]"
+          />
+          <select
+            value={filterType}
+            onChange={e => setFilterType(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-yellow-400 bg-white"
+          >
+            <option value="">All Types</option>
+            {['House', 'Condo', 'Land', 'Commercial', 'Multi-family'].map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          <select
+            value={filterListingType}
+            onChange={e => setFilterListingType(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-yellow-400 bg-white"
+          >
+            <option value="">All Listing Types</option>
+            {['For Sale', 'For Rent', 'For Lease'].map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          {(filterSearch || filterType || filterListingType) && (
+            <button
+              onClick={() => { setFilterSearch(''); setFilterType(''); setFilterListingType(''); }}
+              className="px-3 py-2 text-sm text-gray-500 hover:text-red-500 font-medium transition-colors"
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
+
+        {/* Count */}
+        <p className="text-sm text-gray-500">Showing {filteredListings.length} of {allListings.length} listings</p>
+
+        {/* ── Desktop Table ─────────────────────────────────────────────────────── */}
+        <div className="hidden md:block">
+          <div className="bg-white rounded-2xl overflow-visible" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.05)' }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ borderBottom: '1px solid #F3F4F6' }}>
+                  {['Listing', 'Status', 'Price', 'Actions'].map(h => (
+                    <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredListings.length > 0 ? filteredListings.map(listing => {
+                  const isUnderContract = listing.status === 'under_contract';
+                  const menuItems = buildMenuItems(listing);
+                  return (
+                    <tr key={listing.id} style={{ borderBottom: '1px solid #F9FAFB' }}
+                      className="hover:bg-gray-50 transition-colors">
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={listing.images?.[0] || FALLBACK_IMAGE}
+                            alt={listing.title}
+                            style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+                          />
+                          <div>
+                            <div className="font-semibold text-gray-900 text-sm truncate max-w-[200px]">{listing.title}</div>
+                            <div className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                              <HiMapPin size={10} />
+                              {[listing.city, listing.state].filter(Boolean).join(', ') || 'No location'}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3"><Badge status={listing.status} /></td>
+                      <td className="px-5 py-3 font-semibold text-gray-900">${listing.price?.toLocaleString()}</td>
+                      <td className="px-5 py-3">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <ActionPill
+                            icon={HiEye} label="View"
+                            color="#1D4ED8" bg="rgba(219,234,254,0.8)"
+                            onClick={() => navigate(`/listings/${listing.id}`)}
+                          />
+                          <ActionPill
+                            icon={HiPencilSquare} label="Edit"
+                            color="#374151" bg="#F3F4F6"
+                            disabled={isUnderContract}
+                            onClick={() => openEdit(listing)}
+                          />
+                          <ActionMenu
+                            items={menuItems}
+                            open={openMenuId === listing.id}
+                            onToggle={v => setOpenMenuId(v ? listing.id : null)}
+                          />
+                          <ActionPill
+                            icon={HiXMark} label="Delete"
+                            color="#DC2626" bg="rgba(254,226,226,0.8)"
+                            disabled={isUnderContract}
+                            onClick={() => setDeleteTarget(listing)}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }) : (
+                  <tr>
+                    <td colSpan={4} className="text-center py-16 text-gray-400">
+                      <HiHome className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+                      <p className="font-medium">No {activeTab !== 'all' ? activeTab : ''} listings</p>
+                      {activeTab === 'all' && <p className="text-sm mt-1">Click "+ Create Listing" to get started.</p>}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ── Mobile Cards ──────────────────────────────────────────────────────── */}
+        <div className="md:hidden flex flex-col gap-4">
+          {filteredListings.length > 0 ? filteredListings.map(listing => {
             const tierMeta = TIER_META[listing.upgrade_type] || TIER_META.standard;
             const isRejected = listing.status === 'rejected';
-            const isDraft    = listing.status === 'draft';
+            const isUnderContract = listing.status === 'under_contract';
+            const menuItems = buildMenuItems(listing);
             return (
-              <div key={listing.id} className="bg-white rounded-2xl overflow-hidden transition-all hover:shadow-lg"
+              <div key={listing.id} className="bg-white rounded-2xl overflow-hidden"
                 style={{
                   boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.05)',
                   border: isRejected ? '1.5px solid #FCA5A5' : '1.5px solid transparent',
                 }}>
-                {/* Image */}
                 <div className="relative h-44 overflow-hidden">
                   <img
-                    src={listing.images?.[0] || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=400&q=80'}
+                    src={listing.images?.[0] || FALLBACK_IMAGE}
                     alt={listing.title}
                     className="w-full h-full object-cover"
                   />
@@ -530,74 +765,56 @@ export default function RealtorListingsPage() {
                     </span>
                   </div>
                 </div>
-
-                {/* Content */}
                 <div className="p-4">
-                  <div className="font-semibold text-gray-900 mb-1 text-sm leading-tight">{listing.title}</div>
-                  <div className="text-xs text-gray-400 mb-1">{listing.city} · {listing.property_type}</div>
-
-                  {/* Rejection reason */}
+                  <div className="font-semibold text-gray-900 mb-1 text-sm">{listing.title}</div>
+                  <div className="text-xs text-gray-400 flex items-center gap-1 mb-1">
+                    <HiMapPin size={10} />
+                    {[listing.city, listing.state].filter(Boolean).join(', ') || 'No location'}
+                  </div>
                   {isRejected && listing.rejection_reason && (
                     <div className="text-xs text-red-600 mb-2 p-2 bg-red-50 rounded-lg">
                       <strong>Rejected:</strong> {listing.rejection_reason}
                     </div>
                   )}
-
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-lg font-black text-gray-900">${listing.price?.toLocaleString() || 0}</span>
-                    {listing.views_count > 0 && (
-                      <span className="text-xs text-gray-400">{listing.views_count} views</span>
-                    )}
+                    {listing.views_count > 0 && <span className="text-xs text-gray-400">{listing.views_count} views</span>}
                   </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {/* Edit is disabled for active listings — must go through admin to avoid live-listing data changes */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => listing.status === 'active'
-                        ? addToast({ type: 'warning', title: 'Cannot edit active listing', desc: 'Contact support or expire the listing first.' })
-                        : openEdit(listing)
-                      }
-                      disabled={listing.status === 'active'}
-                      title={listing.status === 'active' ? 'Active listings cannot be edited' : undefined}
-                    >Edit</Button>
-
-                    {/* Submit for Approval — shown for draft and rejected listings */}
-                    {(isDraft || isRejected) && (
-                      <Button
-                        variant="green"
-                        size="sm"
-                        onClick={() => handleSubmitForApproval(listing)}
-                        disabled={!hasActiveSubscription}
-                        title={!hasActiveSubscription ? 'Active subscription required' : undefined}
-                      >
-                        Submit for Approval
-                      </Button>
-                    )}
-
-                    {/* Upgrade — only for active listings that aren't already top tier */}
-                    {listing.status === 'active' && listing.upgrade_type !== 'top' && (
-                      <Button variant="primary" size="sm" onClick={() => openUpgrade(listing)}>
-                        Upgrade
-                      </Button>
-                    )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <ActionPill
+                      icon={HiEye} label="View"
+                      color="#1D4ED8" bg="rgba(219,234,254,0.8)"
+                      onClick={() => navigate(`/listings/${listing.id}`)}
+                    />
+                    <ActionPill
+                      icon={HiPencilSquare} label="Edit"
+                      color="#374151" bg="#F3F4F6"
+                      disabled={isUnderContract}
+                      onClick={() => openEdit(listing)}
+                    />
+                    <ActionMenu
+                      items={menuItems}
+                      open={openMenuId === listing.id}
+                      onToggle={v => setOpenMenuId(v ? listing.id : null)}
+                    />
+                    <ActionPill
+                      icon={HiXMark} label="Delete"
+                      color="#DC2626" bg="rgba(254,226,226,0.8)"
+                      disabled={isUnderContract}
+                      onClick={() => setDeleteTarget(listing)}
+                    />
                   </div>
                 </div>
               </div>
             );
-          })}
+          }) : (
+            <div className="py-16 text-center text-gray-400">
+              <HiHome className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+              <p className="font-medium">No {activeTab !== 'all' ? activeTab : ''} listings</p>
+              {activeTab === 'all' && <p className="text-sm mt-1">Click "+ Create Listing" to get started.</p>}
+            </div>
+          )}
         </div>
-
-        {filteredListings.length === 0 && !isLoading && (
-          <div className="py-16 text-center text-gray-400">
-            <HiHome className="w-10 h-10 text-gray-200 mx-auto mb-2" />
-            <p className="font-medium">No {activeTab !== 'all' ? activeTab : ''} listings</p>
-            {activeTab === 'all' && (
-              <p className="text-sm mt-1">Click "+ Create Listing" to get started.</p>
-            )}
-          </div>
-        )}
 
       </div>
 
@@ -619,7 +836,14 @@ export default function RealtorListingsPage() {
               {step > 0 && <Button variant="ghost" onClick={() => setStep(s => s - 1)}>Back</Button>}
               <Button variant="ghost" onClick={closeCreate}>Cancel</Button>
               {step < STEPS.length - 1 ? (
-                <Button variant="primary" onClick={() => setStep(s => s + 1)}>Next</Button>
+                <Button variant="primary" onClick={() => {
+                  const errs = validateCreateStep(step, form);
+                  if (Object.keys(errs).length > 0) {
+                    setFormFieldErrors(fe => ({ ...fe, ...errs }));
+                    return;
+                  }
+                  setStep(s => s + 1);
+                }}>Next</Button>
               ) : (
                 <Button variant="primary" onClick={handleCreate} isLoading={isSubmitting}>
                   Save as Draft
@@ -657,7 +881,7 @@ export default function RealtorListingsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Price ($)</label>
-              <input type="number" value={editForm.price} onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))} className={inputClass} />
+              <input type="number" min="0" step="1" value={editForm.price} onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))} className={inputClass} />
             </div>
             <div>
               <label className={labelClass}>Property Type</label>
@@ -669,15 +893,15 @@ export default function RealtorListingsPage() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className={labelClass}>Beds</label>
-              <input type="number" value={editForm.bedrooms} onChange={e => setEditForm(f => ({ ...f, bedrooms: e.target.value }))} className={inputClass} />
+              <input type="number" min="0" step="1" value={editForm.bedrooms} onChange={e => setEditForm(f => ({ ...f, bedrooms: e.target.value }))} className={inputClass} />
             </div>
             <div>
               <label className={labelClass}>Baths</label>
-              <input type="number" step="0.5" value={editForm.bathrooms} onChange={e => setEditForm(f => ({ ...f, bathrooms: e.target.value }))} className={inputClass} />
+              <input type="number" min="0" step="0.5" value={editForm.bathrooms} onChange={e => setEditForm(f => ({ ...f, bathrooms: e.target.value }))} className={inputClass} />
             </div>
             <div>
               <label className={labelClass}>Sqft</label>
-              <input type="number" value={editForm.sqft} onChange={e => setEditForm(f => ({ ...f, sqft: e.target.value }))} className={inputClass} />
+              <input type="number" min="0" step="1" value={editForm.sqft} onChange={e => setEditForm(f => ({ ...f, sqft: e.target.value }))} className={inputClass} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -783,6 +1007,32 @@ export default function RealtorListingsPage() {
           })}
         </div>
       </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete Listing?"
+        footer={
+          <div className="flex gap-2 justify-end w-full">
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button
+              variant="primary"
+              onClick={handleDeleteConfirm}
+              isLoading={isDeleting}
+              style={{ background: '#DC2626' }}
+            >
+              Delete
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-gray-600">
+          Are you sure you want to delete <strong>"{deleteTarget?.title}"</strong>?{' '}
+          This action cannot be undone.
+        </p>
+      </Modal>
+
     </AppLayout>
   );
 }

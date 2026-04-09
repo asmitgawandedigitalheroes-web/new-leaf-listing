@@ -31,10 +31,10 @@ export default function Stats() {
             { icon: HiBanknotes, val: '$1.2B',  label: 'Transactions Closed', sub: 'Past 12 months' },
             { icon: HiGlobeAlt,   val: '14',     label: 'Global Markets',      sub: 'And growing' },
           ].map((st, i) => (
-            <div key={st.label} className="flex items-start gap-4">
+            <div key={st.label} className="flex flex-col items-center text-center md:flex-row md:items-start md:text-left gap-4">
               {i > 0 && <div className="hidden md:block w-px self-stretch mr-6" style={{ background: 'rgba(212,175,55,.15)' }} />}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
+              <div className="flex flex-col items-center md:items-start">
+                <div className="flex items-center justify-center md:justify-start gap-2 mb-3">
                   <st.icon size={15} color={S} />
                   <span style={{ fontSize: 9, color: '#fff', letterSpacing: '0.24em', fontWeight: 700, textTransform: 'uppercase', opacity: 0.9 }}>{st.label}</span>
                 </div>

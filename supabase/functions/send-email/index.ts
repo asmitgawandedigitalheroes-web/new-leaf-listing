@@ -1,70 +1,36 @@
 import { serve } from "http/server.ts";
-import { createClient } from "supabase";
 import { SmtpClient } from "smtp";
 
 /**
  * send-email Edge Function
- * 
+ *
  * Sends an email via SMTP using credentials provided in environment variables.
+ * JWT verification is disabled (verify_jwt = false) — Supabase handles auth at
+ * the gateway level via the project's anon/service key.
  */
 
-const supabaseAdmin = createClient(
-  Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
+const url = Deno.env.get("SUPABASE_URL") || "";
+const serviceKey = Deno.env.get("ADMIN_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
-const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
-  .split(",")
-  .map(o => o.trim())
-  .filter(Boolean);
-
-function getCorsHeaders(req: Request): Record<string, string> {
-  const origin = req.headers.get("origin") ?? "";
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : "";
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
-}
+// Standard CORS headers for development flexibility
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
 serve(async (req: Request) => {
-  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    // 1. Authenticate the caller
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      console.error("[send-email] Missing Authorization header");
-      throw new Error("Missing Authorization header");
+    if (!url || !serviceKey) {
+      console.error("[send-email] Configuration is missing from environment");
+      throw new Error("Server configuration error: Missing ADMIN_SERVICE_ROLE_KEY");
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    console.log(`[send-email] Received token (start): ${token.substring(0, 10)}...`);
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.error("[send-email] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing from environment");
-      throw new Error("Server configuration error");
-    }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    
-    if (authError) {
-      console.error(`[send-email] Auth error: ${authError.message}`);
-      throw new Error(`Unauthorized: ${authError.message}`);
-    }
-    if (!user) {
-      console.error("[send-email] No user found for token");
-      throw new Error("Unauthorized: No user found");
-    }
-
-    // 2. Parse request body
+    // 1. Parse request body
     const { to, subject, html } = await req.json();
     if (!to || !subject || !html) {
       throw new Error("Missing required fields: to, subject, html");

@@ -21,12 +21,11 @@ import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 
 // Demo credentials — only available in development builds.
 // Set VITE_DEMO_ADMIN_EMAIL etc. in .env.local to override defaults.
-// Demo credentials — now available in all environments per user request
-const DEMO_CREDS = {
+const DEMO_CREDS = import.meta.env.DEV ? {
   admin:    { email: import.meta.env.VITE_DEMO_ADMIN_EMAIL    ?? 'admin@nlvlistings.com',    password: import.meta.env.VITE_DEMO_ADMIN_PASS    ?? 'admin123' },
   director: { email: import.meta.env.VITE_DEMO_DIRECTOR_EMAIL ?? 'director@nlvlistings.com', password: import.meta.env.VITE_DEMO_DIRECTOR_PASS ?? 'director123' },
   realtor:  { email: import.meta.env.VITE_DEMO_REALTOR_EMAIL  ?? 'realtor@nlvlistings.com',  password: import.meta.env.VITE_DEMO_REALTOR_PASS  ?? 'realtor123' },
-};
+} : null;
 
 // NLV Brand Colors
 const P   = '#D4AF37';
@@ -71,9 +70,27 @@ export default function LoginPage() {
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
-  const fillDemoCredentials = (email, password) => {
+  // BUG-002: Auto-submit with the supplied credentials — state updates are async,
+  // so we pass the values directly into auth.login instead of reading from state.
+  const fillDemoCredentials = async (email, password) => {
     setForm({ email, password });
-    addToast({ type: 'info', title: 'Demo filled', desc: `Credentials for ${email.split('@')[0]} loaded.` });
+    setLoading(true);
+    const { error, profile: loggedInProfile } = await auth.login(email, password);
+    setLoading(false);
+    if (error) {
+      addToast({ type: 'error', title: 'Demo login failed', desc: error.message });
+      return;
+    }
+    addToast({ type: 'success', title: 'Welcome back!', desc: 'Signed in successfully.' });
+    const userRole   = loggedInProfile?.role;
+    const userStatus = loggedInProfile?.status;
+    if (userRole === 'admin') {
+      navigate('/admin/dashboard');
+    } else if (userRole === 'director') {
+      navigate(userStatus === 'pending' ? '/onboarding/pending' : '/director/dashboard');
+    } else {
+      navigate(userStatus === 'pending' ? '/onboarding/pending' : '/realtor/dashboard');
+    }
   };
 
   const handleForgotPassword = async (e) => {
@@ -107,10 +124,15 @@ export default function LoginPage() {
     addToast({ type: 'success', title: 'Welcome back!', desc: 'Signed in successfully.' });
     
     // Use the profile returned by login for immediate redirection
-    const userRole = loggedInProfile?.role;
-    if (userRole === 'admin')         navigate('/admin/dashboard');
-    else if (userRole === 'director') navigate('/director/dashboard');
-    else                              navigate('/realtor/dashboard');
+    const userRole   = loggedInProfile?.role;
+    const userStatus = loggedInProfile?.status;
+    if (userRole === 'admin') {
+      navigate('/admin/dashboard');
+    } else if (userRole === 'director') {
+      navigate(userStatus === 'pending' ? '/onboarding/pending' : '/director/dashboard');
+    } else {
+      navigate(userStatus === 'pending' ? '/onboarding/pending' : '/realtor/dashboard');
+    }
   };
 
   return (

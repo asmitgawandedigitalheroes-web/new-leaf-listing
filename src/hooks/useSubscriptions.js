@@ -45,16 +45,19 @@ export function useSubscriptions() {
    * Redirect the user to Stripe Checkout to purchase a plan.
    * Calls a Supabase Edge Function to create the session.
    */
-  const createCheckoutSession = async (planKey) => {
+  const createCheckoutSession = async (planKey, options = {}) => {
     setIsLoading(true);
     try {
       // 1. Call the edge function
+      // options.invitedFlow = true tells the edge function to use pricing-page
+      // success/cancel URLs instead of the billing page URLs.
       const { data, error: sessionError } = await supabase.functions.invoke('create-checkout-session', {
-        body: { 
+        body: {
           planKey,
           userId: user.id,
           userEmail: user.email,
-          fullName: profile?.full_name || 'User'
+          fullName: profile?.full_name || 'User',
+          invitedFlow: options.invitedFlow === true,
         },
       });
 

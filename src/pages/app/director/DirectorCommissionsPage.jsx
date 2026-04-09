@@ -8,6 +8,9 @@ import Skeleton from '../../../components/ui/Skeleton';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { supabase } from '../../../lib/supabase';
+import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
+import { ActionPill } from '../../../components/shared/TableActions';
+import MobileCard, { MobileCardRow, MobileCardActions } from '../../../components/shared/MobileCard';
 import {
   HiCalendarDays,
   HiArrowTrendingUp,
@@ -24,12 +27,15 @@ const STATUS_STYLES = {
 };
 
 export default function DirectorCommissionsPage() {
+  useDocumentTitle('My Commissions');
   const { user } = useAuth();
   const { addToast } = useToast();
   const [commissions, setCommissions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [payoutOpen, setPayoutOpen] = useState(false);
   const [payoutAmount, setPayoutAmount] = useState('');
+  const [payoutNotes, setPayoutNotes] = useState('');
+  const [payoutSubmitting, setPayoutSubmitting] = useState(false);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -46,7 +52,7 @@ export default function DirectorCommissionsPage() {
     fetchCommissions();
   }, [user?.id]);
 
-  // Timeline: last 6 months from real data
+  // Timeline: last 6 months from real data (actual dollar amounts)
   const timelineData = useMemo(() => {
     const months = [];
     for (let i = 5; i >= 0; i--) {
@@ -58,7 +64,7 @@ export default function DirectorCommissionsPage() {
       const total = commissions
         .filter(c => (c.created_at || '').startsWith(key))
         .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-      months.push({ label, value: Math.round(total / 100) }); // in $100 units
+      months.push({ label, value: Math.round(total) });
     }
     return months;
   }, [commissions]);
@@ -97,9 +103,33 @@ export default function DirectorCommissionsPage() {
     { label: 'Payable', value: `$${payable.toLocaleString()}`, color: '#7C3AED', icon: <HiCurrencyDollar className="w-3.5 h-3.5" /> },
   ];
 
-  const handlePayoutRequest = () => {
-    addToast({ type: 'info', title: 'Payout requested', desc: 'Your payout request will be processed within 3–5 business days.' });
-    setPayoutOpen(false);
+  const handlePayoutRequest = async () => {
+    const amount = Number(payoutAmount);
+    if (!amount || amount <= 0) {
+      addToast({ type: 'error', title: 'Invalid amount', desc: 'Please enter a valid payout amount.' });
+      return;
+    }
+    if (amount > payable) {
+      addToast({ type: 'error', title: 'Amount too high', desc: `You can only request up to $${payable.toLocaleString()} (your payable balance).` });
+      return;
+    }
+    setPayoutSubmitting(true);
+    const { error } = await supabase.from('payout_requests').insert({
+      user_id: user.id,
+      amount,
+      payment_method: 'bank_transfer',
+      notes: payoutNotes || null,
+      status: 'pending',
+    });
+    setPayoutSubmitting(false);
+    if (error) {
+      addToast({ type: 'error', title: 'Request failed', desc: error.message });
+    } else {
+      addToast({ type: 'success', title: 'Payout requested', desc: `$${amount.toLocaleString()} payout request submitted. It will be processed within 3–5 business days.` });
+      setPayoutOpen(false);
+      setPayoutAmount('');
+      setPayoutNotes('');
+    }
   };
 
   return (
@@ -140,10 +170,7 @@ export default function DirectorCommissionsPage() {
                 {isLoading ? (
                   <Skeleton width="100%" height="160px" />
                 ) : (
-                  <>
-                    <BarChart data={timelineData} color="gold" height={160} />
-                    <div className="text-center text-xs text-gray-400 mt-1">(Values in $100 increments)</div>
-                  </>
+                  <BarChart data={timelineData} color="gold" height={160} />
                 )}
               </div>
             </SectionCard>
@@ -171,7 +198,8 @@ export default function DirectorCommissionsPage() {
 
         {/* Commission Details Table */}
         <SectionCard title={`Commission History (${commissions.length})`}>
-          <div className="data-table">
+          {/* Desktop table */}
+          <div className="hidden md:block data-table">
             <table>
               <thead>
                 <tr>
@@ -224,6 +252,49 @@ export default function DirectorCommissionsPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden flex flex-col gap-3 p-4">
+            {isLoading ? (
+              [...Array(4)].map((_, i) => (
+                <MobileCard key={i}>
+                  <Skeleton width="60%" height="14px" className="mb-2" />
+                  <Skeleton width="40%" height="12px" />
+                </MobileCard>
+              ))
+            ) : commissions.length > 0 ? commissions.map(c => (
+              <MobileCard key={c.id} highlight={(STATUS_STYLES[c.status] || STATUS_STYLES.pending).text}>
+                <div className="font-semibold text-gray-800 text-sm mb-2">
+                  {c.listing?.title || c.source_payment_id || `Commission #${c.id?.slice(0, 8)}`}
+                </div>
+                <MobileCardRow label="Type">
+                  <span className="text-xs px-2 py-0.5 rounded font-semibold capitalize"
+                    style={{
+                      background: c.commission_type === 'deal' ? '#EDE9FE' : c.commission_type === 'referral' ? '#FEF3C7' : '#F3F4F6',
+                      color: c.commission_type === 'deal' ? '#5B21B6' : c.commission_type === 'referral' ? '#92400E' : '#4B5563',
+                    }}>
+                    {c.commission_type || 'commission'}
+                  </span>
+                </MobileCardRow>
+                <MobileCardRow label="Amount">
+                  <span className="font-bold text-gray-900">${Number(c.amount || 0).toLocaleString()}</span>
+                </MobileCardRow>
+                <MobileCardRow label="Status">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase"
+                    style={STATUS_STYLES[c.status] || STATUS_STYLES.pending}>
+                    {c.status}
+                  </span>
+                </MobileCardRow>
+                <MobileCardRow label="Date">
+                  <span className="text-gray-400 text-xs">
+                    {c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}
+                  </span>
+                </MobileCardRow>
+              </MobileCard>
+            )) : (
+              <p className="text-center text-gray-400 py-8 text-sm">No commissions recorded yet</p>
+            )}
+          </div>
         </SectionCard>
 
       </div>
@@ -231,12 +302,12 @@ export default function DirectorCommissionsPage() {
       {/* Payout Request Modal */}
       <Modal
         open={payoutOpen}
-        onClose={() => setPayoutOpen(false)}
+        onClose={() => { setPayoutOpen(false); setPayoutAmount(''); setPayoutNotes(''); }}
         title="Request Payout"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setPayoutOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handlePayoutRequest}>Submit Request</Button>
+            <Button variant="ghost" onClick={() => { setPayoutOpen(false); setPayoutAmount(''); setPayoutNotes(''); }}>Cancel</Button>
+            <Button variant="primary" onClick={handlePayoutRequest} isLoading={payoutSubmitting}>Submit Request</Button>
           </>
         }
       >
@@ -246,13 +317,18 @@ export default function DirectorCommissionsPage() {
             <div className="text-3xl font-black" style={{ color: '#D4AF37' }}>
               ${payable.toLocaleString()}
             </div>
+            {payable === 0 && (
+              <p className="text-xs text-gray-400 mt-1">No payable balance at this time.</p>
+            )}
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Amount</label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Amount *</label>
             <input
               type="number"
-              placeholder="Enter amount"
+              placeholder={`Max $${payable.toLocaleString()}`}
               value={payoutAmount}
+              min="1"
+              max={payable}
               onChange={e => setPayoutAmount(e.target.value)}
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none"
             />
@@ -260,13 +336,18 @@ export default function DirectorCommissionsPage() {
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Payment Method</label>
             <select className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white">
-              <option>Bank Transfer</option>
-              <option>Add New Method</option>
+              <option value="bank_transfer">Bank Transfer</option>
             </select>
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Notes (optional)</label>
-            <textarea rows={2} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none resize-none" placeholder="Any notes for this payout..." />
+            <textarea
+              rows={2}
+              value={payoutNotes}
+              onChange={e => setPayoutNotes(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none resize-none"
+              placeholder="Any notes for this payout..."
+            />
           </div>
         </div>
       </Modal>

@@ -19,9 +19,15 @@
   --color-gold-muted: rgba(212, 175, 55, 0.15);
   --color-gold-tint:  #F2D57E;
   --color-gold-hover: #B8962E;
+
+  /* Color Shades for Gradients (Avatar/UI) */
+  --color-gold-400:   #F2D57E;
+  --color-gold-600:   #D4AF37;
+  --color-brand-400:  #2D5A4A;
+  --color-brand-600:  #1F4D3A;
  
   /* Luxury Dark & Ivory */
-  --color-jet-black: #0A0A0A;
+  --color-jet-black: #1F4D3A;
   --color-ivory:     #F7F6F2;
 
   /* Surfaces */
@@ -35,7 +41,7 @@
   --color-primary-muted:            rgba(31, 77, 58, 0.08);
 
   /* Dark */
-  --color-dark-900: #1A202C;
+  --color-dark-900: #0F2A1E;
   --color-dark-800: #2D3748;
   --color-dark-700: #4B5563;
 }
@@ -78,7 +84,7 @@ body {
 
 /* ── App Shell ── */
 .sidebar {
-  width: 240px; min-width: 240px; background: #1A202C;
+  width: 240px; min-width: 240px; background: var(--color-dark-900);
   border-right: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column;
   height: 100vh; overflow-y: auto;
 }
@@ -102,8 +108,8 @@ body {
 }
 
 /* ── Data Table ── */
-.data-table { width: 100%; overflow-x: auto; }
-.data-table table { width: 100%; border-collapse: collapse; }
+.data-table { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.data-table table { width: 100%; border-collapse: collapse; min-width: 600px; }
 .data-table thead { background: #F9FAFB; }
 .data-table th {
   padding: 11px 16px; text-align: left; font-size: 11px; font-weight: 600;
@@ -130,18 +136,22 @@ body {
   display: flex; flex-direction: column;
 }
 .drawer.open { transform: translateX(0); }
+@media (max-width: 540px) {
+  .drawer { width: 100%; }
+}
 
 /* ── Modal ── */
 .modal-backdrop {
   position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 300;
   display: flex; align-items: center; justify-content: center;
   opacity: 0; pointer-events: none; transition: opacity .2s;
+  padding: 12px;
 }
 .modal-backdrop.open { opacity: 1; pointer-events: all; }
 .modal-backdrop.open .modal-box { transform: scale(1) translateY(0); }
 .modal-box {
   background: #fff; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.06);
-  width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; margin: 20px;
+  width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; margin: 0;
   transform: scale(.97) translateY(8px); transition: transform .2s;
 }
 
@@ -154,13 +164,45 @@ body {
 .tab-btn:hover { color: #111111; }
 .tab-btn.active { color: #1F4D3A; border-bottom-color: #D4AF37; font-weight: 600; }
 
+/* ── Tabs — mobile badge style ── */
+@media (max-width: 640px) {
+  .tabs-strip {
+    border-bottom: none;
+    gap: 8px;
+    overflow-x: visible;
+    padding: 0 4px 4px;
+    flex-wrap: wrap;
+  }
+  .tabs-strip .tab-btn {
+    padding: 5px 12px;
+    margin-right: 0;
+    border-bottom: none;
+    border-radius: 999px;
+    background: #F3F4F6;
+    color: #4B5563;
+    font-size: 12px;
+    top: 0;
+    flex-shrink: 0;
+  }
+  .tabs-strip .tab-btn:hover { background: #E5E7EB; color: #111; }
+  .tabs-strip .tab-btn.active {
+    background: #D4AF37;
+    color: #fff;
+    border-bottom-color: transparent;
+  }
+  .tabs-strip .tab-btn.active .tab-count {
+    background: rgba(255,255,255,0.30);
+    color: #fff;
+  }
+}
+
 /* ── Listing card hover ── */
 .listing-card-img img { transition: transform .3s; }
 .listing-card:hover .listing-card-img img { transform: scale(1.03); }
 
 /* ── Hero bg ── */
 .hero-bg {
-  background-image: linear-gradient(rgba(10,10,10,.72), rgba(10,10,10,.88)),
+  background-image: linear-gradient(rgba(31,77,58,.72), rgba(31,77,58,.88)),
     url('https://images.unsplash.com/photo-1613977257363-707ba9348227?w=1600&q=80');
   background-size: cover; background-position: center;
 }
@@ -239,4 +281,51 @@ body {
   display: inline-block;
   box-sizing: border-box;
   animation: spin 0.8s linear infinite;
+}
+
+/* ── CRM UI Utilities ── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.crm-timeline::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: linear-gradient(to bottom, #E5E7EB 0%, #E5E7EB 80%, transparent 100%);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #E5E7EB;
+  border-radius: 20px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #D1D5DB;
+}
+
+.sticky-action-bar {
+  position: sticky;
+  bottom: 0;
+  background: white;
+  border-top: 1px solid #F3F4F6;
+  padding: 16px 24px;
+  margin: 0 -24px -24px -24px;
+  z-index: 10;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.02);
 }

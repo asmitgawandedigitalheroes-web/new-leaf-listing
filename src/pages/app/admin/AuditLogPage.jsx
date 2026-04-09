@@ -97,22 +97,22 @@ export default function AuditLogPage() {
 
         {/* Filters */}
         <div className="bg-white rounded-xl p-4 flex flex-wrap gap-3" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <select value={filterAction} onChange={e => { setFilterAction(e.target.value); setPage(1); }} className={selectClass}>
+          <select value={filterAction} onChange={e => { setFilterAction(e.target.value); setPage(1); }} className={selectClass + ' flex-1 min-w-[120px]'}>
             <option value="all">All Actions</option>
             {Object.keys(ACTION_STYLES).map(a => <option key={a} value={a}>{ACTION_STYLES[a].label}</option>)}
           </select>
-          <select value={filterUser} onChange={e => { setFilterUser(e.target.value); setPage(1); }} className={selectClass}>
+          <select value={filterUser} onChange={e => { setFilterUser(e.target.value); setPage(1); }} className={selectClass + ' flex-1 min-w-[140px]'}>
             <option value="all">All Users</option>
             {uniqueUsers.filter(u => u !== 'all').map(u => <option key={u} value={u}>{u}</option>)}
           </select>
-          <select value={filterEntity} onChange={e => { setFilterEntity(e.target.value); setPage(1); }} className={selectClass}>
+          <select value={filterEntity} onChange={e => { setFilterEntity(e.target.value); setPage(1); }} className={selectClass + ' flex-1 min-w-[120px]'}>
             <option value="all">All Entities</option>
             {uniqueEntities.filter(e => e !== 'all').map(e => <option key={e} value={e}>{e}</option>)}
           </select>
-          <div className="flex items-center gap-2">
-            <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }} className={inputClass} />
+          <div className="flex flex-wrap items-center gap-2">
+            <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }} className={inputClass + ' flex-1 min-w-[130px]'} />
             <span className="text-gray-400 text-sm">to</span>
-            <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }} className={inputClass} />
+            <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }} className={inputClass + ' flex-1 min-w-[130px]'} />
           </div>
           {(filterAction !== 'all' || filterUser !== 'all' || filterEntity !== 'all' || dateFrom || dateTo) && (
             <Button variant="ghost" size="sm" onClick={() => { setFilterAction('all'); setFilterUser('all'); setFilterEntity('all'); setDateFrom(''); setDateTo(''); setPage(1); }}>
@@ -149,7 +149,11 @@ export default function AuditLogPage() {
                   ))
                 ) : paginated.map(log => (
                   <React.Fragment key={log.id}>
-                    <tr className="cursor-pointer" onClick={() => setExpanded(expanded === log.id ? null : log.id)}>
+                    {/* BUG-009: row click toggles expanded detail; chevron button is the visual affordance */}
+                    <tr
+                      className="cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={() => setExpanded(expanded === log.id ? null : log.id)}
+                    >
                       <td className="text-gray-500 text-xs whitespace-nowrap">{formatTS(log.timestamp)}</td>
                       <td>
                         <div className="text-sm text-gray-700 font-medium">{log.userName}</div>
@@ -161,7 +165,15 @@ export default function AuditLogPage() {
                         <span className="text-gray-400 text-xs ml-1">{log.entityId}</span>
                       </td>
                       <td className="text-gray-500 text-sm max-w-xs truncate">{log.details}</td>
-                      <td><span className="text-xs text-gray-400">{expanded === log.id ? '▲' : '▼'}</span></td>
+                      <td>
+                        <button
+                          onClick={e => { e.stopPropagation(); setExpanded(expanded === log.id ? null : log.id); }}
+                          className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                          aria-label={expanded === log.id ? 'Collapse row' : 'Expand row'}
+                        >
+                          {expanded === log.id ? '▲' : '▼'}
+                        </button>
+                      </td>
                     </tr>
                     {expanded === log.id && (
                       <tr key={`${log.id}-meta`} className="bg-gray-50">
@@ -197,11 +209,11 @@ export default function AuditLogPage() {
           )}
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-3" style={{ borderTop: '1px solid #F3F4F6' }}>
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-3" style={{ borderTop: '1px solid #F3F4F6' }}>
               <span className="text-sm text-gray-400">
                 Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
               </span>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Prev</Button>
                 {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => i + 1).map(p => (
                   <button key={p} onClick={() => setPage(p)}

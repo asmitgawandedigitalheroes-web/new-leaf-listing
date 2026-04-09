@@ -59,8 +59,14 @@ export default function ListingDetail() {
   };
 
   const isAdminOrDirector = role === 'admin' || role === 'director';
+  const isDirector = role === 'director';
   const isOwnListing = listing?.realtor_id === profile?.id;
-  const canTransition = isAdminOrDirector || isOwnListing;
+  const canTransition = (isAdminOrDirector && !isDirector) || isOwnListing;
+
+  const backToListings =
+    role === 'admin'    ? '/admin/listings' :
+    role === 'director' ? '/director/listings' :
+                          '/realtor/listings';
 
   if (error) {
     return (
@@ -68,7 +74,7 @@ export default function ListingDetail() {
         <div className="p-6 text-center py-24">
           <div className="text-5xl mb-3">⚠️</div>
           <p className="text-gray-500 font-medium">Error loading listing: {error}</p>
-          <Button variant="outline" onClick={() => navigate('/app/listings')} className="mt-4">← Back to Listings</Button>
+          <Button variant="outline" onClick={() => navigate(backToListings)} className="mt-4">← Back to Listings</Button>
         </div>
       </AppLayout>
     );
@@ -80,7 +86,7 @@ export default function ListingDetail() {
         <div className="p-6 text-center py-24">
           <div className="text-5xl mb-3">🏠</div>
           <p className="text-gray-500 font-medium">Listing not found</p>
-          <Button variant="outline" onClick={() => navigate('/app/listings')} className="mt-4">← Back to Listings</Button>
+          <Button variant="outline" onClick={() => navigate(backToListings)} className="mt-4">← Back to Listings</Button>
         </div>
       </AppLayout>
     );
@@ -124,6 +130,10 @@ export default function ListingDetail() {
         if (result.error) throw result.error;
         addToast({ type: 'warning', title: 'Listing archived', desc: 'Status set to expired.' });
       }
+      // After any successful admin/director action, go back to their listings page
+      if (isAdminOrDirector) {
+        navigate(backToListings);
+      }
     } catch (err) {
       addToast({ type: 'error', title: 'Action failed', desc: err?.message || 'Please try again.' });
     } finally {
@@ -142,17 +152,17 @@ export default function ListingDetail() {
       const { error: leadError } = await createInquiry({
         listing_id: listing.id,
         source: 'listing_detail',
-        contact_name: contactForm.name,
-        contact_email: contactForm.email,
-        contact_phone: contactForm.phone,
+        name: contactForm.name,
+        email: contactForm.email,
+        phone: contactForm.phone,
         message: contactForm.message,
-        interest_type: contactForm.interest,
+        interest: contactForm.interest,
         territory_id: listing.territory_id,
         status: 'new',
       });
 
       if (leadError) throw leadError;
-      
+
       addToast({
         type: 'success',
         title: 'Request sent',
@@ -162,7 +172,8 @@ export default function ListingDetail() {
       // Reset non-auth fields
       setContactForm(prev => ({ ...prev, message: '', phone: '' }));
     } catch (err) {
-      addToast({ type: 'error', title: 'Could not send request', desc: err?.message || 'Please try again.' });
+      console.error('Contact agent error:', err);
+      addToast({ type: 'error', title: 'Could not send request', desc: 'Unable to send your inquiry. Please try again or contact support.' });
     } finally {
       setIsContactLoading(false);
     }
@@ -173,10 +184,10 @@ export default function ListingDetail() {
 
   return (
     <AppLayout role={profile?.role || 'realtor'} title={isLoading ? 'Loading listing…' : listing?.title} user={layoutUser}>
-      <div className="p-4 md:p-6 max-w-5xl">
+      <div className="p-4 md:p-6 max-w-5xl mx-auto">
         {/* Back */}
         <button
-          onClick={() => navigate('/app/listings')}
+          onClick={() => navigate(backToListings)}
           className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-5 transition-colors"
         >
           ← Back to Listings
@@ -293,14 +304,14 @@ export default function ListingDetail() {
             )}
 
             <div className="flex gap-2 mt-auto">
-              {isAdminOrDirector && !isInactive && (
+              {isAdminOrDirector && !isDirector && !isInactive && (
                 <Button variant="primary" className="flex-1"
                   isLoading={isActing['feature']}
                   onClick={() => handleAction('feature')}>
                   Feature Listing
                 </Button>
               )}
-              {canTransition && (
+              {canTransition && (role !== 'admin' || isOwnListing) && (
                 <Button variant="outline"
                   onClick={() => navigate(`/listings/${id}/edit`)}>
                   Edit
@@ -399,12 +410,13 @@ export default function ListingDetail() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Phone Number</label>
-                <input 
-                  type="tel" 
+                <input
+                  type="tel"
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none text-sm"
                   value={contactForm.phone}
-                  onChange={e => setContactForm({...contactForm, phone: e.target.value})}
+                  onChange={e => setContactForm({...contactForm, phone: e.target.value.replace(/[^0-9+\-\s()]/g, '').slice(0, 20)})}
                   placeholder="(555) 000-0000"
+                  maxLength={20}
                 />
               </div>
               <div>

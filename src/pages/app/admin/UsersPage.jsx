@@ -5,6 +5,7 @@ import {
   HiMagnifyingGlass,
   HiUsers,
   HiCheckBadge,
+  HiShieldCheck,
   HiClock,
   HiNoSymbol,
   HiTrash,
@@ -21,6 +22,10 @@ import {
 import Button from '../../../components/ui/Button';
 import Skeleton from '../../../components/ui/Skeleton';
 import { useUsers } from '../../../hooks/useUsers';
+import { useAuth } from '../../../context/AuthContext';
+import SearchableSelect from '../../../components/ui/SearchableSelect';
+import { ActionPill } from '../../../components/shared/TableActions';
+import MobileCard, { MobileCardRow, MobileCardActions } from '../../../components/shared/MobileCard';
 
 // ── Color constants ───────────────────────────────────────────────────────────
 const P     = '#D4AF37';
@@ -144,8 +149,8 @@ function KPICard({ label, value, icon, accent, onClick, active }) {
 function ConfirmModal({ open, title, message, onConfirm, onCancel, danger = false }) {
   if (!open) return null;
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-      <div style={{ background: '#fff', borderRadius: 14, padding: 28, width: 380, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
+      <div style={{ background: '#fff', borderRadius: 14, padding: 24, width: '100%', maxWidth: 380, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
           <HiExclamationTriangle size={22} color={danger ? '#DC2626' : P} />
           <h3 style={{ fontSize: 16, fontWeight: 700, color: OS }}>{title}</h3>
@@ -170,24 +175,45 @@ function ManageUserModal({
   onUpdateTerritory,
   onUpdateSubscription,
   onStatusChange,
+  onVerify,
   onDelete,
 }) {
   const [activeTab, setActiveTab] = useState('profile');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [verifyLoading, setVerifyLoading] = useState(false);
 
   if (!open || !user) return null;
 
   const handleStatusToggle = () => {
-    onStatusChange(user.id, user.status === 'active' ? 'suspended' : 'active');
+    const nextStatus = user.status === 'active' ? 'suspended' : 'active';
+    // When restoring access (suspended → active), auto-grant verification badge
+    const autoVerify = nextStatus === 'active' ? true : undefined;
+    onStatusChange(user.id, nextStatus, autoVerify);
   };
 
   const handleApprove = () => {
-    onStatusChange(user.id, 'active');
+    onStatusChange(user.id, 'active', true);
+  };
+
+  const handleVerifyToggle = async () => {
+    setVerifyLoading(true);
+    await onVerify(user.id, !user.verified_at);
+    setVerifyLoading(false);
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-      <div style={{ background: '#fff', borderRadius: 24, width: 480, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
+      <div style={{ 
+        background: '#fff', 
+        borderRadius: 24, 
+        width: '100%', 
+        maxWidth: 480, 
+        maxHeight: '90vh', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', 
+        overflow: 'hidden' 
+      }}>
         
         {/* Header Profile Section */}
         <div style={{ background: `linear-gradient(135deg, ${P}EE, ${S}EE)`, padding: '36px 32px', color: '#fff', position: 'relative' }}>
@@ -231,7 +257,14 @@ function ManageUserModal({
           ))}
         </div>
 
-        <div style={{ padding: 32, maxHeight: 440, minHeight: 340, overflowY: 'auto' }}>
+        <div style={{ 
+          padding: '32px 32px 220px 32px', 
+          maxHeight: 520, 
+          minHeight: 380, 
+          overflowY: 'auto',
+          scrollbarWidth: 'thin',
+          scrollbarColor: `${P}22 transparent`
+        }}>
           {activeTab === 'profile' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               
@@ -240,7 +273,7 @@ function ManageUserModal({
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: LGRAY, textTransform: 'uppercase', marginBottom: 12, letterSpacing: '0.05em' }}>Account Status</label>
                 {user.status === 'pending' ? (
                   <button onClick={handleApprove} style={{ width: '100%', padding: '12px', borderRadius: 12, background: '#22C55E12', color: '#065F46', border: '1px solid #22C55E33', fontWeight: 800, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                    <HiCheckBadge size={20} /> Activate Account
+                    <HiCheckBadge size={20} /> Activate & Verify Account
                   </button>
                 ) : (
                   <button onClick={handleStatusToggle} style={{ 
@@ -256,29 +289,79 @@ function ManageUserModal({
                 )}
               </div>
 
+              {/* Verification Badge */}
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: LGRAY, textTransform: 'uppercase', marginBottom: 12, letterSpacing: '0.05em' }}>Verification Badge</label>
+                {user.verified_at ? (
+                  // Already verified — show green confirmed state + revoke option
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+                      <HiCheckBadge size={20} color="#059669" />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: '#065F46' }}>Officially Verified</div>
+                        <div style={{ fontSize: 11, color: '#6B7280' }}>
+                          Since {new Date(user.verified_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleVerifyToggle}
+                      disabled={verifyLoading}
+                      style={{ width: '100%', padding: '8px', borderRadius: 10, background: '#FEF2F2', color: '#991B1B', border: '1px solid #FECACA', fontWeight: 600, cursor: verifyLoading ? 'wait' : 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: verifyLoading ? 0.6 : 1 }}
+                    >
+                      {verifyLoading ? <HiArrowPath size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <HiXMark size={14} />}
+                      {verifyLoading ? 'Revoking…' : 'Revoke Badge'}
+                    </button>
+                  </div>
+                ) : (
+                  // Not verified — clear gold CTA button
+                  <button
+                    onClick={handleVerifyToggle}
+                    disabled={verifyLoading}
+                    style={{ width: '100%', padding: '12px', borderRadius: 12, background: verifyLoading ? '#F9FAFB' : P, color: verifyLoading ? LGRAY : '#fff', border: 'none', fontWeight: 800, cursor: verifyLoading ? 'wait' : 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.15s', opacity: verifyLoading ? 0.7 : 1, boxShadow: verifyLoading ? 'none' : '0 2px 8px rgba(212,175,55,0.35)' }}
+                  >
+                    {verifyLoading
+                      ? <><HiArrowPath size={18} style={{ animation: 'spin 1s linear infinite' }} /> Verifying…</>
+                      : <><HiShieldCheck size={18} /> Grant Verification Badge</>
+                    }
+                  </button>
+                )}
+              </div>
+
               {/* Role Management */}
               <div>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: LGRAY, textTransform: 'uppercase', marginBottom: 12, letterSpacing: '0.05em' }}>Assign Platform Role</label>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {['admin', 'director', 'realtor'].map(r => (
-                    <button key={r} onClick={() => onUpdateRole(user.id, r)} style={{
-                      flex: 1, padding: '10px 4px', borderRadius: 10, border: user.role === r ? `2px solid ${targetColor(r)}` : `1px solid ${BORDER}`,
-                      background: user.role === r ? `${targetColor(r)}08` : '#fff', fontSize: 12, fontWeight: 700, color: user.role === r ? targetColor(r) : OSV,
-                      cursor: 'pointer', textTransform: 'capitalize', transition: 'all 0.15s'
-                    }}>{r}</button>
-                  ))}
-                </div>
+                {user.role === 'admin' ? (
+                  <div style={{ padding: '10px 14px', borderRadius: 10, background: '#FEF3C7', border: '1px solid #FCD34D', fontSize: 12, color: '#92400E', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <HiExclamationTriangle size={14} /> Admin role is protected and cannot be changed.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {['admin', 'director', 'realtor'].map(r => (
+                      <button key={r} onClick={() => onUpdateRole(user.id, r)} style={{
+                        flex: 1, padding: '10px 4px', borderRadius: 10, border: user.role === r ? `2px solid ${targetColor(r)}` : `1px solid ${BORDER}`,
+                        background: user.role === r ? `${targetColor(r)}08` : '#fff', fontSize: 12, fontWeight: 700, color: user.role === r ? targetColor(r) : OSV,
+                        cursor: 'pointer', textTransform: 'capitalize', transition: 'all 0.15s'
+                      }}>{r}</button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Territory Assignment */}
               <div>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: LGRAY, textTransform: 'uppercase', marginBottom: 12, letterSpacing: '0.05em' }}>Territory Assignment</label>
-                <select value={user.territory_id ?? ''} onChange={(e) => onUpdateTerritory(user.id, e.target.value)} style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: `1px solid ${BORDER}`, background: '#F9FAFB', fontSize: 13, color: OS, outline: 'none', cursor: 'pointer' }}>
-                  <option value="">— Unassigned —</option>
-                  {territories.map(t => (
-                    <option key={t.id} value={t.id}>{[t.city, t.state].filter(Boolean).join(', ')}</option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  value={user.territory_id ?? ''}
+                  onChange={(val) => onUpdateTerritory(user.id, val)}
+                  options={territories.map(t => ({
+                    value: t.id,
+                    label: t.city,
+                    sublabel: t.state
+                  }))}
+                  emptyLabel="— Unassigned —"
+                  placeholder="Find territory..."
+                />
               </div>
 
             </div>
@@ -360,10 +443,8 @@ function targetColor(role) {
 }
 
 // ── Add User Modal ────────────────────────────────────────────────────────────
-const PLANS = ['starter', 'pro', 'dominator', 'sponsor'];
-
 function AddUserModal({ open, territories, onConfirm, onCancel, isSubmitting }) {
-  const empty = { name: '', email: '', role: 'realtor', territory_id: '', plan: 'starter' };
+  const empty = { name: '', email: '', role: 'realtor', territory_id: '' };
   const [form, setForm] = useState(empty);
   const [errors, setErrors] = useState({});
 
@@ -388,7 +469,15 @@ function AddUserModal({ open, territories, onConfirm, onCancel, isSubmitting }) 
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-      <div style={{ background: '#fff', borderRadius: 16, padding: 32, width: 440, boxShadow: '0 24px 64px rgba(0,0,0,0.22)', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ 
+        background: '#fff', 
+        borderRadius: 16, 
+        padding: '32px 32px 180px 32px', 
+        width: 440, 
+        boxShadow: '0 24px 64px rgba(0,0,0,0.22)', 
+        maxHeight: '90vh', 
+        overflowY: 'auto' 
+      }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
           <div>
             <h3 style={{ fontSize: 18, fontWeight: 800, color: OS, margin: 0 }}>Add New User</h3>
@@ -427,27 +516,27 @@ function AddUserModal({ open, territories, onConfirm, onCancel, isSubmitting }) 
           <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: OSV, marginBottom: 5 }}>
             Territory <span style={{ color: LGRAY, fontWeight: 400 }}>(optional)</span>
           </label>
-          <select value={form.territory_id} onChange={e => set('territory_id', e.target.value)}
-            style={{ width: '100%', padding: '9px 12px', border: `1.5px solid ${BORDER}`, borderRadius: 8, fontSize: 13, color: OS, background: '#F9FAFB', outline: 'none', boxSizing: 'border-box', cursor: 'pointer' }}>
-            <option value=''>— None —</option>
-            {territories.map(t => (
-              <option key={t.id} value={t.id}>{[t.city, t.state].filter(Boolean).join(', ')}</option>
-            ))}
-          </select>
+          <SearchableSelect
+            value={form.territory_id}
+            onChange={val => set('territory_id', val)}
+            options={territories.map(t => ({
+              value: t.id,
+              label: t.city,
+              sublabel: t.state
+            }))}
+            emptyLabel="— None —"
+            placeholder="Search territories..."
+          />
         </div>
 
-        <div style={{ marginBottom: 24 }}>
-          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: OSV, marginBottom: 8 }}>Subscription Plan</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {PLANS.map(pl => (
-              <button key={pl} onClick={() => set('plan', pl)} style={{
-                flex: 1, padding: '9px 6px', borderRadius: 8,
-                border: form.plan === pl ? `1.5px solid ${S}` : `1.5px solid ${BORDER}`,
-                background: form.plan === pl ? '#F0FDF4' : '#fff', cursor: 'pointer',
-                fontSize: 12, fontWeight: 600, color: form.plan === pl ? S : OSV,
-                textTransform: 'capitalize', transition: 'all 0.15s',
-              }}>{pl}</button>
-            ))}
+        {/* Trial notice — user selects plan themselves after accepting invite */}
+        <div style={{ marginBottom: 24, padding: '12px 14px', borderRadius: 10, background: '#FFFBEB', border: '1px solid #FCD34D', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <HiSparkles size={16} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
+          <div>
+            <p style={{ fontSize: 12, fontWeight: 700, color: '#92400E', margin: 0 }}>User selects their own plan</p>
+            <p style={{ fontSize: 11, color: '#B45309', margin: '2px 0 0' }}>
+              After setting their password, the invited user will be directed to choose a subscription plan. All plans include a <strong>14-day free trial</strong>.
+            </p>
           </div>
         </div>
 
@@ -468,6 +557,7 @@ function AddUserModal({ open, territories, onConfirm, onCancel, isSubmitting }) 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function UsersPage() {
   const { addToast } = useToast();
+  const { user: currentUser } = useAuth();
   const { users, territories, isLoading, updateUser, deleteUser: apiDeleteUser, createUser, changeUserPlan, refresh } = useUsers();
 
   const [search, setSearch] = useState('');
@@ -526,13 +616,32 @@ export default function UsersPage() {
       : { type: 'success', title: 'User approved', desc: 'Account is now active.' });
   };
 
-  const handleStatusChange = async (id, status) => {
+  const handleStatusChange = async (id, status, verify) => {
     if (isLocal(id)) return;
-    const { error } = await updateUser(id, { status });
+    
+    // Protect admin accounts from suspension
+    const target = users.find(u => u.id === id);
+    if (target?.role === 'admin' && status === 'suspended') {
+      addToast({ type: 'error', title: 'Protected account', desc: 'Admin accounts cannot be suspended.' });
+      return;
+    }
+    
+    // Cannot suspend yourself
+    if (id === currentUser?.id && status === 'suspended') {
+      addToast({ type: 'error', title: 'Not allowed', desc: 'You cannot suspend your own account.' });
+      return;
+    }
+
+    const updates = { status };
+    if (verify === true) updates.verified_at = new Date().toISOString();
+    if (verify === false) updates.verified_at = null;
+
+    const { error } = await updateUser(id, updates);
     const actionLabel = status === 'active' ? 'activated' : 'suspended';
+    
     addToast(error
       ? { type: 'error', title: 'Update failed', desc: error.message }
-      : { type: 'success', title: `User ${actionLabel}`, desc: `Account is now ${status}.` });
+      : { type: 'success', title: `User ${actionLabel}`, desc: `Account is now ${status}${updates.verified_at ? ' and verified' : ''}.` });
   };
 
   const reactivateUser = async (id) => {
@@ -556,6 +665,17 @@ export default function UsersPage() {
 
   const changeRole = async (id, newRole) => {
     if (isLocal(id)) return;
+    // Protect admin accounts: cannot downgrade an admin's role
+    const target = users.find(u => u.id === id);
+    if (target?.role === 'admin') {
+      addToast({ type: 'error', title: 'Protected account', desc: 'Admin accounts cannot have their role changed. Contact the system owner.' });
+      return;
+    }
+    // Cannot change your own role
+    if (id === currentUser?.id) {
+      addToast({ type: 'error', title: 'Cannot change own role', desc: 'You cannot modify your own platform role.' });
+      return;
+    }
     const { error } = await updateUser(id, { role: newRole });
     addToast(error
       ? { type: 'error', title: 'Update failed', desc: error.message }
@@ -578,10 +698,25 @@ export default function UsersPage() {
       : { type: 'success', title: 'Territory assigned' });
   };
 
+  // Dedicated verify / unverify — does NOT touch status
+  const verifyUser = async (id, grant) => {
+    if (isLocal(id)) return;
+    const { error } = await updateUser(id, {
+      verified_at: grant ? new Date().toISOString() : null,
+    });
+    addToast(error
+      ? { type: 'error', title: 'Verification failed', desc: error.message }
+      : { type: 'success', title: grant ? '✓ Verified' : 'Badge removed', desc: grant ? 'Verification badge granted.' : 'Verification badge revoked.' });
+  };
+
   const approveAll = async () => {
     const pendingIds = pending.filter(u => !isLocal(u.id)).map(u => u.id);
-    await Promise.all(pendingIds.map(id => updateUser(id, { status: 'active' })));
-    addToast({ type: 'success', title: 'All pending users approved', desc: `${pendingIds.length} accounts activated.` });
+    // Auto-verify all approved users
+    await Promise.all(pendingIds.map(id => updateUser(id, {
+      status: 'active',
+      verified_at: new Date().toISOString(),
+    })));
+    addToast({ type: 'success', title: 'All pending users approved & verified', desc: `${pendingIds.length} accounts activated with verification badge.` });
     await refresh();
   };
 
@@ -614,20 +749,24 @@ export default function UsersPage() {
       full_name: formData.name.trim(),
       role: formData.role,
       territory_id: formData.territory_id || null,
-      plan: formData.plan,
+      // No plan — user selects & pays themselves after accepting the invite
     });
     setIsSubmitting(false);
     if (error) {
-      addToast({ type: 'error', title: 'Create failed', desc: error.message });
+      addToast({ type: 'error', title: 'Invitation failed', desc: error.message });
     } else {
       setAddUserOpen(false);
-      addToast({ type: 'success', title: 'User created', desc: `${data?.full_name || 'User'} added (pending approval).` });
+      addToast({
+        type: 'success',
+        title: 'Invitation Sent',
+        desc: `${formData.email} will receive an email to set their password and choose a subscription plan (14-day free trial included).`
+      });
     }
   }, [createUser, addToast]);
 
   return (
     <AppLayout role="admin">
-      <div style={{ padding: '28px 32px', minHeight: '100vh', background: '#F9FAFB' }}>
+      <div style={{ padding: 'clamp(16px, 4vw, 32px)', minHeight: '100vh', background: '#F9FAFB' }}>
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" style={{ marginBottom: 24 }}>
@@ -652,7 +791,7 @@ export default function UsersPage() {
 
         {/* Pending Banner */}
         {pending.length > 0 && (
-          <div style={{ background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: 10, padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: 10, padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <HiClock size={18} color="#D97706" />
               <span style={{ fontSize: 13, fontWeight: 600, color: '#92400E' }}>
@@ -667,7 +806,7 @@ export default function UsersPage() {
         )}
 
         {/* Filter Bar */}
-        <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 10, padding: '14px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 10, padding: '12px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 180 }}>
             <HiMagnifyingGlass size={15} color={LGRAY} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
             <input placeholder="Search name or email…" value={search} onChange={e => setSearch(e.target.value)}
@@ -702,10 +841,10 @@ export default function UsersPage() {
           )}
         </div>
 
-        {/* Table */}
-        <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+        {/* Table — desktop only */}
+        <div className="hidden md:block" style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 700 }}>
               <thead>
                 <tr style={{ background: '#F9FAFB', borderBottom: `1px solid ${BORDER}` }}>
                   <th style={{ padding: '11px 14px', textAlign: 'left', width: 40 }}>
@@ -754,12 +893,12 @@ export default function UsersPage() {
                     <td style={{ padding: '12px 14px', color: LGRAY, whiteSpace: 'nowrap' }}>{user.joined}</td>
                     <td style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <button 
-                          onClick={() => setManageModal({ open: true, user })} 
+                        <button
+                          onClick={() => setManageModal({ open: true, user })}
                           title="View Profile & Manage"
-                          style={{ 
-                            padding: '6px 12px', borderRadius: 8, background: `${S}10`, color: S, 
-                            fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', 
+                          style={{
+                            padding: '6px 12px', borderRadius: 8, background: `${S}10`, color: S,
+                            fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer',
                             display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
                           }}
                         >
@@ -777,6 +916,50 @@ export default function UsersPage() {
           </div>
         </div>
 
+        {/* Mobile cards — hidden on md+ */}
+        <div className="md:hidden flex flex-col gap-3">
+          {isLoading ? (
+            [...Array(4)].map((_, i) => (
+              <MobileCard key={i}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <Skeleton variant="circle" width="36px" height="36px" />
+                  <Skeleton width="120px" height="14px" />
+                </div>
+                <Skeleton width="180px" height="11px" style={{ marginBottom: 8 }} />
+                <Skeleton width="80px" height="20px" style={{ marginBottom: 4 }} />
+                <Skeleton width="60px" height="20px" />
+              </MobileCard>
+            ))
+          ) : filtered.length === 0 ? (
+            <p style={{ textAlign: 'center', color: LGRAY, fontSize: 13, padding: '32px 0' }}>No users match your filters.</p>
+          ) : filtered.map(user => (
+            <MobileCard
+              key={user.id}
+              highlight={user.status === 'suspended' ? '#EF4444' : user.status === 'pending' ? '#F59E0B' : undefined}
+            >
+              {/* Card title: avatar + name */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <Avatar initials={user.initials} size={36} />
+                <span style={{ fontWeight: 700, fontSize: 14, color: OS }}>{user.name}</span>
+              </div>
+
+              <MobileCardRow label="Email">{user.email}</MobileCardRow>
+              <MobileCardRow label="Role"><RoleBadge role={user.role} /></MobileCardRow>
+              <MobileCardRow label="Status"><StatusBadge status={user.status} /></MobileCardRow>
+
+              <MobileCardActions>
+                <ActionPill
+                  icon={HiEye}
+                  label="Manage"
+                  color={S}
+                  bg={`${S}10`}
+                  onClick={() => setManageModal({ open: true, user })}
+                />
+              </MobileCardActions>
+            </MobileCard>
+          ))}
+        </div>
+
         <p style={{ fontSize: 12, color: LGRAY, marginTop: 10 }}>Showing {filtered.length} of {users.length} users</p>
       </div>
 
@@ -790,6 +973,7 @@ export default function UsersPage() {
         onUpdateTerritory={assignTerritory}
         onUpdateSubscription={changeSubscription}
         onStatusChange={handleStatusChange}
+        onVerify={verifyUser}
         onDelete={deleteUser}
       />
       <AddUserModal open={addUserOpen} territories={territories} isSubmitting={isSubmitting}

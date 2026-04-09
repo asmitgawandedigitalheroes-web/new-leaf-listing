@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import AppLayout from '../../components/layout/AppLayout';
 import { SectionCard } from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
@@ -13,10 +13,10 @@ import { supabase } from '../../lib/supabase';
 
 // Fallback plan catalog used only when the DB fetch fails or returns empty.
 const planCatalog_FALLBACK = [
-  { slug: 'starter',   name: 'Starter',   price: 9,   description: 'Up to 5 active listings, basic lead notifications, standard support.',                                      maxListings: 5,  maxLeads: 50  },
-  { slug: 'pro',       name: 'Pro',       price: 29,  description: 'Unlimited listings, priority lead routing, analytics dashboard, email support.',                             maxListings: -1, maxLeads: 200 },
-  { slug: 'dominator', name: 'Dominator', price: 79,  description: 'Everything in Pro plus territory exclusivity, featured listing upgrades, phone support.',                    maxListings: -1, maxLeads: -1  },
-  { slug: 'sponsor',   name: 'Sponsor',   price: 199, description: 'Everything in Dominator plus sponsored placement, custom branding, dedicated manager.',                      maxListings: -1, maxLeads: -1  },
+  { slug: 'starter',   name: 'Starter',   price: 29,  description: 'Up to 10 listings, 50 lead captures/mo, 1 territory, priority email support.',                                    maxListings: 10, maxLeads: 50  },
+  { slug: 'pro',       name: 'Pro Agent', price: 79,  description: 'Up to 25 listings, 200 lead captures/mo, 3 territories, CRM integration, commission tracking.',                   maxListings: 25, maxLeads: 200 },
+  { slug: 'dominator', name: 'Dominator', price: 199, description: 'Unlimited listings, unlimited leads, unlimited territories, top placement, dedicated account manager.',           maxListings: -1, maxLeads: -1  },
+  { slug: 'sponsor',   name: 'Territory Sponsor', price: null, description: 'Exclusive territory lock, first-priority lead routing, co-branded marketing, custom commission splits. Contact sales.', maxListings: -1, maxLeads: -1  },
 ];
 
 function formatDate(isoString) {
@@ -38,6 +38,16 @@ export default function BillingPage() {
   const { user, profile, subscription } = useAuth();
   const { addToast } = useToast();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  // Directors have their own billing page — redirect them if they land here
+  // (e.g. after a Stripe checkout that used the realtor success URL)
+  useEffect(() => {
+    if (profile?.role === 'director') {
+      const qs = searchParams.toString();
+      navigate(`/director/billing${qs ? `?${qs}` : ''}`, { replace: true });
+    }
+  }, [profile?.role]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [payments, setPayments] = useState([]);
@@ -46,6 +56,8 @@ export default function BillingPage() {
   const [selectedPlan, setSelectedPlan] = useState('pro');
   const [upgrading, setUpgrading] = useState(false);
   const [planCatalog, setPlanCatalog] = useState(planCatalog_FALLBACK);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   // Detect Stripe redirect success/cancel
   useEffect(() => {
@@ -139,11 +151,21 @@ export default function BillingPage() {
     }
     setUpgrading(true);
     try {
+      // BUG-010: Explicitly forward the session JWT to prevent 401 from the Edge Function
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) {
+        throw new Error('Your session has expired. Please sign in again.');
+      }
+
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
         body: {
           planKey: selectedPlan,
           userId: user.id,
           userEmail: user.email,
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 
@@ -165,12 +187,27 @@ export default function BillingPage() {
     }
   };
 
-  const handleCancelSubscription = () => {
-    addToast({
-      type: 'warning',
-      title: 'To cancel your subscription',
-      desc: 'Please contact support at billing@nlvlistings.com',
-    });
+  const handleCancelSubscription = async () => {
+    setCancelling(true);
+    try {
+      const { error } = await supabase
+        .from('subscriptions')
+        .update({ status: 'cancelling', updated_at: new Date().toISOString() })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      addToast({
+        type: 'success',
+        title: 'Subscription cancelled',
+        desc: `Your access continues until ${nextBillingDate}. No further charges.`,
+      });
+      setCancelOpen(false);
+    } catch (err) {
+      addToast({ type: 'error', title: 'Cancellation failed', desc: 'Please contact support at billing@nlvlistings.com' });
+    } finally {
+      setCancelling(false);
+    }
   };
 
   return (
@@ -183,7 +220,7 @@ export default function BillingPage() {
         initials: (profile?.full_name || 'U').slice(0, 2).toUpperCase(),
       }}
     >
-      <div className="p-4 md:p-6 flex flex-col gap-6 max-w-4xl">
+      <div className="p-4 md:p-6 flex flex-col gap-6 max-w-4xl mx-auto">
 
         {/* Current Plan */}
         <SectionCard title="Current Plan">
@@ -211,7 +248,9 @@ export default function BillingPage() {
                   {isActive && nextBillingDate !== '—' ? (
                     <>Next billing: <strong style={{ color: '#111111' }}>{nextBillingDate}</strong> — </>
                   ) : null}
-                  <strong style={{ color: '#D4AF37' }}>${currentPlan.price}/mo</strong>
+                  <strong style={{ color: '#D4AF37' }}>
+                    {currentPlan.price != null ? `$${currentPlan.price}/mo` : 'Contact Sales'}
+                  </strong>
                 </p>
               </div>
             )}
@@ -220,7 +259,7 @@ export default function BillingPage() {
                 Upgrade Plan
               </Button>
               {subscription && isActive && (
-                <Button variant="outline" onClick={handleCancelSubscription}>
+                <Button variant="outline" onClick={() => setCancelOpen(true)}>
                   Cancel
                 </Button>
               )}
@@ -381,16 +420,50 @@ export default function BillingPage() {
                       )}
                     </span>
                     <span className="font-bold text-sm" style={{ color: '#D4AF37' }}>
-                      ${plan.price}/mo
+                      {plan.price != null && plan.price > 0 ? `$${plan.price}/mo` : 'Contact Sales'}
                     </span>
                   </div>
                   <p className="text-xs mt-0.5" style={{ color: '#6B7280' }}>{plan.description}</p>
+                  {isSelected && plan.slug === 'starter' && (
+                    <div className="mt-2 p-2.5 rounded-lg text-xs" style={{ background: 'rgba(212,175,55,0.1)', color: '#B8962E', border: '1px solid rgba(212,175,55,0.3)' }}>
+                      Starter plan requires a <strong>12-month minimum commitment</strong>. Early cancellation does not waive the remaining monthly fees.
+                    </div>
+                  )}
                 </div>
               </button>
             );
           })}
         </div>
       </Modal>
+
+      {/* Cancel Subscription Modal */}
+      <Modal
+        open={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        title="Cancel Your Subscription?"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setCancelOpen(false)}>Keep Subscription</Button>
+            <Button
+              variant="primary"
+              onClick={handleCancelSubscription}
+              isLoading={cancelling}
+              style={{ background: '#DC2626' }}
+            >
+              Cancel Subscription
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-600 mb-3">
+          Your subscription will remain active until{' '}
+          <strong>{nextBillingDate}</strong>. After that, your listings will be deactivated.
+        </p>
+        <p className="text-xs text-gray-400">
+          You can reactivate at any time before the end date to avoid interruption.
+        </p>
+      </Modal>
+
     </AppLayout>
   );
 }

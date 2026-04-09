@@ -18,6 +18,11 @@ import {
   HiCurrencyDollar,
   HiEnvelope,
   HiSparkles,
+  HiExclamationTriangle,
+  HiArrowDownTray,
+  HiDocumentText,
+  HiCheckBadge,
+  HiUserPlus,
 } from 'react-icons/hi2';
 
 // Reusable icon wrapper for consistency
@@ -29,21 +34,29 @@ const NAV = {
   admin: [
     { key: 'dashboard',    label: 'Dashboard',    icon: HiViewColumns,         to: '/admin/dashboard' },
     { key: 'users',        label: 'Users',         icon: HiUsers,               to: '/admin/users' },
+    { key: 'approvals',   label: 'Approvals',     icon: HiCheckBadge,          to: '/admin/approvals' },
+    { key: 'add-user',        label: 'Add User',         icon: HiUserPlus,       to: '/admin/add-user' },
     { key: 'listings',     label: 'Listings',      icon: HiHomeModern,          to: '/admin/listings' },
     { key: 'leads',        label: 'Leads',         icon: HiChatBubbleLeftRight,  to: '/admin/leads' },
+    { key: 'enquiries',   label: 'Enquiries',     icon: HiEnvelope,            to: '/admin/enquiries' },
     { key: 'territories',  label: 'Territories',   icon: HiMap,                 to: '/admin/territories' },
     { key: 'subscriptions',label: 'Subscriptions', icon: HiCreditCard,          to: '/admin/subscriptions' },
     { key: 'commissions',  label: 'Commissions',   icon: HiBanknotes,           to: '/admin/commissions-admin' },
-    { key: 'pricing',      label: 'Pricing',       icon: HiCurrencyDollar,      to: '/admin/pricing' },
+    { key: 'pricing',      label: 'Pricing',       icon: HiCurrencyDollar,        to: '/admin/pricing' },
+    { key: 'payouts',      label: 'Payouts',       icon: HiArrowDownTray,         to: '/admin/payouts' },
+    { key: 'disputes',     label: 'Disputes',      icon: HiExclamationTriangle,   to: '/admin/disputes' },
     { key: 'audit',        label: 'Audit Log',     icon: HiClipboardDocumentList, to: '/admin/audit' },
-    { key: 'settings',     label: 'Settings',      icon: HiCog6Tooth,           to: '/admin/settings' },
+    { key: 'settings',     label: 'Settings',      icon: HiCog6Tooth,             to: '/admin/settings' },
   ],
   director: [
     { key: 'dashboard',    label: 'Dashboard',     icon: HiViewColumns,         to: '/director/dashboard' },
+    { key: 'listings',     label: 'Listings',      icon: HiHomeModern,          to: '/director/listings' },
     { key: 'leads',        label: 'My Leads',      icon: HiChatBubbleLeftRight,  to: '/director/leads' },
     { key: 'realtors',     label: 'My Realtors',   icon: HiIdentification,      to: '/director/realtors' },
     { key: 'commissions',  label: 'My Commissions',icon: HiBanknotes,           to: '/director/commissions' },
+    { key: 'billing',      label: 'Earnings & Payouts', icon: HiCreditCard,      to: '/director/billing' },
     { key: 'reports',      label: 'Reports',       icon: HiChartBar,            to: '/director/reports' },
+    { key: 'contracts',    label: 'Legal & Contracts', icon: HiDocumentText,    to: '/director/contracts' },
   ],
   realtor: [
     { key: 'dashboard',    label: 'Dashboard',     icon: HiViewColumns,         to: '/realtor/dashboard' },
@@ -88,7 +101,6 @@ export default function Sidebar({ role: roleProp = 'realtor', onClose }) {
   const navigate = useNavigate();
   const { role: authRole, profile, logout } = useAuth();
 
-  // Auth context role takes priority over the prop passed from AppLayout
   const effectiveRole = authRole || roleProp || 'realtor';
   const items = NAV[effectiveRole] || NAV.realtor;
 
@@ -98,7 +110,10 @@ export default function Sidebar({ role: roleProp = 'realtor', onClose }) {
 
   const handleSignOut = async () => {
     try { await logout(); } catch { /* ignore */ }
-    navigate('/login');
+    // FIX: CRIT-004 — Use hard redirect instead of navigate() to prevent race condition
+    // where React state (auth.profile) is not yet null when LoginPage mounts,
+    // causing the redirect-if-authenticated useEffect to loop back to admin dashboard.
+    window.location.replace('/login');
   };
 
   return (
@@ -132,6 +147,7 @@ export default function Sidebar({ role: roleProp = 'realtor', onClose }) {
             {item.label}
           </NavLink>
         ))}
+
       </nav>
 
       {/* User footer */}

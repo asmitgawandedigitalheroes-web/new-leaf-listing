@@ -12,10 +12,10 @@ const TS = '#4B5563';
 const TM = '#6B7280';
 
 const STATS = [
-  { value: '3,200+', label: 'Properties Listed' },
-  { value: '840+',   label: 'Verified Agents' },
-  { value: '18',     label: 'Markets Served' },
-  { value: '$4.2B',  label: 'Total Transactions' },
+  { value: '2,400+', label: 'Active Listings' },
+  { value: '340+',   label: 'Elite Realtors' },
+  { value: '14',     label: 'Global Markets' },
+  { value: '$1.2B',  label: 'Transactions Closed' },
 ];
 
 const VALUES = [

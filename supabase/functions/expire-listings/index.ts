@@ -17,11 +17,18 @@ import { createClient } from "supabase";
  *   $$);
  */
 
-const supabaseAdmin = createClient(
-  Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
+const url = Deno.env.get("SUPABASE_URL") || "";
+const serviceKey = Deno.env.get("ADMIN_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+const supabaseAdmin = createClient(url, serviceKey, {
+  auth: { autoRefreshToken: false, persistSession: false }
+});
+
+interface Listing {
+  id: string;
+  title: string;
+  realtor_id: string;
+}
 
 serve(async (req: Request) => {
   // Allow POST or GET (cron callers may use either)
@@ -60,7 +67,7 @@ serve(async (req: Request) => {
 
     // Optionally notify each realtor whose listing just expired
     if (expired && expired.length > 0) {
-      const notifications = expired.map((listing: any) => ({
+      const notifications = expired.map((listing: Listing) => ({
         user_id: listing.realtor_id,
         title: "Listing Expired",
         message: `Your listing "${listing.title}" has been automatically expired after 180 days. Upgrade to a Featured or Top tier to extend visibility.`,
@@ -68,7 +75,7 @@ serve(async (req: Request) => {
         entity_id: listing.id,
         read: false,
         created_at: new Date().toISOString(),
-      })).filter((n: any) => n.user_id); // only notify if realtor_id is set
+      })).filter((n) => n.user_id); // only notify if realtor_id is set
 
       if (notifications.length > 0) {
         const { error: notifError } = await supabaseAdmin

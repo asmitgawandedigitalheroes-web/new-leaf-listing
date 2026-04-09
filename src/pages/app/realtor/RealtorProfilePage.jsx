@@ -5,22 +5,29 @@ import Button from '../../../components/ui/Button';
 import Skeleton from '../../../components/ui/Skeleton';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
-import { HiCheckCircle, HiClock } from 'react-icons/hi2';
+import { supabase } from '../../../lib/supabase';
+import { HiCheckCircle, HiClock, HiLockClosed } from 'react-icons/hi2';
 
 const PLAN_STYLES = {
   starter:   { bg: '#F3F4F6', text: '#4B5563', price: '$9/mo' },
   pro:       { bg: 'rgba(212,175,55,0.12)', text: '#B8962E', price: '$29/mo' },
   dominator: { bg: '#EDE9FE', text: '#5B21B6', price: '$79/mo' },
-  sponsor:   { bg: '#DBEAFE', text: '#1D4ED8', price: '$199/mo' },
+  // OBS-003: Aligned to "Contact Sales" to match PricingPage (was $199/mo)
+  sponsor:   { bg: '#DBEAFE', text: '#1D4ED8', price: 'Contact Sales' },
 };
 
 export default function RealtorProfilePage() {
   const { profile, subscription, updateProfile, isLoading: authLoading } = useAuth();
   const { addToast } = useToast();
-  const [form, setForm] = useState({ full_name: '', phone: '' });
+  const [form, setForm] = useState({ full_name: '', phone: '', company: '', city: '', state: '', license_number: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [referralCopied, setReferralCopied] = useState(false);
+
+  // BUG-006: Security / password-change state
+  const [pwForm, setPwForm] = useState({ newPassword: '', confirmPassword: '' });
+  const [pwErrors, setPwErrors] = useState({});
+  const [isSavingPw, setIsSavingPw] = useState(false);
 
   // Sync form with profile once loaded
   useEffect(() => {
@@ -28,11 +35,23 @@ export default function RealtorProfilePage() {
       setForm({
         full_name: profile.full_name || '',
         phone: profile.phone || '',
+        company: profile.company || '',
+        city: profile.city || '',
+        state: profile.state || '',
+        license_number: profile.license_number || '',
       });
     }
   }, [profile]);
 
   const handleSave = async () => {
+    if (!form.full_name.trim()) {
+      addToast({ type: 'error', title: 'Name required', desc: 'Please enter your full name.' });
+      return;
+    }
+    if (!form.phone.trim()) {
+      addToast({ type: 'error', title: 'Phone required', desc: 'Please enter your phone number.' });
+      return;
+    }
     setIsSaving(true);
     const { error } = await updateProfile(form);
     setIsSaving(false);
@@ -45,7 +64,14 @@ export default function RealtorProfilePage() {
   };
 
   const handleReset = () => {
-    if (profile) setForm({ full_name: profile.full_name || '', phone: profile.phone || '' });
+    if (profile) setForm({ 
+      full_name: profile.full_name || '', 
+      phone: profile.phone || '',
+      company: profile.company || '',
+      city: profile.city || '',
+      state: profile.state || '',
+      license_number: profile.license_number || '',
+    });
   };
 
   const initials = profile?.full_name
@@ -59,8 +85,31 @@ export default function RealtorProfilePage() {
 
   const referralCode = profile?.full_name
     ? profile.full_name.toUpperCase().replace(/\s+/g, '_').slice(0, 20)
-    : 'MY_REF';
-  const referralLink = `https://nlvlistings.com/join?ref=${referralCode}`;
+    : (profile?.id?.slice(0, 8) || 'MY_REF');
+  const referralLink = `${window.location.origin}/join?ref=${referralCode}`;
+
+  const handlePasswordChange = async () => {
+    const errors = {};
+    if (!pwForm.newPassword) errors.newPassword = 'New password is required.';
+    else if (pwForm.newPassword.length < 8) errors.newPassword = 'Password must be at least 8 characters.';
+    if (!pwForm.confirmPassword) errors.confirmPassword = 'Please confirm your new password.';
+    else if (pwForm.newPassword !== pwForm.confirmPassword) errors.confirmPassword = 'Passwords do not match.';
+
+    setPwErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    setIsSavingPw(true);
+    const { error } = await supabase.auth.updateUser({ password: pwForm.newPassword });
+    setIsSavingPw(false);
+
+    if (error) {
+      addToast({ type: 'error', title: 'Password update failed', desc: error.message });
+    } else {
+      addToast({ type: 'success', title: 'Password updated', desc: 'Your password has been changed successfully.' });
+      setPwForm({ newPassword: '', confirmPassword: '' });
+      setPwErrors({});
+    }
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(referralLink).catch(() => {});
@@ -73,7 +122,7 @@ export default function RealtorProfilePage() {
 
   return (
     <AppLayout role="realtor" title="My Profile">
-      <div className="p-4 md:p-6 flex flex-col gap-6 max-w-3xl">
+      <div className="p-4 md:p-6 flex flex-col gap-6 max-w-3xl mx-auto">
 
         {/* Profile Photo + Basic Info */}
         <SectionCard title="Profile">
@@ -144,19 +193,57 @@ export default function RealtorProfilePage() {
                   <div>
                     <label className={labelClass}>Phone</label>
                     <input
+                      type="tel"
                       value={form.phone}
-                      onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                      onChange={e => setForm(f => ({ ...f, phone: e.target.value.replace(/[^0-9+\-\s()]/g, '').slice(0, 20) }))}
                       className={inputClass}
                       placeholder="(555) 000-0000"
+                      maxLength={20}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Company / Brokerage</label>
+                    <input
+                      value={form.company}
+                      onChange={e => setForm(f => ({ ...f, company: e.target.value }))}
+                      className={inputClass}
+                      placeholder="e.g. Century 21"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>City</label>
+                    <input
+                      value={form.city}
+                      onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
+                      className={inputClass}
+                      placeholder="City"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>State</label>
+                    <input
+                      value={form.state}
+                      onChange={e => setForm(f => ({ ...f, state: e.target.value }))}
+                      className={inputClass}
+                      placeholder="State"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>License Number</label>
+                    <input
+                      value={form.license_number}
+                      onChange={e => setForm(f => ({ ...f, license_number: e.target.value }))}
+                      className={inputClass}
+                      placeholder="e.g. RE-123456"
                     />
                   </div>
                   <div>
                     <label className={labelClass}>Territory</label>
-                    <input
-                      value={profile?.territory || 'Not assigned'}
-                      readOnly
-                      className={inputClass + ' bg-gray-50 cursor-not-allowed text-gray-400'}
-                    />
+                    <div className={inputClass + ' bg-gray-50 text-gray-700 flex items-center min-h-[38px]'}>
+                      {profile?.territory 
+                        ? `${profile.territory.city}, ${profile.territory.state}` 
+                        : (profile?.city || 'Not assigned')}
+                    </div>
                     <p className="text-[11px] text-gray-400 mt-1">Set by your Director. Contact them to change.</p>
                   </div>
                 </>
@@ -241,6 +328,47 @@ export default function RealtorProfilePage() {
             <p className="text-xs text-gray-400">
               Earn commission when someone signs up through your referral link and activates a paid plan.
             </p>
+          </div>
+        </SectionCard>
+
+        {/* Security */}
+        <SectionCard title="Security">
+          <div className="px-6 py-5 flex flex-col gap-4">
+            <div className="flex items-center gap-2 mb-1">
+              <HiLockClosed className="w-4 h-4 text-gray-400" />
+              <span className="text-sm font-semibold text-gray-700">Change Password</span>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>New Password</label>
+                <input
+                  type="password"
+                  value={pwForm.newPassword}
+                  onChange={e => { setPwForm(f => ({ ...f, newPassword: e.target.value })); setPwErrors(ev => ({ ...ev, newPassword: '' })); }}
+                  className={inputClass + (pwErrors.newPassword ? ' border-red-400' : '')}
+                  placeholder="Min. 8 characters"
+                  autoComplete="new-password"
+                />
+                {pwErrors.newPassword && <p className="text-xs text-red-500 mt-1">{pwErrors.newPassword}</p>}
+              </div>
+              <div>
+                <label className={labelClass}>Confirm Password</label>
+                <input
+                  type="password"
+                  value={pwForm.confirmPassword}
+                  onChange={e => { setPwForm(f => ({ ...f, confirmPassword: e.target.value })); setPwErrors(ev => ({ ...ev, confirmPassword: '' })); }}
+                  className={inputClass + (pwErrors.confirmPassword ? ' border-red-400' : '')}
+                  placeholder="Repeat new password"
+                  autoComplete="new-password"
+                />
+                {pwErrors.confirmPassword && <p className="text-xs text-red-500 mt-1">{pwErrors.confirmPassword}</p>}
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={handlePasswordChange} isLoading={isSavingPw}>
+                Update Password
+              </Button>
+            </div>
           </div>
         </SectionCard>
 

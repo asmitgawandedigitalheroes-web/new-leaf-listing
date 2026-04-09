@@ -5,6 +5,8 @@ import BarChart from '../../../components/shared/BarChart';
 import Skeleton from '../../../components/ui/Skeleton';
 import { useAuth } from '../../../context/AuthContext';
 import { supabase } from '../../../lib/supabase';
+import { ActionPill } from '../../../components/shared/TableActions';
+import MobileCard, { MobileCardRow } from '../../../components/shared/MobileCard';
 import {
   HiChartBar,
   HiArrowTrendingUp,
@@ -48,51 +50,30 @@ export default function DirectorReportsPage() {
     async function load() {
       setIsLoading(true);
       try {
-        const territoryId = profile?.territory_id || null;
+        // Resolve all territories this director manages
+        const { data: territories } = await supabase
+          .from('territories').select('id').eq('director_id', profile.id);
+        const territoryIds = (territories || []).map(t => t.id);
 
-        // Build filters based on director's territory
+        // Build filters based on director's territories
+        let realtorsQuery = supabase.from('profiles').select('id, full_name, status').eq('role', 'realtor');
+        if (territoryIds.length > 0) realtorsQuery = realtorsQuery.in('territory_id', territoryIds);
+
+        let leadsQuery = supabase.from('leads').select('id, status, assigned_realtor_id');
+        if (territoryIds.length > 0) leadsQuery = leadsQuery.in('territory_id', territoryIds);
+
         const [realtorsRes, listingsRes, leadsRes, commissionsRes] = await Promise.all([
-          supabase
-            .from('profiles')
-            .select('id, full_name, status')
-            .eq('role', 'realtor')
-            .then(res => {
-              if (territoryId) {
-                return supabase
-                  .from('profiles')
-                  .select('id, full_name, status')
-                  .eq('role', 'realtor')
-                  .eq('territory_id', territoryId);
-              }
-              return res;
-            }),
-          supabase
-            .from('listings')
-            .select('id, status, realtor_id')
-            .eq('status', 'active'),
-          supabase
-            .from('leads')
-            .select('id, status, assigned_realtor_id')
-            .then(res => {
-              if (territoryId) {
-                return supabase
-                  .from('leads')
-                  .select('id, status, assigned_realtor_id')
-                  .eq('territory_id', territoryId);
-              }
-              return res;
-            }),
-          supabase
-            .from('commissions')
-            .select('id, amount, status')
-            .in('status', ['paid', 'approved']),
+          realtorsQuery,
+          supabase.from('listings').select('id, status, realtor_id').eq('status', 'active'),
+          leadsQuery,
+          supabase.from('commissions').select('id, amount, status, recipient_user_id').in('status', ['paid', 'approved']),
         ]);
 
         const realtors = realtorsRes.data || [];
         const realtorIds = new Set(realtors.map(r => r.id));
 
         const allLeads = leadsRes.data || [];
-        const myLeads = territoryId
+        const myLeads = territoryIds.length > 0
           ? allLeads
           : allLeads.filter(l => realtorIds.has(l.assigned_realtor_id));
 
@@ -100,10 +81,8 @@ export default function DirectorReportsPage() {
         const myListings = allListings.filter(l => realtorIds.has(l.realtor_id));
 
         const allCommissions = commissionsRes.data || [];
-        const myCommissions = allCommissions.filter(c => {
-          // commissions linked via realtor — approximate with available data
-          return true;
-        });
+        // Filter commissions to those belonging to realtors in this territory
+        const myCommissions = allCommissions.filter(c => realtorIds.has(c.recipient_user_id));
 
         const convertedLeads = myLeads.filter(l => l.status === 'converted').length;
         const totalCommissionAmt = myCommissions.reduce((s, c) => s + (Number(c.amount) || 0), 0);
@@ -136,7 +115,7 @@ export default function DirectorReportsPage() {
       }
     }
     if (profile) load();
-  }, [profile?.id, profile?.territory_id]);
+  }, [profile?.id]);
 
   const chartData = useMemo(() =>
     realtorRows.slice(0, 6).map(r => ({
@@ -180,7 +159,8 @@ export default function DirectorReportsPage() {
 
         {/* Realtor breakdown table */}
         <SectionCard title={`Realtor Performance (${realtorRows.length})`}>
-          <div className="data-table">
+          {/* Desktop table */}
+          <div className="hidden md:block data-table">
             <table>
               <thead>
                 <tr>
@@ -223,6 +203,42 @@ export default function DirectorReportsPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden flex flex-col gap-3 p-4">
+            {isLoading ? (
+              [...Array(4)].map((_, i) => (
+                <MobileCard key={i}>
+                  <Skeleton width="60%" height="14px" className="mb-2" />
+                  <Skeleton width="40%" height="12px" />
+                </MobileCard>
+              ))
+            ) : realtorRows.length > 0 ? realtorRows.map(r => (
+              <MobileCard key={r.id} highlight={r.rate >= 50 ? '#1F4D3A' : r.rate >= 25 ? '#B8962E' : '#991B1B'}>
+                <div className="font-semibold text-gray-900 text-sm mb-2">{r.name}</div>
+                <MobileCardRow label="Leads">
+                  <span className="text-gray-700 text-sm">{r.leads}</span>
+                </MobileCardRow>
+                <MobileCardRow label="Converted">
+                  <span className="text-gray-700 text-sm">{r.converted}</span>
+                </MobileCardRow>
+                <MobileCardRow label="Active Listings">
+                  <span className="text-gray-700 text-sm">{r.listings}</span>
+                </MobileCardRow>
+                <MobileCardRow label="Conv. Rate">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                    style={{
+                      background: r.rate >= 50 ? '#E8F3EE' : r.rate >= 25 ? 'rgba(212,175,55,0.12)' : '#FEE2E2',
+                      color:      r.rate >= 50 ? '#1F4D3A' : r.rate >= 25 ? '#B8962E' : '#991B1B',
+                    }}>
+                    {r.rate}%
+                  </span>
+                </MobileCardRow>
+              </MobileCard>
+            )) : (
+              <p className="text-center text-gray-400 py-8 text-sm">No realtor data available</p>
+            )}
           </div>
         </SectionCard>
 
