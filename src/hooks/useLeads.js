@@ -46,20 +46,21 @@ export function useLeads() {
       if (role === 'realtor') {
         query = query.eq('assigned_realtor_id', user.id);
       } else if (role === 'director') {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('territory_id')
-          .eq('id', user.id)
-          .single();
+        // Directors may manage multiple territories — look up by director_id, not profile.territory_id
+        const { data: territories } = await supabase
+          .from('territories')
+          .select('id')
+          .eq('director_id', user.id);
 
-        if (profile?.territory_id) {
-          query = query.eq('territory_id', profile.territory_id);
-        } else {
-          // Director with no territory assigned must see nothing — not all leads
+        const territoryIds = (territories || []).map(t => t.id);
+
+        if (territoryIds.length === 0) {
           setLeads([]);
           setIsLoading(false);
           return;
         }
+
+        query = query.in('territory_id', territoryIds);
       }
 
       const { data, error: fetchError } = await query;
@@ -196,27 +197,46 @@ export function useLeads() {
     }
   };
 
+  // Maps UI status values (used in dropdowns/display) to the DB CHECK constraint values.
+  // DB constraint: ('new','assigned','contacted','showing','offer','converted','lost')
+  const UI_TO_DB_STATUS = {
+    new:         'new',
+    contacted:   'contacted',
+    in_progress: 'showing',
+    closed:      'converted',
+  };
+
   const updateLeadStatus = async (id, status) => {
     try {
-      // Separate update from select to avoid RLS join failures on listings/profiles.
-      // The UPDATE itself succeeds even when the chained SELECT with joins is blocked.
-      const { error: updateError } = await supabase
+      // Translate UI status → valid DB enum value before writing.
+      const dbStatus = UI_TO_DB_STATUS[status] ?? status;
+
+      // Select only 'id' (no joins) to detect silent RLS failures without triggering
+      // join-level RLS issues on listings/profiles.
+      const { data: updatedRows, error: updateError } = await supabase
         .from('leads')
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq('id', id);
+        .update({ status: dbStatus, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select('id');
 
       if (updateError) throw updateError;
 
-      // Optimistically update local state — no re-fetch needed.
-      setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l));
+      // If RLS silently blocked the update, data will be an empty array — treat as error.
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error('Status update failed: permission denied or lead not found.');
+      }
 
-      audit(user.id, `lead.status_changed`, id, { status }).catch(() => {});
+      // Confirmed DB write — store the DB value in local state so normalizeStatus
+      // renders it correctly without a full re-fetch.
+      setLeads(prev => prev.map(l => l.id === id ? { ...l, status: dbStatus } : l));
 
-      crmService.syncLeadStatus(id, status).catch(err => {
+      audit(user.id, `lead.status_changed`, id, { status: dbStatus }).catch(() => {});
+
+      crmService.syncLeadStatus(id, dbStatus).catch(err => {
         console.error('[useLeads] CRM Status Sync failed:', err);
       });
 
-      return { data: { id, status }, error: null };
+      return { data: { id, status: dbStatus }, error: null };
     } catch (err) {
       console.error('[useLeads] Update status error:', err);
       return { data: null, error: err };
@@ -293,6 +313,43 @@ export function useLeads() {
   };
 
   /**
+   * Assign a lead to a director (admin only).
+   * Director will then manually assign to one of their realtors.
+   * No 180-day lock applied yet (lock applies when director assigns to realtor).
+   */
+  const assignLeadToDirector = async (id, directorId) => {
+    try {
+      const { data, error: updateError } = await supabase
+        .from('leads')
+        .update({
+          assigned_director_id: directorId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select('*, listing:listings(title, address, city, state), assigned_director:profiles!leads_assigned_director_id_fkey(full_name, email)')
+        .single();
+
+      if (updateError) throw updateError;
+
+      audit(user.id, 'lead.assigned_to_director', id, { director_id: directorId }).catch(() => {});
+
+      // Notify director of new lead assignment
+      notificationService.notifyDirectorLead(id, directorId).catch(console.error);
+
+      // Update state with full lead data including director info
+      if (data) {
+        setLeads(prev => prev.map(l => l.id === id ? data : l));
+      } else {
+        setLeads(prev => prev.map(l => l.id === id ? { ...l, assigned_director_id: directorId } : l));
+      }
+      return { data, error: null };
+    } catch (err) {
+      console.error('[useLeads] Assign to director error:', err);
+      return { data: null, error: err };
+    }
+  };
+
+  /**
    * Fetch available realtors for lead assignment (admin/director only).
    * Returns active realtors with their profile info.
    */
@@ -361,9 +418,11 @@ export function useLeads() {
     isLoading,
     error,
     refresh: fetchLeads,
+    fetchDirectorQueue,
     createInquiry,
     updateLeadStatus,
     reassignLead,
+    assignLeadToDirector,
     addLeadNote,
     fetchAvailableRealtors,
     fetchDirectorQueue,

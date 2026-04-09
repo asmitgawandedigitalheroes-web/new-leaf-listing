@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AppLayout from '../../../components/layout/AppLayout';
 import Button from '../../../components/ui/Button';
 import Badge from '../../../components/ui/Badge';
@@ -7,7 +8,8 @@ import { useAuth } from '../../../context/AuthContext';
 import { useListings } from '../../../hooks/useListings';
 import { useToast } from '../../../context/ToastContext';
 import { supabase } from '../../../lib/supabase';
-import { HiPhoto, HiHome, HiExclamationCircle, HiArrowUpTray, HiXMark, HiTableCells, HiSquares2X2 } from 'react-icons/hi2';
+import { HiPhoto, HiHome, HiExclamationCircle, HiArrowUpTray, HiXMark, HiEye, HiMapPin, HiPencilSquare, HiArrowUpCircle } from 'react-icons/hi2';
+import { ActionPill, ActionMenu } from '../../../components/shared/TableActions';
 
 // Upgrade tier display config — prices come from listing_prices table
 const TIER_META = {
@@ -27,9 +29,13 @@ const defaultForm = {
 
 const STEPS = ['Basic Info', 'Location', 'Media', 'Review'];
 
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400&q=80';
+
+
 export default function RealtorListingsPage() {
   const { profile, subscription } = useAuth();
   const { addToast } = useToast();
+  const navigate = useNavigate();
 
   const [activeTab, setActiveTab]   = useState('all');
   const [createOpen, setCreateOpen] = useState(false);
@@ -48,13 +54,11 @@ export default function RealtorListingsPage() {
   const [uploading, setUploading]         = useState(false);
   const [deleteTarget, setDeleteTarget]   = useState(null);
   const [isDeleting, setIsDeleting]       = useState(false);
-  const [viewMode, setViewMode]           = useState(() => localStorage.getItem('listings_view') || 'card');
-  const [sortField, setSortField]         = useState('created_at');
-  const [sortDir, setSortDir]             = useState('desc');
   const [filterType, setFilterType]       = useState('');
   const [filterListingType, setFilterListingType] = useState('');
   const [filterSearch, setFilterSearch]   = useState('');
   const [formFieldErrors, setFormFieldErrors] = useState({});
+  const [openMenuId, setOpenMenuId]       = useState(null);
 
   const { listings: allListings, createListing, updateListing, deleteListing, submitForApproval, isLoading } = useListings({
     // Fetch all listings for this realtor to calculate global counts accurately
@@ -362,7 +366,11 @@ export default function RealtorListingsPage() {
 
     setUpgrading(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
         body: {
           type: 'listing_upgrade',
           listingId: upgradeTarget.id,
@@ -547,6 +555,23 @@ export default function RealtorListingsPage() {
 
   const hasActiveSubscription = subscription?.status === 'active' || subscription?.status === 'trialing';
 
+  const buildMenuItems = (listing) => {
+    const items = [];
+    if (listing.status === 'draft' || listing.status === 'rejected') {
+      items.push({
+        icon: HiArrowUpCircle, label: 'Submit for Approval', color: '#16a34a',
+        onClick: () => handleSubmitForApproval(listing),
+      });
+    }
+    if (listing.status === 'active' && listing.upgrade_type !== 'top') {
+      items.push({
+        icon: HiArrowUpCircle, label: 'Upgrade Listing', color: '#D4AF37',
+        onClick: () => openUpgrade(listing),
+      });
+    }
+    return items;
+  };
+
   return (
     <AppLayout role="realtor" title="My Listings">
       <div className="p-4 md:p-6 flex flex-col gap-6 max-w-6xl mx-auto">
@@ -571,39 +596,24 @@ export default function RealtorListingsPage() {
           <Button variant="primary" onClick={() => setCreateOpen(true)}>+ Create Listing</Button>
         </div>
 
-        {/* Status Tabs + View toggle */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {STATUS_TABS.map(tab => {
-              const count = tab === 'all' ? allListings.length : tabCounts[tab] ?? 0;
-              return (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all capitalize"
-                  style={{
-                    background: activeTab === tab ? '#D4AF37' : '#F3F4F6',
-                    color: activeTab === tab ? '#fff' : '#4B5563',
-                  }}
-                >
-                  {tab} ({count})
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-lg flex-shrink-0">
-            {[{ id: 'card', icon: HiSquares2X2 }, { id: 'table', icon: HiTableCells }].map(({ id, icon: Icon }) => (
+        {/* Status Tabs */}
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {STATUS_TABS.map(tab => {
+            const count = tab === 'all' ? allListings.length : tabCounts[tab] ?? 0;
+            return (
               <button
-                key={id}
-                onClick={() => { setViewMode(id); localStorage.setItem('listings_view', id); }}
-                className="p-1.5 rounded-md transition-all"
-                style={{ background: viewMode === id ? '#fff' : 'transparent', color: viewMode === id ? '#D4AF37' : '#9CA3AF', boxShadow: viewMode === id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
-                title={id === 'card' ? 'Card View' : 'Table View'}
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all capitalize"
+                style={{
+                  background: activeTab === tab ? '#D4AF37' : '#F3F4F6',
+                  color: activeTab === tab ? '#fff' : '#4B5563',
+                }}
               >
-                <Icon className="w-4 h-4" />
+                {tab} ({count})
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
 
         {/* Filter Bar */}
@@ -648,83 +658,102 @@ export default function RealtorListingsPage() {
         {/* Count */}
         <p className="text-sm text-gray-500">Showing {filteredListings.length} of {allListings.length} listings</p>
 
-        {/* Table View */}
-        {viewMode === 'table' && (
-          <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.05)' }}>
+        {/* ── Desktop Table ─────────────────────────────────────────────────────── */}
+        <div className="hidden md:block">
+          <div className="bg-white rounded-2xl overflow-visible" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.05)' }}>
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100">
-                  {[
-                    { key: 'title', label: 'Title' },
-                    { key: 'status', label: 'Status' },
-                    { key: 'property_type', label: 'Type' },
-                    { key: 'price', label: 'Price' },
-                    { key: 'created_at', label: 'Date Created' },
-                  ].map(col => (
-                    <th
-                      key={col.key}
-                      className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-gray-800 select-none"
-                      onClick={() => {
-                        if (sortField === col.key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-                        else { setSortField(col.key); setSortDir('asc'); }
-                      }}
-                    >
-                      {col.label} {sortField === col.key ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                <tr style={{ borderBottom: '1px solid #F3F4F6' }}>
+                  {['Listing', 'Status', 'Price', 'Actions'].map(h => (
+                    <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      {h}
                     </th>
                   ))}
-                  <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody>
-                {[...filteredListings].sort((a, b) => {
-                  const av = a[sortField] ?? '';
-                  const bv = b[sortField] ?? '';
-                  if (sortField === 'price') return sortDir === 'asc' ? Number(av) - Number(bv) : Number(bv) - Number(av);
-                  return sortDir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
-                }).map(listing => (
-                  <tr key={listing.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-gray-900 max-w-[200px] truncate">{listing.title}</td>
-                    <td className="px-4 py-3"><Badge status={listing.status} /></td>
-                    <td className="px-4 py-3 text-gray-500">{listing.property_type}</td>
-                    <td className="px-4 py-3 font-semibold text-gray-900">${listing.price?.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                      {new Date(listing.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => openEdit(listing)}>Edit</Button>
-                        <Button variant="outline" size="sm" onClick={() => setDeleteTarget(listing)} className="text-red-500">Delete</Button>
-                        {(listing.status === 'draft' || listing.status === 'rejected') && (
-                          <Button variant="green" size="sm" onClick={() => handleSubmitForApproval(listing)}>Submit</Button>
-                        )}
-                      </div>
+                {filteredListings.length > 0 ? filteredListings.map(listing => {
+                  const isUnderContract = listing.status === 'under_contract';
+                  const menuItems = buildMenuItems(listing);
+                  return (
+                    <tr key={listing.id} style={{ borderBottom: '1px solid #F9FAFB' }}
+                      className="hover:bg-gray-50 transition-colors">
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={listing.images?.[0] || FALLBACK_IMAGE}
+                            alt={listing.title}
+                            style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+                          />
+                          <div>
+                            <div className="font-semibold text-gray-900 text-sm truncate max-w-[200px]">{listing.title}</div>
+                            <div className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                              <HiMapPin size={10} />
+                              {[listing.city, listing.state].filter(Boolean).join(', ') || 'No location'}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3"><Badge status={listing.status} /></td>
+                      <td className="px-5 py-3 font-semibold text-gray-900">${listing.price?.toLocaleString()}</td>
+                      <td className="px-5 py-3">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <ActionPill
+                            icon={HiEye} label="View"
+                            color="#1D4ED8" bg="rgba(219,234,254,0.8)"
+                            onClick={() => navigate(`/listings/${listing.id}`)}
+                          />
+                          <ActionPill
+                            icon={HiPencilSquare} label="Edit"
+                            color="#374151" bg="#F3F4F6"
+                            disabled={isUnderContract}
+                            onClick={() => openEdit(listing)}
+                          />
+                          <ActionMenu
+                            items={menuItems}
+                            open={openMenuId === listing.id}
+                            onToggle={v => setOpenMenuId(v ? listing.id : null)}
+                          />
+                          <ActionPill
+                            icon={HiXMark} label="Delete"
+                            color="#DC2626" bg="rgba(254,226,226,0.8)"
+                            disabled={isUnderContract}
+                            onClick={() => setDeleteTarget(listing)}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }) : (
+                  <tr>
+                    <td colSpan={4} className="text-center py-16 text-gray-400">
+                      <HiHome className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+                      <p className="font-medium">No {activeTab !== 'all' ? activeTab : ''} listings</p>
+                      {activeTab === 'all' && <p className="text-sm mt-1">Click "+ Create Listing" to get started.</p>}
                     </td>
                   </tr>
-                ))}
-                {filteredListings.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-10 text-gray-400">No listings found</td></tr>
                 )}
               </tbody>
             </table>
           </div>
-        )}
+        </div>
 
-        {/* Listings Grid */}
-        {viewMode === 'card' && <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
-          {filteredListings.map(listing => {
+        {/* ── Mobile Cards ──────────────────────────────────────────────────────── */}
+        <div className="md:hidden flex flex-col gap-4">
+          {filteredListings.length > 0 ? filteredListings.map(listing => {
             const tierMeta = TIER_META[listing.upgrade_type] || TIER_META.standard;
             const isRejected = listing.status === 'rejected';
-            const isDraft    = listing.status === 'draft';
+            const isUnderContract = listing.status === 'under_contract';
+            const menuItems = buildMenuItems(listing);
             return (
-              <div key={listing.id} className="bg-white rounded-2xl overflow-hidden transition-all hover:shadow-lg"
+              <div key={listing.id} className="bg-white rounded-2xl overflow-hidden"
                 style={{
                   boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.05)',
                   border: isRejected ? '1.5px solid #FCA5A5' : '1.5px solid transparent',
                 }}>
-                {/* Image */}
                 <div className="relative h-44 overflow-hidden">
                   <img
-                    src={listing.images?.[0] || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=400&q=80'}
+                    src={listing.images?.[0] || FALLBACK_IMAGE}
                     alt={listing.title}
                     className="w-full h-full object-cover"
                   />
@@ -736,80 +765,56 @@ export default function RealtorListingsPage() {
                     </span>
                   </div>
                 </div>
-
-                {/* Content */}
                 <div className="p-4">
-                  <div className="font-semibold text-gray-900 mb-1 text-sm leading-tight">{listing.title}</div>
-                  <div className="text-xs text-gray-400 mb-1">{listing.city} · {listing.property_type}</div>
-
-                  {/* Rejection reason */}
+                  <div className="font-semibold text-gray-900 mb-1 text-sm">{listing.title}</div>
+                  <div className="text-xs text-gray-400 flex items-center gap-1 mb-1">
+                    <HiMapPin size={10} />
+                    {[listing.city, listing.state].filter(Boolean).join(', ') || 'No location'}
+                  </div>
                   {isRejected && listing.rejection_reason && (
                     <div className="text-xs text-red-600 mb-2 p-2 bg-red-50 rounded-lg">
                       <strong>Rejected:</strong> {listing.rejection_reason}
                     </div>
                   )}
-
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-lg font-black text-gray-900">${listing.price?.toLocaleString() || 0}</span>
-                    {listing.views_count > 0 && (
-                      <span className="text-xs text-gray-400">{listing.views_count} views</span>
-                    )}
+                    {listing.views_count > 0 && <span className="text-xs text-gray-400">{listing.views_count} views</span>}
                   </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {/* Edit is disabled for active listings — must go through admin to avoid live-listing data changes */}
-                    <Button
-                      variant="outline"
-                      size="sm"
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <ActionPill
+                      icon={HiEye} label="View"
+                      color="#1D4ED8" bg="rgba(219,234,254,0.8)"
+                      onClick={() => navigate(`/listings/${listing.id}`)}
+                    />
+                    <ActionPill
+                      icon={HiPencilSquare} label="Edit"
+                      color="#374151" bg="#F3F4F6"
+                      disabled={isUnderContract}
                       onClick={() => openEdit(listing)}
-                      disabled={listing.status === 'under_contract'}
-                      title={listing.status === 'under_contract' ? 'Listings under contract cannot be edited' : undefined}
-                    >Edit</Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    />
+                    <ActionMenu
+                      items={menuItems}
+                      open={openMenuId === listing.id}
+                      onToggle={v => setOpenMenuId(v ? listing.id : null)}
+                    />
+                    <ActionPill
+                      icon={HiXMark} label="Delete"
+                      color="#DC2626" bg="rgba(254,226,226,0.8)"
+                      disabled={isUnderContract}
                       onClick={() => setDeleteTarget(listing)}
-                      disabled={listing.status === 'under_contract'}
-                      title={listing.status === 'under_contract' ? 'Listings under contract cannot be deleted' : undefined}
-                      className="text-red-500 hover:text-white hover:bg-red-500 border-red-200 hover:border-red-500"
-                    >Delete</Button>
-
-                    {/* Submit for Approval — shown for draft and rejected listings */}
-                    {(isDraft || isRejected) && (
-                      <Button
-                        variant="green"
-                        size="sm"
-                        onClick={() => handleSubmitForApproval(listing)}
-                        disabled={!hasActiveSubscription}
-                        title={!hasActiveSubscription ? 'Active subscription required' : undefined}
-                      >
-                        Submit for Approval
-                      </Button>
-                    )}
-
-                    {/* Upgrade — only for active listings that aren't already top tier */}
-                    {listing.status === 'active' && listing.upgrade_type !== 'top' && (
-                      <Button variant="primary" size="sm" onClick={() => openUpgrade(listing)}>
-                        Upgrade
-                      </Button>
-                    )}
+                    />
                   </div>
                 </div>
               </div>
             );
-          })}
-        </div>}
-
-        {viewMode === 'card' && filteredListings.length === 0 && !isLoading && (
-          <div className="py-16 text-center text-gray-400">
-            <HiHome className="w-10 h-10 text-gray-200 mx-auto mb-2" />
-            <p className="font-medium">No {activeTab !== 'all' ? activeTab : ''} listings</p>
-            {activeTab === 'all' && (
-              <p className="text-sm mt-1">Click "+ Create Listing" to get started.</p>
-            )}
-          </div>
-        )}
+          }) : (
+            <div className="py-16 text-center text-gray-400">
+              <HiHome className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+              <p className="font-medium">No {activeTab !== 'all' ? activeTab : ''} listings</p>
+              {activeTab === 'all' && <p className="text-sm mt-1">Click "+ Create Listing" to get started.</p>}
+            </div>
+          )}
+        </div>
 
       </div>
 

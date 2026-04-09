@@ -4,6 +4,7 @@ import Button from '../../../components/ui/Button';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../context/ToastContext';
 import { useAuth } from '../../../context/AuthContext';
+import { sendInviteEmail } from '../../../utils/email';
 import {
   HiUserPlus,
   HiLink,
@@ -299,7 +300,7 @@ function DetailedInviteTab({ territories, currentUserId, onNewInvite }) {
   });
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, maxWidth: 900 }}>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" style={{ maxWidth: 900 }}>
 
       {/* Form card */}
       <div style={{ background: '#fff', borderRadius: 16, padding: 28, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
@@ -545,7 +546,7 @@ function QuickLinkTab({ territories, currentUserId, onNewInvite }) {
   });
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, maxWidth: 900 }}>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" style={{ maxWidth: 900 }}>
 
       {/* Form card */}
       <div style={{ background: '#fff', borderRadius: 16, padding: 28, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
@@ -685,7 +686,8 @@ function RecentInvitations({ invitations, onRevoke }) {
     <div style={{ marginTop: 36 }}>
       <h3 style={{ fontSize: 14, fontWeight: 700, color: OS, marginBottom: 14 }}>Recent Invitations</h3>
       <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
           <thead>
             <tr style={{ background: '#F9FAFB', borderBottom: `1px solid ${BORDER}` }}>
               {['Name / Email', 'Role', 'Territory', 'Status', 'Expires', 'Action'].map(h => (
@@ -737,6 +739,7 @@ function RecentInvitations({ invitations, onRevoke }) {
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
@@ -794,6 +797,7 @@ export default function AddUserPage() {
   return (
     <AppLayout role="admin">
       <div style={{ padding: 'clamp(16px, 4vw, 32px)', minHeight: '100vh', background: '#F9FAFB' }}>
+        <div style={{ maxWidth: 960, margin: '0 auto' }}>
 
         {/* Header */}
         <div style={{ marginBottom: 28 }}>
@@ -804,13 +808,14 @@ export default function AddUserPage() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 28, background: '#F3F4F6', borderRadius: 10, padding: 4, width: 'fit-content' }}>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 28, background: '#F3F4F6', borderRadius: 10, padding: 4 }} className="w-full sm:w-fit">
           {tabs.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
+              className="flex-1 sm:flex-none"
               style={{
-                display: 'flex', alignItems: 'center', gap: 7,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                 padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
                 fontSize: 13, fontWeight: 700,
                 background: activeTab === key ? '#fff' : 'transparent',
@@ -843,6 +848,7 @@ export default function AddUserPage() {
         {/* Recent invitations (shared across tabs) */}
         <RecentInvitations invitations={invitations} onRevoke={handleRevoke} />
 
+        </div>
       </div>
     </AppLayout>
   );

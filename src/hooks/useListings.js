@@ -64,17 +64,16 @@ export function useListings(filters = {}) {
       if (role === 'realtor') {
         query = query.eq('realtor_id', user.id);
       } else if (role === 'director') {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('territory_id')
-          .eq('id', user.id)
-          .single();
+        const { data: territories } = await supabase
+          .from('territories')
+          .select('id')
+          .eq('director_id', user.id);
 
-        if (profile?.territory_id) {
-          query = query.eq('territory_id', profile.territory_id);
-        }
-        // If director has no territory_id, they see nothing (not all leads)
-        else {
+        const territoryIds = (territories || []).map(t => t.id);
+
+        if (territoryIds.length > 0) {
+          query = query.in('territory_id', territoryIds);
+        } else {
           setListings([]);
           setIsLoading(false);
           return;
@@ -358,6 +357,28 @@ export function useListings(filters = {}) {
   };
 
   /**
+   * Admin-only: deactivate a listing (sets status → inactive).
+   * The listing is hidden from public but not deleted.
+   */
+  const deactivateListing = async (id) => {
+    try {
+      const prevListing = listings.find(l => l.id === id);
+      const { error: updateError } = await supabase
+        .from('listings')
+        .update({ status: 'inactive', updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (updateError) throw updateError;
+      audit(user.id, 'listing.deactivated', id, { note: 'Deactivated by admin' }).catch(() => {});
+      listingAuditLog(id, 'listing.deactivated', user.id, prevListing?.status ?? null, 'inactive').catch(() => {});
+      setListings(prev => prev.map(l => l.id === id ? { ...l, status: 'inactive' } : l));
+      return { error: null };
+    } catch (err) {
+      console.error('[useListings] Deactivate error:', err);
+      return { error: err };
+    }
+  };
+
+  /**
    * Permanently delete a listing.
    * Note: associated audit logs are CASCADE deleted.
    */
@@ -402,6 +423,7 @@ export function useListings(filters = {}) {
     featureListing,           // active → featured upgrade type (admin/director only)
     setUpgradeType,           // set upgrade tier (admin/director) or initiate Stripe (realtor)
     deleteListing,            // permanently remove a listing
+    deactivateListing,        // admin: set status → inactive (hidden, not deleted)
   };
 }
 

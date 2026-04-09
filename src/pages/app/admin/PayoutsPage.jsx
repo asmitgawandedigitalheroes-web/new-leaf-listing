@@ -7,13 +7,28 @@ import Skeleton from '../../../components/ui/Skeleton';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { supabase } from '../../../lib/supabase';
+import { ActionPill } from '../../../components/shared/TableActions';
+import MobileCard, { MobileCardRow, MobileCardActions } from '../../../components/shared/MobileCard';
 import {
   HiCurrencyDollar,
   HiClock,
   HiCheckCircle,
   HiArrowTrendingUp,
   HiMagnifyingGlass,
+  HiArrowDownTray,
 } from 'react-icons/hi2';
+
+function exportCSV(rows, filename) {
+  if (!rows.length) return;
+  const headers = Object.keys(rows[0]);
+  const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const csv = [headers.join(','), ...rows.map(r => headers.map(h => escape(r[h])).join(','))].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 const STATUS_STYLES = {
   pending:   { bg: 'rgba(212,175,55,0.12)', text: '#B8962E', dot: '#D4AF37', label: 'Pending' },
@@ -124,6 +139,22 @@ export default function PayoutsPage() {
             <h2 className="text-xl font-bold text-gray-900">Payout Requests</h2>
             <p className="text-sm text-gray-400 mt-0.5">Review and process payout requests from directors and realtors</p>
           </div>
+          <button
+            onClick={() => exportCSV(filtered.map(r => ({
+              Name: r.user?.full_name || '',
+              Email: r.user?.email || '',
+              Role: r.user?.role || '',
+              Amount: r.amount,
+              Method: r.payment_method || '',
+              Status: r.status,
+              Requested: r.created_at ? new Date(r.created_at).toLocaleDateString() : '',
+              Admin_Notes: r.admin_notes || '',
+            })), 'payouts.csv')}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors text-sm font-medium text-gray-600 self-start sm:self-auto"
+          >
+            <HiArrowDownTray size={15} />
+            Export CSV
+          </button>
         </div>
 
         {/* KPI Cards */}
@@ -178,7 +209,7 @@ export default function PayoutsPage() {
             ))}
           </div>
 
-          <div className="data-table">
+          <div className="hidden md:block data-table">
             <table>
               <thead>
                 <tr>
@@ -254,6 +285,39 @@ export default function PayoutsPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden flex flex-col gap-3 p-4">
+            {isLoading ? [...Array(3)].map((_, i) => (
+              <MobileCard key={i}>
+                <Skeleton variant="text" width="60%" className="mb-2" />
+                <Skeleton variant="text" width="40%" />
+              </MobileCard>
+            )) : filtered.length > 0 ? filtered.map(r => (
+              <MobileCard key={r.id}>
+                <div style={{ fontWeight: 600, fontSize: 14, color: '#111' }}>{r.user?.full_name || '—'}</div>
+                <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 8 }}>{r.user?.email || ''}</div>
+                <MobileCardRow label="Amount">${Number(r.amount || 0).toLocaleString()}</MobileCardRow>
+                <MobileCardRow label="Method">{(r.payment_method || 'bank_transfer').replace('_', ' ')}</MobileCardRow>
+                <MobileCardRow label="Status"><StatusBadge status={r.status} /></MobileCardRow>
+                <MobileCardRow label="Requested">{r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'}</MobileCardRow>
+                <MobileCardActions>
+                  <ActionPill label="View" color="#1D4ED8" bg="rgba(219,234,254,0.8)" onClick={() => { setViewRequest(r); setAdminNotes(r.admin_notes || ''); }} />
+                  {r.status === 'pending' && (
+                    <>
+                      <ActionPill label="Approve" color="#fff" bg="#22C55E" onClick={() => handleAction(r.id, 'approved')} />
+                      <ActionPill label="Reject" color="#DC2626" bg="rgba(254,226,226,0.8)" onClick={() => handleAction(r.id, 'rejected')} />
+                    </>
+                  )}
+                </MobileCardActions>
+              </MobileCard>
+            )) : (
+              <div className="py-12 text-center text-gray-400">
+                <HiCurrencyDollar className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                <p className="font-medium">No payout requests found</p>
+              </div>
+            )}
           </div>
         </SectionCard>
 

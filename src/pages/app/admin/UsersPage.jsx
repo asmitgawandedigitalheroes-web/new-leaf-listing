@@ -24,6 +24,8 @@ import Skeleton from '../../../components/ui/Skeleton';
 import { useUsers } from '../../../hooks/useUsers';
 import { useAuth } from '../../../context/AuthContext';
 import SearchableSelect from '../../../components/ui/SearchableSelect';
+import { ActionPill } from '../../../components/shared/TableActions';
+import MobileCard, { MobileCardRow, MobileCardActions } from '../../../components/shared/MobileCard';
 
 // ── Color constants ───────────────────────────────────────────────────────────
 const P     = '#D4AF37';
@@ -839,8 +841,8 @@ export default function UsersPage() {
           )}
         </div>
 
-        {/* Table */}
-        <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+        {/* Table — desktop only */}
+        <div className="hidden md:block" style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 700 }}>
               <thead>
@@ -891,12 +893,12 @@ export default function UsersPage() {
                     <td style={{ padding: '12px 14px', color: LGRAY, whiteSpace: 'nowrap' }}>{user.joined}</td>
                     <td style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <button 
-                          onClick={() => setManageModal({ open: true, user })} 
+                        <button
+                          onClick={() => setManageModal({ open: true, user })}
                           title="View Profile & Manage"
-                          style={{ 
-                            padding: '6px 12px', borderRadius: 8, background: `${S}10`, color: S, 
-                            fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', 
+                          style={{
+                            padding: '6px 12px', borderRadius: 8, background: `${S}10`, color: S,
+                            fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer',
                             display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
                           }}
                         >
@@ -912,6 +914,50 @@ export default function UsersPage() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* Mobile cards — hidden on md+ */}
+        <div className="md:hidden flex flex-col gap-3">
+          {isLoading ? (
+            [...Array(4)].map((_, i) => (
+              <MobileCard key={i}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <Skeleton variant="circle" width="36px" height="36px" />
+                  <Skeleton width="120px" height="14px" />
+                </div>
+                <Skeleton width="180px" height="11px" style={{ marginBottom: 8 }} />
+                <Skeleton width="80px" height="20px" style={{ marginBottom: 4 }} />
+                <Skeleton width="60px" height="20px" />
+              </MobileCard>
+            ))
+          ) : filtered.length === 0 ? (
+            <p style={{ textAlign: 'center', color: LGRAY, fontSize: 13, padding: '32px 0' }}>No users match your filters.</p>
+          ) : filtered.map(user => (
+            <MobileCard
+              key={user.id}
+              highlight={user.status === 'suspended' ? '#EF4444' : user.status === 'pending' ? '#F59E0B' : undefined}
+            >
+              {/* Card title: avatar + name */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <Avatar initials={user.initials} size={36} />
+                <span style={{ fontWeight: 700, fontSize: 14, color: OS }}>{user.name}</span>
+              </div>
+
+              <MobileCardRow label="Email">{user.email}</MobileCardRow>
+              <MobileCardRow label="Role"><RoleBadge role={user.role} /></MobileCardRow>
+              <MobileCardRow label="Status"><StatusBadge status={user.status} /></MobileCardRow>
+
+              <MobileCardActions>
+                <ActionPill
+                  icon={HiEye}
+                  label="Manage"
+                  color={S}
+                  bg={`${S}10`}
+                  onClick={() => setManageModal({ open: true, user })}
+                />
+              </MobileCardActions>
+            </MobileCard>
+          ))}
         </div>
 
         <p style={{ fontSize: 12, color: LGRAY, marginTop: 10 }}>Showing {filtered.length} of {users.length} users</p>

@@ -5,6 +5,7 @@ import { SectionCard } from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import Avatar from '../../../components/ui/Avatar';
 import Skeleton from '../../../components/ui/Skeleton';
+import MobileCard, { MobileCardRow, MobileCardActions } from '../../../components/shared/MobileCard';
 import { useToast } from '../../../context/ToastContext';
 import { useAdminSubscriptions } from '../../../hooks/useAdminSubscriptions';
 import {
@@ -307,7 +308,8 @@ export default function SubscriptionsPage() {
 
         {/* Table */}
         <SectionCard title={`Subscriptions (${filtered.length})`}>
-          <div className="data-table">
+          {/* Desktop table */}
+          <div className="hidden md:block data-table">
             <table>
               <thead>
                 <tr>
@@ -383,6 +385,61 @@ export default function SubscriptionsPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden flex flex-col gap-3 p-4">
+            {isLoading ? (
+              [...Array(4)].map((_, i) => (
+                <div key={i} style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <Skeleton variant="circle" width="36px" height="36px" />
+                    <div className="flex flex-col gap-1.5">
+                      <Skeleton width="120px" height="12px" />
+                      <Skeleton width="160px" height="10px" />
+                    </div>
+                  </div>
+                  <Skeleton width="100%" height="10px" />
+                </div>
+              ))
+            ) : filtered.map(s => {
+              const nextBill = s.next_billing_date
+                ? new Date(s.next_billing_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                : (s.current_period_end ? new Date(s.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
+              return (
+                <MobileCard key={s.id}>
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: '#111111' }}>{s.profile?.full_name || s.profile?.email || '—'}</div>
+                    <div style={{ fontSize: 12, color: '#6B7280' }}>{s.profile?.email || '—'}</div>
+                  </div>
+                  <MobileCardRow label="Plan"><PlanBadge plan={s.plan} /></MobileCardRow>
+                  <MobileCardRow label="Status"><SubStatusBadge status={s.status} /></MobileCardRow>
+                  <MobileCardRow label="Billing">{nextBill}</MobileCardRow>
+                  <MobileCardActions>
+                    <Button variant="outline" size="sm" onClick={() => setChangePlanSub(s)}>Plan</Button>
+                    {(s.status === 'active' || s.status === 'trialing') && (
+                      <Button variant="danger" size="sm" onClick={() => handleCancel(s.id)}>Cancel</Button>
+                    )}
+                    {s.status === 'cancelled' && (
+                      <Button variant="green" size="sm" onClick={() => handleReactivate(s.id)}>Reactivate</Button>
+                    )}
+                    {s.status === 'past_due' && (
+                      <Button variant="outline" size="sm" onClick={() => addToast({ type: 'info', title: 'Retry payment', desc: 'Webhook will retry automatically, or connect Stripe.' })}>Retry</Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={!s.stripe_customer_id}
+                      title={s.stripe_customer_id ? 'View in Stripe Dashboard' : 'No Stripe customer ID linked'}
+                      onClick={() => s.stripe_customer_id && window.open(`https://dashboard.stripe.com/customers/${s.stripe_customer_id}`, '_blank')}
+                    >
+                      Stripe
+                    </Button>
+                  </MobileCardActions>
+                </MobileCard>
+              );
+            })}
+          </div>
+
           {!isLoading && filtered.length === 0 && (
             <div className="py-16 text-center text-gray-400">
               <HiCreditCard className="mx-auto text-4xl text-gray-200 mb-4" />

@@ -7,13 +7,28 @@ import Skeleton from '../../../components/ui/Skeleton';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { supabase } from '../../../lib/supabase';
+import { ActionPill } from '../../../components/shared/TableActions';
+import MobileCard, { MobileCardRow, MobileCardActions } from '../../../components/shared/MobileCard';
 import {
   HiExclamationTriangle,
   HiCheckCircle,
   HiClock,
   HiNoSymbol,
   HiMagnifyingGlass,
+  HiArrowDownTray,
 } from 'react-icons/hi2';
+
+function exportCSV(rows, filename) {
+  if (!rows.length) return;
+  const headers = Object.keys(rows[0]);
+  const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const csv = [headers.join(','), ...rows.map(r => headers.map(h => escape(r[h])).join(','))].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 const STATUS_STYLES = {
   open:          { bg: '#FEE2E2', text: '#991B1B', dot: '#DC2626', label: 'Open' },
@@ -134,6 +149,22 @@ export default function DisputesPage() {
             <h2 className="text-xl font-bold text-gray-900">Dispute Resolution</h2>
             <p className="text-sm text-gray-400 mt-0.5">Review and resolve platform disputes raised by users</p>
           </div>
+          <button
+            onClick={() => exportCSV(filtered.map(d => ({
+              Raised_By: d.raised_by_profile?.full_name || '',
+              Email: d.raised_by_profile?.email || '',
+              Role: d.raised_by_profile?.role || '',
+              Type: TYPE_LABELS[d.dispute_type] || d.dispute_type,
+              Subject: d.subject || '',
+              Status: d.status,
+              Date: d.created_at ? new Date(d.created_at).toLocaleDateString() : '',
+              Resolution: d.resolution || '',
+            })), 'disputes.csv')}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors text-sm font-medium text-gray-600 self-start sm:self-auto"
+          >
+            <HiArrowDownTray size={15} />
+            Export CSV
+          </button>
         </div>
 
         {/* KPI Cards */}
@@ -190,7 +221,7 @@ export default function DisputesPage() {
             ))}
           </div>
 
-          <div className="data-table">
+          <div className="hidden md:block data-table">
             <table>
               <thead>
                 <tr>
@@ -256,6 +287,36 @@ export default function DisputesPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden flex flex-col gap-3 p-4">
+            {isLoading ? [...Array(3)].map((_, i) => (
+              <MobileCard key={i}>
+                <Skeleton variant="text" width="60%" className="mb-2" />
+                <Skeleton variant="text" width="40%" />
+              </MobileCard>
+            )) : filtered.length > 0 ? filtered.map(d => (
+              <MobileCard key={d.id}>
+                <div style={{ fontWeight: 600, fontSize: 14, color: '#111' }}>{d.raised_by_profile?.full_name || '—'}</div>
+                <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 8 }}>{d.raised_by_profile?.email || ''}</div>
+                <MobileCardRow label="Type">{TYPE_LABELS[d.dispute_type] || d.dispute_type}</MobileCardRow>
+                <MobileCardRow label="Subject">{d.subject}</MobileCardRow>
+                <MobileCardRow label="Status"><StatusBadge status={d.status} /></MobileCardRow>
+                <MobileCardRow label="Date">{d.created_at ? new Date(d.created_at).toLocaleDateString() : '—'}</MobileCardRow>
+                <MobileCardActions>
+                  <ActionPill label="View" color="#1D4ED8" bg="rgba(219,234,254,0.8)" onClick={() => { setViewDispute(d); setResolution(d.resolution || ''); }} />
+                  {d.status === 'open' && (
+                    <ActionPill label="Mark Under Review" color="#92400E" bg="rgba(212,175,55,0.2)" onClick={() => handleUpdateStatus(d.id, 'under_review')} />
+                  )}
+                </MobileCardActions>
+              </MobileCard>
+            )) : (
+              <div className="py-12 text-center text-gray-400">
+                <HiExclamationTriangle className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                <p className="font-medium">No disputes found</p>
+              </div>
+            )}
           </div>
         </SectionCard>
 

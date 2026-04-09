@@ -9,6 +9,17 @@ import { useState, useEffect } from 'react';
 
 import { HiPhone, HiEnvelope, HiCalendar, HiTag, HiCurrencyDollar, HiIdentification, HiChatBubbleLeftEllipsis, HiLockClosed, HiLockOpen, HiPaperAirplane, HiXCircle } from 'react-icons/hi2';
 
+/** Maps raw DB status values to the 4 UI status values used in the dropdown. */
+function normalizeStatus(status) {
+  const map = {
+    new: 'new', assigned: 'new',
+    contacted: 'contacted',
+    showing: 'in_progress', offer: 'in_progress', in_progress: 'in_progress',
+    converted: 'closed', lost: 'closed', closed: 'closed',
+  };
+  return map[status] || 'new';
+}
+
 /** Mask an email: j***@domain.com */
 function maskEmail(email) {
   if (!email) return '—';
@@ -431,7 +442,7 @@ export default function LeadDrawer({ lead, open, onClose, onAssign, updateStatus
         </div>
 
         {/* Close Lead button — Bug 11 */}
-        {displayLead.status !== 'closed' && (
+        {normalizeStatus(displayLead.status) !== 'closed' && (
           <div className="mb-6">
             {!closeConfirmOpen ? (
               <button
@@ -455,7 +466,7 @@ export default function LeadDrawer({ lead, open, onClose, onAssign, updateStatus
                       const { error } = await updateStatus(lead.id, 'closed');
                       setIsClosingLead(false);
                       if (!error) {
-                        setLocalLead(prev => prev ? { ...prev, status: 'closed' } : null);
+                        setLocalLead(prev => prev ? { ...prev, status: 'converted' } : null);
                         setCloseConfirmOpen(false);
                         addToast({ type: 'success', title: 'Lead closed' });
                         fetchLogs();
@@ -481,7 +492,7 @@ export default function LeadDrawer({ lead, open, onClose, onAssign, updateStatus
             </div>
             <select
               className="w-full h-10 px-3 py-1.5 text-xs font-bold text-gray-700 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-gold transition-all cursor-pointer appearance-none uppercase tracking-wide"
-              value={displayLead.status}
+              value={normalizeStatus(displayLead.status)}
               disabled={isUpdatingStatus}
               onChange={async (e) => {
                 const newStatus = e.target.value;

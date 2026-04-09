@@ -214,37 +214,37 @@ export default function App() {
 
             {/* ── Director routes ──────────────────────────────── */}
             <Route path="/director/dashboard" element={
-              <ProtectedRoute allowedRoles={['admin', 'director']}>
+              <ProtectedRoute allowedRoles={['director']}>
                 <DirectorDashboard />
               </ProtectedRoute>
             } />
             <Route path="/director/listings" element={
-              <ProtectedRoute allowedRoles={['admin', 'director']}>
+              <ProtectedRoute allowedRoles={['director']}>
                 <DirectorListingsPage />
               </ProtectedRoute>
             } />
             <Route path="/director/leads" element={
-              <ProtectedRoute allowedRoles={['admin', 'director']}>
+              <ProtectedRoute allowedRoles={['director']}>
                 <DirectorLeadsPage />
               </ProtectedRoute>
             } />
             <Route path="/director/realtors" element={
-              <ProtectedRoute allowedRoles={['admin', 'director']}>
+              <ProtectedRoute allowedRoles={['director']}>
                 <DirectorRealtorsPage />
               </ProtectedRoute>
             } />
             <Route path="/director/commissions" element={
-              <ProtectedRoute allowedRoles={['admin', 'director']}>
+              <ProtectedRoute allowedRoles={['director']}>
                 <DirectorCommissionsPage />
               </ProtectedRoute>
             } />
             <Route path="/director/reports" element={
-              <ProtectedRoute allowedRoles={['admin', 'director']}>
+              <ProtectedRoute allowedRoles={['director']}>
                 <DirectorReportsPage />
               </ProtectedRoute>
             } />
             <Route path="/director/contracts" element={
-              <ProtectedRoute allowedRoles={['admin', 'director']}>
+              <ProtectedRoute allowedRoles={['director']}>
                 <DirectorContractsPage />
               </ProtectedRoute>
             } />
@@ -258,42 +258,42 @@ export default function App() {
 
             {/* ── Realtor routes ───────────────────────────────── */}
             <Route path="/realtor/dashboard" element={
-              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+              <ProtectedRoute allowedRoles={['director', 'realtor']}>
                 <RealtorDashboard />
               </ProtectedRoute>
             } />
             <Route path="/realtor/listings" element={
-              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+              <ProtectedRoute allowedRoles={['director', 'realtor']}>
                 <RealtorListingsPage />
               </ProtectedRoute>
             } />
             <Route path="/realtor/leads" element={
-              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+              <ProtectedRoute allowedRoles={['director', 'realtor']}>
                 <RealtorLeadsPage />
               </ProtectedRoute>
             } />
             <Route path="/realtor/commissions" element={
-              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+              <ProtectedRoute allowedRoles={['director', 'realtor']}>
                 <RealtorCommissionsPage />
               </ProtectedRoute>
             } />
             <Route path="/realtor/billing" element={
-              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+              <ProtectedRoute allowedRoles={['director', 'realtor']}>
                 <BillingPage />
               </ProtectedRoute>
             } />
             <Route path="/realtor/profile" element={
-              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+              <ProtectedRoute allowedRoles={['director', 'realtor']}>
                 <RealtorProfilePage />
               </ProtectedRoute>
             } />
             <Route path="/realtor/messages" element={
-              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+              <ProtectedRoute allowedRoles={['director', 'realtor']}>
                 <RealtorMessagesPage />
               </ProtectedRoute>
             } />
             <Route path="/realtor/referrals" element={
-              <ProtectedRoute allowedRoles={['admin', 'director', 'realtor']}>
+              <ProtectedRoute allowedRoles={['director', 'realtor']}>
                 <RealtorReferralsPage />
               </ProtectedRoute>
             } />

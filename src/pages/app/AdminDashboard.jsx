@@ -141,34 +141,40 @@ export default function AdminDashboard() {
     {
       label: 'Total Listings',
       value: stats.totalListings.toString(),
-      icon: <HiHome className="text-blue-600" />
+      icon: <HiHome className="text-blue-600" />,
+      onClick: () => navigate('/admin/listings'),
     },
     {
       label: 'Active Leads',
       value: stats.activeLeads.toString(),
-      icon: <HiUsers className="text-purple-600" />
+      icon: <HiUsers className="text-purple-600" />,
+      onClick: () => navigate('/admin/leads'),
     },
     {
       label: 'Monthly Revenue',
       value: `$${stats.monthlyRevenue.toLocaleString()}`,
-      icon: <HiBanknotes className="text-green-600" />
+      icon: <HiBanknotes className="text-green-600" />,
+      onClick: () => navigate('/admin/subscriptions'),
     },
     {
       label: 'Pending Approvals',
       value: stats.pendingApprovals.toString(),
-      icon: <HiCheckBadge className="text-yellow-600" />
+      icon: <HiCheckBadge className="text-yellow-600" />,
+      onClick: () => navigate('/admin/approvals'),
     },
     {
       label: 'Commission Liability',
       value: `$${(stats.commissionLiability || 0).toLocaleString()}`,
       icon: <HiBanknotes className="text-amber-500" />,
       trendLabel: 'approved + payable, outstanding',
+      onClick: () => navigate('/admin/commissions-admin'),
     },
     {
       label: 'Payouts This Month',
       value: `$${(stats.payoutsThisMonth || 0).toLocaleString()}`,
       icon: <HiArrowDownTray className="text-emerald-600" />,
       trendLabel: 'processed this month',
+      onClick: () => navigate('/admin/payouts'),
     },
   ];
 

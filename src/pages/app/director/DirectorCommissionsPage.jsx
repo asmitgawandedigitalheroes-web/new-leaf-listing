@@ -9,6 +9,8 @@ import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { supabase } from '../../../lib/supabase';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
+import { ActionPill } from '../../../components/shared/TableActions';
+import MobileCard, { MobileCardRow, MobileCardActions } from '../../../components/shared/MobileCard';
 import {
   HiCalendarDays,
   HiArrowTrendingUp,
@@ -196,7 +198,8 @@ export default function DirectorCommissionsPage() {
 
         {/* Commission Details Table */}
         <SectionCard title={`Commission History (${commissions.length})`}>
-          <div className="data-table">
+          {/* Desktop table */}
+          <div className="hidden md:block data-table">
             <table>
               <thead>
                 <tr>
@@ -248,6 +251,49 @@ export default function DirectorCommissionsPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden flex flex-col gap-3 p-4">
+            {isLoading ? (
+              [...Array(4)].map((_, i) => (
+                <MobileCard key={i}>
+                  <Skeleton width="60%" height="14px" className="mb-2" />
+                  <Skeleton width="40%" height="12px" />
+                </MobileCard>
+              ))
+            ) : commissions.length > 0 ? commissions.map(c => (
+              <MobileCard key={c.id} highlight={(STATUS_STYLES[c.status] || STATUS_STYLES.pending).text}>
+                <div className="font-semibold text-gray-800 text-sm mb-2">
+                  {c.listing?.title || c.source_payment_id || `Commission #${c.id?.slice(0, 8)}`}
+                </div>
+                <MobileCardRow label="Type">
+                  <span className="text-xs px-2 py-0.5 rounded font-semibold capitalize"
+                    style={{
+                      background: c.commission_type === 'deal' ? '#EDE9FE' : c.commission_type === 'referral' ? '#FEF3C7' : '#F3F4F6',
+                      color: c.commission_type === 'deal' ? '#5B21B6' : c.commission_type === 'referral' ? '#92400E' : '#4B5563',
+                    }}>
+                    {c.commission_type || 'commission'}
+                  </span>
+                </MobileCardRow>
+                <MobileCardRow label="Amount">
+                  <span className="font-bold text-gray-900">${Number(c.amount || 0).toLocaleString()}</span>
+                </MobileCardRow>
+                <MobileCardRow label="Status">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase"
+                    style={STATUS_STYLES[c.status] || STATUS_STYLES.pending}>
+                    {c.status}
+                  </span>
+                </MobileCardRow>
+                <MobileCardRow label="Date">
+                  <span className="text-gray-400 text-xs">
+                    {c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}
+                  </span>
+                </MobileCardRow>
+              </MobileCard>
+            )) : (
+              <p className="text-center text-gray-400 py-8 text-sm">No commissions recorded yet</p>
+            )}
           </div>
         </SectionCard>
 

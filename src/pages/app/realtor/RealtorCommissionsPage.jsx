@@ -7,6 +7,8 @@ import Skeleton from '../../../components/ui/Skeleton';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { supabase } from '../../../lib/supabase';
+import { ActionPill } from '../../../components/shared/TableActions';
+import MobileCard, { MobileCardRow, MobileCardActions } from '../../../components/shared/MobileCard';
 import {
   HiCalendarDays,
   HiClock,
@@ -267,7 +269,7 @@ export default function RealtorCommissionsPage() {
               Total: ${filteredTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
-          <div className="data-table">
+          <div className="hidden md:block data-table">
             <table>
               <thead>
                 <tr>
@@ -363,6 +365,76 @@ export default function RealtorCommissionsPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden flex flex-col gap-3 px-4 py-3">
+            {isLoading ? (
+              [...Array(3)].map((_, i) => (
+                <MobileCard key={i}>
+                  <Skeleton width="180px" height="14px" className="mb-2" />
+                  <Skeleton width="120px" height="12px" />
+                </MobileCard>
+              ))
+            ) : filteredCommissions.length > 0 ? filteredCommissions.map(c => (
+              <MobileCard
+                key={c.id}
+                highlight={(STATUS_STYLES[c.status] || STATUS_STYLES.pending).text}
+                onClick={() => setActiveComm(activeComm === c.id ? null : c.id)}
+              >
+                <div className="font-semibold text-gray-900 text-sm mb-1">
+                  {c.listing?.title || c.source_transaction_id || `Commission #${c.id?.slice(0, 8)}`}
+                </div>
+                {c.listing?.city && <div className="text-xs text-gray-400 mb-2">{c.listing.city}</div>}
+                <MobileCardRow label="Type">
+                  <span className="text-xs px-2 py-0.5 rounded font-semibold capitalize"
+                    style={{
+                      background: c.type === 'deal' ? '#EDE9FE' : '#F3F4F6',
+                      color: c.type === 'deal' ? '#5B21B6' : '#4B5563',
+                    }}>
+                    {c.type || 'commission'}
+                  </span>
+                </MobileCardRow>
+                <MobileCardRow label="Amount">
+                  <span className="font-bold text-gray-900">${c.amount?.toLocaleString()}</span>
+                </MobileCardRow>
+                <MobileCardRow label="Status">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase"
+                    style={STATUS_STYLES[c.status] || STATUS_STYLES.pending}>
+                    {c.status}
+                  </span>
+                </MobileCardRow>
+                <MobileCardRow label="Date">
+                  {c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}
+                </MobileCardRow>
+                {activeComm === c.id && (
+                  <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500 flex flex-wrap gap-3">
+                    <div><span className="text-gray-400">Total: </span><span className="font-semibold">${Number(c.amount || 0).toLocaleString()}</span></div>
+                    <div><span className="text-gray-400">Type: </span><span className="font-semibold capitalize">{c.type || '—'}</span></div>
+                    <div><span className="text-gray-400">Status: </span><span className="font-semibold capitalize">{c.status}</span></div>
+                    {c.paid_at && <div><span className="text-gray-400">Paid At: </span><span className="font-semibold">{new Date(c.paid_at).toLocaleDateString()}</span></div>}
+                  </div>
+                )}
+                <MobileCardActions>
+                  <ActionPill
+                    label="Expand"
+                    color="#1F4D3A"
+                    bg="#E8F3EE"
+                    onClick={() => setActiveComm(activeComm === c.id ? null : c.id)}
+                  />
+                  {(c.status === 'pending' || c.status === 'rejected') && (
+                    <ActionPill
+                      label="Raise Dispute"
+                      color="#DC2626"
+                      bg="#FEE2E2"
+                      onClick={e => { e.stopPropagation(); setDisputeComm(c); setDisputeForm({ subject: '', description: '' }); setDisputeOpen(true); }}
+                    />
+                  )}
+                </MobileCardActions>
+              </MobileCard>
+            )) : (
+              <p className="py-10 text-center text-gray-400 text-sm">No commissions recorded yet</p>
+            )}
           </div>
         </SectionCard>
 

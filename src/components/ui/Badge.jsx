@@ -18,6 +18,7 @@ const STYLES = {
   offer:     { bg: 'rgba(212,175,55,0.12)', text: '#B8962E', dot: '#D4AF37' },
   trial:     { bg: 'rgba(212,175,55,0.12)', text: '#B8962E', dot: '#D4AF37' },
   assigned:  { bg: 'rgba(31,77,58,0.06)', text: '#1F4D3A', dot: '#D4AF37' },
+  inactive:  { bg: '#F3F4F6', text: '#6B7280', dot: '#9CA3AF' },
 };
 
 export default function Badge({ status, label, className = '' }) {

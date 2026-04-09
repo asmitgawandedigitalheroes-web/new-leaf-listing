@@ -101,7 +101,6 @@ export default function Sidebar({ role: roleProp = 'realtor', onClose }) {
   const navigate = useNavigate();
   const { role: authRole, profile, logout } = useAuth();
 
-  // Auth context role takes priority over the prop passed from AppLayout
   const effectiveRole = authRole || roleProp || 'realtor';
   const items = NAV[effectiveRole] || NAV.realtor;
 
@@ -148,6 +147,7 @@ export default function Sidebar({ role: roleProp = 'realtor', onClose }) {
             {item.label}
           </NavLink>
         ))}
+
       </nav>
 
       {/* User footer */}
