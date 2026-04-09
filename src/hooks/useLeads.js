@@ -54,13 +54,12 @@ export function useLeads() {
 
         const territoryIds = (territories || []).map(t => t.id);
 
-        if (territoryIds.length === 0) {
-          setLeads([]);
-          setIsLoading(false);
-          return;
+        // Show leads in director's territories OR leads directly assigned to this director
+        if (territoryIds.length > 0) {
+          query = query.or(`territory_id.in.(${territoryIds.join(',')}),assigned_director_id.eq.${user.id}`);
+        } else {
+          query = query.eq('assigned_director_id', user.id);
         }
-
-        query = query.in('territory_id', territoryIds);
       }
 
       const { data, error: fetchError } = await query;
@@ -323,6 +322,8 @@ export function useLeads() {
         .from('leads')
         .update({
           assigned_director_id: directorId,
+          assigned_realtor_id: null,
+          status: 'assigned',
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
@@ -340,7 +341,10 @@ export function useLeads() {
       if (data) {
         setLeads(prev => prev.map(l => l.id === id ? data : l));
       } else {
-        setLeads(prev => prev.map(l => l.id === id ? { ...l, assigned_director_id: directorId } : l));
+        setLeads(prev => prev.map(l => l.id === id
+          ? { ...l, assigned_director_id: directorId, assigned_realtor_id: null, assigned_realtor: null, status: 'assigned' }
+          : l
+        ));
       }
       return { data, error: null };
     } catch (err) {
