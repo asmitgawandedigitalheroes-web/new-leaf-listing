@@ -9,7 +9,6 @@ import { useToast } from '../../../context/ToastContext';
 import { supabase } from '../../../lib/supabase';
 import { HiCheckCircle, HiUserGroup, HiXMark } from 'react-icons/hi2';
 import LeadDrawer from '../../../components/shared/LeadDrawer';
-import { supabase } from '../../../lib/supabase';
 
 const SCORE_COLOR = (s) => s >= 80 ? '#1F4D3A' : s >= 50 ? '#D4AF37' : '#DC2626';
 

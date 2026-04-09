@@ -380,43 +380,6 @@ export function useLeads() {
     }
   }, []);
 
-  /**
-   * Assign a lead to a director (admin only).
-   * Director will then manually assign to one of their realtors.
-   * No 180-day lock applied yet (lock applies when director assigns to realtor).
-   */
-  const assignLeadToDirector = async (id, directorId) => {
-    try {
-      const { data, error: updateError } = await supabase
-        .from('leads')
-        .update({
-          assigned_director_id: directorId,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
-        .select('*, listing:listings(title, address, city, state), assigned_director:profiles!leads_assigned_director_id_fkey(full_name, email)')
-        .single();
-
-      if (updateError) throw updateError;
-
-      audit(user.id, 'lead.assigned_to_director', id, { director_id: directorId }).catch(() => {});
-
-      // Notify director of new lead assignment
-      notificationService.notifyDirectorLead(id, directorId).catch(console.error);
-
-      // Update state with full lead data including director info
-      if (data) {
-        setLeads(prev => prev.map(l => l.id === id ? data : l));
-      } else {
-        setLeads(prev => prev.map(l => l.id === id ? { ...l, assigned_director_id: directorId } : l));
-      }
-      return { data, error: null };
-    } catch (err) {
-      console.error('[useLeads] Assign to director error:', err);
-      return { data: null, error: err };
-    }
-  };
-
   return {
     leads,
     isLoading,
@@ -429,8 +392,6 @@ export function useLeads() {
     assignLeadToDirector,
     addLeadNote,
     fetchAvailableRealtors,
-    fetchDirectorQueue,
-    assignLeadToDirector,
   };
 }
 

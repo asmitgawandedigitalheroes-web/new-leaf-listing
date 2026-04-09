@@ -4,7 +4,7 @@ import Button from '../../../components/ui/Button';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../context/ToastContext';
 import { useAuth } from '../../../context/AuthContext';
-import { sendInviteEmail } from '../../../utils/email';
+// Note: Using local sendInviteEmailImpl function instead of external import
 import {
   HiUserPlus,
   HiLink,
@@ -82,7 +82,7 @@ function buildInviteEmailHtml({ fullName, role, inviteUrl, isDetailedInvite }) {
 </html>`;
 }
 
-async function sendInviteEmail({ to, fullName, role, inviteUrl, isDetailedInvite }) {
+async function sendInviteEmailImpl({ to, fullName, role, inviteUrl, isDetailedInvite }) {
   const roleLabel = role === 'director' ? 'Regional Director' : 'Realtor';
   const subject   = isDetailedInvite
     ? `You've been invited to join NLV Listings as a ${roleLabel}`
@@ -277,7 +277,7 @@ function DetailedInviteTab({ territories, currentUserId, onNewInvite }) {
 
   const handleSendEmail = async () => {
     setEmailSending(true);
-    const { sent, error } = await sendInviteEmail({
+    const { sent, error } = await sendInviteEmailImpl({
       to:               pendingEmail.to,
       fullName:         pendingEmail.name,
       role:             pendingEmail.role,
@@ -522,7 +522,7 @@ function QuickLinkTab({ territories, currentUserId, onNewInvite }) {
     const emailTo = form.recipient_email.trim();
     if (!emailTo) return;
     setEmailSending(true);
-    const { sent, error } = await sendInviteEmail({
+    const { sent, error } = await sendInviteEmailImpl({
       to:               emailTo,
       fullName:         null,
       role:             savedRole,
