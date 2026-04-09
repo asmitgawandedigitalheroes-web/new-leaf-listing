@@ -8,6 +8,8 @@ import Skeleton from '../../../components/ui/Skeleton';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { supabase } from '../../../lib/supabase';
+import { ActionPill } from '../../../components/shared/TableActions';
+import MobileCard, { MobileCardRow, MobileCardActions } from '../../../components/shared/MobileCard';
 import {
   HiCalendarDays,
   HiArrowTrendingUp,
@@ -54,15 +56,24 @@ export default function DirectorBillingPage() {
     if (!user) return;
     setIsLoading(true);
     try {
-      // Step 1: fetch realtors under this director
-      const { data: realtors } = await supabase
-        .from('profiles')
+      // Step 1: resolve all territories this director manages
+      const { data: territories } = await supabase
+        .from('territories')
         .select('id')
-        .eq('assigned_director_id', user.id)
-        .eq('role', 'realtor')
-        .eq('status', 'active');
+        .eq('director_id', user.id);
+      const territoryIds = (territories || []).map(t => t.id);
 
-      const realtorIds = (realtors || []).map(r => r.id);
+      // Step 2: fetch active realtors across those territories
+      let realtorIds = [];
+      if (territoryIds.length > 0) {
+        const { data: realtors } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('role', 'realtor')
+          .eq('status', 'active')
+          .in('territory_id', territoryIds);
+        realtorIds = (realtors || []).map(r => r.id);
+      }
 
       // Step 2: count active subscriptions for those realtors
       let activeSubs = 0;
@@ -218,7 +229,8 @@ export default function DirectorBillingPage() {
 
         {/* Commission History */}
         <SectionCard title={`Commission History (${commissions.length})`}>
-          <div className="data-table">
+          {/* Desktop table */}
+          <div className="hidden md:block data-table">
             <table>
               <thead>
                 <tr>
@@ -273,11 +285,57 @@ export default function DirectorBillingPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden flex flex-col gap-3 p-4">
+            {isLoading ? (
+              [...Array(4)].map((_, i) => (
+                <MobileCard key={i}>
+                  <Skeleton width="60%" height="14px" className="mb-2" />
+                  <Skeleton width="40%" height="12px" />
+                </MobileCard>
+              ))
+            ) : commissions.length > 0 ? commissions.map(c => (
+              <MobileCard key={c.id} highlight={(STATUS_STYLES[c.status] || STATUS_STYLES.pending).text}>
+                <div className="font-semibold text-gray-800 text-sm mb-2">
+                  {c.source_transaction_id
+                    ? `Tx #${c.source_transaction_id.slice(0, 8)}`
+                    : `Commission #${c.id?.slice(0, 8)}`}
+                </div>
+                <MobileCardRow label="Type">
+                  <span className="text-xs px-2 py-0.5 rounded font-semibold capitalize"
+                    style={{
+                      background: c.type === 'deal' ? '#EDE9FE' : c.type === 'referral' ? '#FEF3C7' : '#F3F4F6',
+                      color: c.type === 'deal' ? '#5B21B6' : c.type === 'referral' ? '#92400E' : '#4B5563',
+                    }}>
+                    {c.type || 'commission'}
+                  </span>
+                </MobileCardRow>
+                <MobileCardRow label="Amount">
+                  <span className="font-bold text-gray-900">${Number(c.amount || 0).toLocaleString()}</span>
+                </MobileCardRow>
+                <MobileCardRow label="Status">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase"
+                    style={STATUS_STYLES[c.status] || STATUS_STYLES.pending}>
+                    {c.status}
+                  </span>
+                </MobileCardRow>
+                <MobileCardRow label="Date">
+                  <span className="text-gray-400 text-xs">
+                    {c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}
+                  </span>
+                </MobileCardRow>
+              </MobileCard>
+            )) : (
+              <p className="text-center text-gray-400 py-8 text-sm">No commissions recorded yet. Commissions are generated when realtors in your territory are billed.</p>
+            )}
+          </div>
         </SectionCard>
 
         {/* Invoice History (platform payments to this account — typically empty for directors) */}
         <SectionCard title="Payment Records">
-          <div className="data-table">
+          {/* Desktop table */}
+          <div className="hidden md:block data-table">
             <table>
               <thead>
                 <tr>
@@ -322,6 +380,40 @@ export default function DirectorBillingPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden flex flex-col gap-3 p-4">
+            {isLoading ? (
+              [...Array(2)].map((_, i) => (
+                <MobileCard key={i}>
+                  <Skeleton width="60%" height="14px" className="mb-2" />
+                  <Skeleton width="40%" height="12px" />
+                </MobileCard>
+              ))
+            ) : payments.length === 0 ? (
+              <p className="text-center text-gray-400 py-8 text-sm">No payment records on file for your account.</p>
+            ) : payments.map(inv => (
+              <MobileCard key={inv.id}>
+                <div className="font-mono text-sm font-semibold text-gray-700 mb-2">
+                  {inv.stripe_payment_id
+                    ? inv.stripe_payment_id.slice(0, 16) + '…'
+                    : `PAY-${inv.id.slice(0, 8).toUpperCase()}`}
+                </div>
+                <MobileCardRow label="Date">
+                  <span className="text-gray-500 text-xs">{formatDate(inv.created_at)}</span>
+                </MobileCardRow>
+                <MobileCardRow label="Amount">
+                  <span className="font-semibold text-gray-900">{formatCurrency(inv.amount)}</span>
+                </MobileCardRow>
+                <MobileCardRow label="Status">
+                  <Badge
+                    status={inv.status === 'succeeded' ? 'active' : inv.status === 'pending' ? 'pending' : 'rejected'}
+                    label={inv.status === 'succeeded' ? 'Paid' : inv.status}
+                  />
+                </MobileCardRow>
+              </MobileCard>
+            ))}
           </div>
         </SectionCard>
 

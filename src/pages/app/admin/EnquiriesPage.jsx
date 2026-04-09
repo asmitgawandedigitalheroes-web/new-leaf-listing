@@ -11,6 +11,8 @@ import { useToast } from '../../../context/ToastContext';
 import { useAuth } from '../../../context/AuthContext';
 import { supabase } from '../../../lib/supabase';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
+import { ActionPill } from '../../../components/shared/TableActions';
+import MobileCard, { MobileCardRow, MobileCardActions } from '../../../components/shared/MobileCard';
 import {
   HiEnvelope,
   HiPhone,
@@ -144,9 +146,9 @@ export default function EnquiriesPage() {
           </div>
         </div>
 
-        {/* Table */}
+        {/* Table - Desktop */}
         <div
-          className="bg-white rounded-2xl overflow-hidden"
+          className="hidden md:block bg-white rounded-2xl overflow-hidden"
           style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.05)' }}
         >
           <div className="data-table">
@@ -256,6 +258,45 @@ export default function EnquiriesPage() {
               <div className="text-4xl mb-2">📬</div>
               <p className="font-medium">No enquiries found</p>
               <p className="text-sm mt-1">Contact form submissions from the public site will appear here.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden flex flex-col gap-3">
+          {isLoading ? [...Array(3)].map((_, i) => (
+            <MobileCard key={i}>
+              <Skeleton variant="text" width="60%" className="mb-2" />
+              <Skeleton variant="text" width="40%" />
+            </MobileCard>
+          )) : filtered.length > 0 ? filtered.map(enq => {
+            const st = STATUS_MAP[enq.status] || STATUS_MAP.new;
+            return (
+              <MobileCard key={enq.id} onClick={() => setSelected(enq)}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: '#111' }}>{enq.name}</div>
+                    <div style={{ fontSize: 12, color: '#9CA3AF' }}>{enq.email}</div>
+                  </div>
+                  <span style={{ background: st.bg, color: st.color, borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{st.label}</span>
+                </div>
+                {enq.subject && <MobileCardRow label="Subject">{enq.subject}</MobileCardRow>}
+                <MobileCardRow label="Date">{formatDate(enq.created_at)}</MobileCardRow>
+                <MobileCardActions>
+                  <ActionPill label="View" color="#1D4ED8" bg="rgba(219,234,254,0.8)" onClick={e => { e.stopPropagation(); setSelected(enq); }} />
+                  {enq.status === 'new' && (
+                    <>
+                      <ActionPill label="Convert" color="#fff" bg="#D4AF37" onClick={e => { e.stopPropagation(); openConvert(enq); }} />
+                      <ActionPill label="Dismiss" color="#6B7280" bg="#F3F4F6" onClick={e => { e.stopPropagation(); handleDismiss(enq); }} />
+                    </>
+                  )}
+                </MobileCardActions>
+              </MobileCard>
+            );
+          }) : (
+            <div className="py-16 text-center text-gray-400">
+              <div className="text-4xl mb-2">📬</div>
+              <p className="font-medium">No enquiries found</p>
             </div>
           )}
         </div>

@@ -1,17 +1,19 @@
 // ── KPICard ───────────────────────────────
 // Premium dashboard metric card
 
-export default function KPICard({ label, value, trend, trendLabel, icon, accentColor = 'green', dark = false }) {
+export default function KPICard({ label, value, trend, trendLabel, icon, accentColor = 'green', dark = false, onClick }) {
   const isPositive = trend >= 0;
 
   if (dark) {
     return (
       <div
+        onClick={onClick}
         className="rounded-2xl p-6 flex flex-col gap-3"
         style={{
           background: '#1A202C',
           boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
           borderLeft: '3px solid #D4AF37',
+          cursor: onClick ? 'pointer' : undefined,
         }}
       >
         <div className="flex items-start justify-between">
@@ -38,10 +40,12 @@ export default function KPICard({ label, value, trend, trendLabel, icon, accentC
 
   return (
     <div
+      onClick={onClick}
       className="bg-white rounded-2xl p-6 flex flex-col gap-4 group transition-all duration-300 hover:-translate-y-1 relative overflow-hidden"
-      style={{ 
+      style={{
         boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05), 0 2px 6px -1px rgba(0,0,0,0.02)',
-        border: '1px solid rgba(229, 231, 235, 0.5)'
+        border: '1px solid rgba(229, 231, 235, 0.5)',
+        cursor: onClick ? 'pointer' : undefined,
       }}
     >
       {/* Noise pattern overlay */}

@@ -4,6 +4,7 @@ import Button from '../../../components/ui/Button';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../context/ToastContext';
 import { useAuth } from '../../../context/AuthContext';
+import { sendInviteEmail } from '../../../utils/email';
 import {
   HiUserPlus,
   HiLink,
@@ -32,70 +33,6 @@ function generateInviteToken() {
   const arr = new Uint8Array(32);
   crypto.getRandomValues(arr);
   return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// ── Email sending via send-email edge function ──────────────────────────────
-function buildInviteEmailHtml({ fullName, role, inviteUrl, isDetailedInvite }) {
-  const roleLabel = role === 'director' ? 'Regional Director' : 'Realtor';
-  const greeting  = fullName ? `Hi ${fullName},` : 'Hi there,';
-  const action    = isDetailedInvite
-    ? 'Click the button below to set your password and activate your account immediately — no approval needed.'
-    : 'Click the button below to create your account. Your role and territory are already pre-assigned — just fill in your details.';
-
-  return `<!DOCTYPE html>
-<html>
-<body style="margin:0;padding:0;background:#F9FAFB;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px;">
-    <tr><td align="center">
-      <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
-        <tr><td style="background:#1F4D3A;padding:28px 32px;text-align:center;">
-          <span style="color:#D4AF37;font-size:22px;font-weight:900;letter-spacing:-0.5px;">NLV Listings</span>
-        </td></tr>
-        <tr><td style="padding:36px 32px;">
-          <p style="margin:0 0 8px;font-size:15px;color:#111;">${greeting}</p>
-          <p style="margin:0 0 20px;font-size:14px;color:#4B5563;line-height:1.6;">
-            You've been invited to join <strong>NLV Listings</strong> as a <strong>${roleLabel}</strong>.
-          </p>
-          <p style="margin:0 0 28px;font-size:14px;color:#4B5563;line-height:1.6;">${action}</p>
-          <table cellpadding="0" cellspacing="0" style="margin:0 auto 28px;">
-            <tr><td align="center" style="background:#D4AF37;border-radius:10px;">
-              <a href="${inviteUrl}" style="display:inline-block;padding:14px 32px;color:#111;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:0.02em;">
-                ${isDetailedInvite ? 'Set Password & Activate Account' : 'Create Your Account'}
-              </a>
-            </td></tr>
-          </table>
-          <p style="margin:0 0 8px;font-size:12px;color:#9CA3AF;">Or copy this link:</p>
-          <p style="margin:0 0 28px;font-size:11px;color:#6B7280;word-break:break-all;background:#F3F4F6;padding:10px 14px;border-radius:8px;">${inviteUrl}</p>
-          <p style="margin:0;font-size:12px;color:#9CA3AF;line-height:1.6;">
-            This link expires in <strong>7 days</strong> and can only be used once.<br/>
-            Questions? Email <a href="mailto:support@nlvlistings.com" style="color:#1F4D3A;">support@nlvlistings.com</a>
-          </p>
-        </td></tr>
-        <tr><td style="background:#F9FAFB;padding:18px 32px;text-align:center;">
-          <p style="margin:0;font-size:11px;color:#9CA3AF;">© NLV Listings — Premium Real Estate Platform</p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
-}
-
-async function sendInviteEmail({ to, fullName, role, inviteUrl, isDetailedInvite }) {
-  const roleLabel = role === 'director' ? 'Regional Director' : 'Realtor';
-  const subject   = isDetailedInvite
-    ? `You've been invited to join NLV Listings as a ${roleLabel}`
-    : `Your invite to join NLV Listings as a ${roleLabel}`;
-
-  const html = buildInviteEmailHtml({ fullName, role, inviteUrl, isDetailedInvite });
-
-  const { data, error } = await supabase.functions.invoke('send-email', {
-    body: { to, subject, html },
-  });
-
-  if (error) return { sent: false, error: error.message };
-  if (data?.error) return { sent: false, error: data.error };
-  return { sent: true, error: null };
 }
 
 // ── Shared: territory select + role select helpers ──────────────────────────
@@ -293,7 +230,7 @@ function DetailedInviteTab({ territories, currentUserId, onNewInvite }) {
   });
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, maxWidth: 900 }}>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" style={{ maxWidth: 900 }}>
 
       {/* Form card */}
       <div style={{ background: '#fff', borderRadius: 16, padding: 28, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
@@ -539,7 +476,7 @@ function QuickLinkTab({ territories, currentUserId, onNewInvite }) {
   });
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, maxWidth: 900 }}>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" style={{ maxWidth: 900 }}>
 
       {/* Form card */}
       <div style={{ background: '#fff', borderRadius: 16, padding: 28, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
@@ -679,7 +616,8 @@ function RecentInvitations({ invitations, onRevoke }) {
     <div style={{ marginTop: 36 }}>
       <h3 style={{ fontSize: 14, fontWeight: 700, color: OS, marginBottom: 14 }}>Recent Invitations</h3>
       <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
           <thead>
             <tr style={{ background: '#F9FAFB', borderBottom: `1px solid ${BORDER}` }}>
               {['Name / Email', 'Role', 'Territory', 'Status', 'Expires', 'Action'].map(h => (
@@ -731,6 +669,7 @@ function RecentInvitations({ invitations, onRevoke }) {
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
@@ -788,6 +727,7 @@ export default function AddUserPage() {
   return (
     <AppLayout role="admin">
       <div style={{ padding: 'clamp(16px, 4vw, 32px)', minHeight: '100vh', background: '#F9FAFB' }}>
+        <div style={{ maxWidth: 960, margin: '0 auto' }}>
 
         {/* Header */}
         <div style={{ marginBottom: 28 }}>
@@ -798,13 +738,14 @@ export default function AddUserPage() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 28, background: '#F3F4F6', borderRadius: 10, padding: 4, width: 'fit-content' }}>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 28, background: '#F3F4F6', borderRadius: 10, padding: 4 }} className="w-full sm:w-fit">
           {tabs.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
+              className="flex-1 sm:flex-none"
               style={{
-                display: 'flex', alignItems: 'center', gap: 7,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                 padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
                 fontSize: 13, fontWeight: 700,
                 background: activeTab === key ? '#fff' : 'transparent',
@@ -837,6 +778,7 @@ export default function AddUserPage() {
         {/* Recent invitations (shared across tabs) */}
         <RecentInvitations invitations={invitations} onRevoke={handleRevoke} />
 
+        </div>
       </div>
     </AppLayout>
   );

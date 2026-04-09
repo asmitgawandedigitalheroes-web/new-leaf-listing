@@ -6,6 +6,7 @@ import Skeleton from '../../../components/ui/Skeleton';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../context/ToastContext';
 import { useAuth } from '../../../context/AuthContext';
+import MobileCard, { MobileCardRow, MobileCardActions } from '../../../components/shared/MobileCard';
 import {
   HiCheck,
   HiXMark,
@@ -246,125 +247,208 @@ export default function ApprovalsPage() {
               </button>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
-                    {['Realtor', 'Territory', 'Source', 'Applied', 'Actions'].map(h => (
-                      <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: LGRAY, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingRealtors.map(r => (
-                    <React.Fragment key={r.id}>
-                      <tr style={{ borderBottom: showRejectInput.has(r.id) ? 'none' : `1px solid ${BORDER}` }}>
-                        <td style={{ padding: '12px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <div style={{
-                              width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
-                              background: `linear-gradient(135deg, ${P}, ${S})`,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              color: '#fff', fontSize: 12, fontWeight: 700,
-                            }}>
-                              {(r.full_name || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+            <>
+              {/* Desktop table */}
+              <div className="hidden md:block" style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
+                      {['Realtor', 'Territory', 'Source', 'Applied', 'Actions'].map(h => (
+                        <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: LGRAY, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingRealtors.map(r => (
+                      <React.Fragment key={r.id}>
+                        <tr style={{ borderBottom: showRejectInput.has(r.id) ? 'none' : `1px solid ${BORDER}` }}>
+                          <td style={{ padding: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div style={{
+                                width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+                                background: `linear-gradient(135deg, ${P}, ${S})`,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: '#fff', fontSize: 12, fontWeight: 700,
+                              }}>
+                                {(r.full_name || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 600, color: OS, fontSize: 13 }}>{r.full_name || '—'}</div>
+                                <div style={{ fontSize: 11, color: LGRAY }}>{r.email}</div>
+                              </div>
                             </div>
-                            <div>
-                              <div style={{ fontWeight: 600, color: OS, fontSize: 13 }}>{r.full_name || '—'}</div>
-                              <div style={{ fontSize: 11, color: LGRAY }}>{r.email}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '12px', color: LGRAY }}>
-                          {r.territory ? `${r.territory.city}, ${r.territory.state}` : 'Unassigned'}
-                        </td>
-                        <td style={{ padding: '12px' }}>
-                          {r.assigned_director_id ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, background: '#E8F3EE', color: S, fontSize: 11, fontWeight: 700 }}>
-                              <HiUserGroup size={11} /> Invited
-                            </span>
-                          ) : (
-                            <span style={{ fontSize: 11, color: LGRAY }}>Self-signup</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '12px', color: LGRAY, whiteSpace: 'nowrap' }}>{formatDate(r.created_at)}</td>
-                        <td style={{ padding: '12px' }}>
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button
-                              onClick={() => handleRealtorAction(r.id, 'approve')}
-                              disabled={processing.has(r.id)}
-                              style={{
-                                padding: '7px 16px', borderRadius: 8, border: 'none',
-                                background: processing.has(r.id) ? '#E5E7EB' : '#16A34A',
-                                color: processing.has(r.id) ? LGRAY : '#fff',
-                                fontSize: 12, fontWeight: 700,
-                                cursor: processing.has(r.id) ? 'not-allowed' : 'pointer',
-                                opacity: processing.has(r.id) ? 0.7 : 1,
-                                display: 'flex', alignItems: 'center', gap: 5,
-                                boxShadow: processing.has(r.id) ? 'none' : '0 2px 6px rgba(22,163,74,0.3)',
-                                transition: 'all 0.15s',
-                              }}
-                              onMouseEnter={e => { if (!processing.has(r.id)) e.currentTarget.style.background = '#15803D'; }}
-                              onMouseLeave={e => { if (!processing.has(r.id)) e.currentTarget.style.background = '#16A34A'; }}
-                            >
-                              <HiCheck size={14} /> Approve
-                            </button>
-                            <button
-                              onClick={() => toggleRejectInput(r.id)}
-                              disabled={processing.has(r.id)}
-                              style={{
-                                padding: '7px 14px', borderRadius: 8, border: `1px solid #FECACA`,
-                                background: showRejectInput.has(r.id) ? '#FEE2E2' : '#fff', color: '#991B1B',
-                                fontSize: 12, fontWeight: 700, cursor: processing.has(r.id) ? 'not-allowed' : 'pointer',
-                                opacity: processing.has(r.id) ? 0.6 : 1,
-                                display: 'flex', alignItems: 'center', gap: 4,
-                                transition: 'all 0.15s',
-                              }}
-                            >
-                              <HiXMark size={14} /> Reject
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      {/* Reject reason input row */}
-                      {showRejectInput.has(r.id) && (
-                        <tr style={{ borderBottom: `1px solid ${BORDER}`, background: '#FFF5F5' }}>
-                          <td colSpan={6} style={{ padding: '10px 12px' }}>
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                              <input
-                                type="text"
-                                placeholder="Reason for rejection (optional)…"
-                                value={rejectReasons[r.id] || ''}
-                                onChange={e => setRejectReasons(prev => ({ ...prev, [r.id]: e.target.value }))}
-                                style={{ flex: 1, padding: '7px 12px', border: `1px solid #FCA5A5`, borderRadius: 8, fontSize: 13, color: OS, background: '#fff' }}
-                              />
+                          </td>
+                          <td style={{ padding: '12px', color: LGRAY }}>
+                            {r.territory ? `${r.territory.city}, ${r.territory.state}` : 'Unassigned'}
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            {r.assigned_director_id ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, background: '#E8F3EE', color: S, fontSize: 11, fontWeight: 700 }}>
+                                <HiUserGroup size={11} /> Invited
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: 11, color: LGRAY }}>Self-signup</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px', color: LGRAY, whiteSpace: 'nowrap' }}>{formatDate(r.created_at)}</td>
+                          <td style={{ padding: '12px' }}>
+                            <div style={{ display: 'flex', gap: 8 }}>
                               <button
-                                onClick={() => handleRealtorAction(r.id, 'reject')}
+                                onClick={() => handleRealtorAction(r.id, 'approve')}
                                 disabled={processing.has(r.id)}
                                 style={{
                                   padding: '7px 16px', borderRadius: 8, border: 'none',
-                                  background: '#991B1B', color: '#fff',
-                                  fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
-                                  display: 'flex', alignItems: 'center', gap: 4,
+                                  background: processing.has(r.id) ? '#E5E7EB' : '#16A34A',
+                                  color: processing.has(r.id) ? LGRAY : '#fff',
+                                  fontSize: 12, fontWeight: 700,
+                                  cursor: processing.has(r.id) ? 'not-allowed' : 'pointer',
+                                  opacity: processing.has(r.id) ? 0.7 : 1,
+                                  display: 'flex', alignItems: 'center', gap: 5,
+                                  boxShadow: processing.has(r.id) ? 'none' : '0 2px 6px rgba(22,163,74,0.3)',
+                                  transition: 'all 0.15s',
                                 }}
+                                onMouseEnter={e => { if (!processing.has(r.id)) e.currentTarget.style.background = '#15803D'; }}
+                                onMouseLeave={e => { if (!processing.has(r.id)) e.currentTarget.style.background = '#16A34A'; }}
                               >
-                                <HiXMark size={14} /> Confirm Reject
+                                <HiCheck size={14} /> Approve
                               </button>
                               <button
                                 onClick={() => toggleRejectInput(r.id)}
-                                style={{ padding: '7px 12px', borderRadius: 8, border: `1px solid ${BORDER}`, background: '#fff', fontSize: 12, cursor: 'pointer', color: LGRAY }}
+                                disabled={processing.has(r.id)}
+                                style={{
+                                  padding: '7px 14px', borderRadius: 8, border: `1px solid #FECACA`,
+                                  background: showRejectInput.has(r.id) ? '#FEE2E2' : '#fff', color: '#991B1B',
+                                  fontSize: 12, fontWeight: 700, cursor: processing.has(r.id) ? 'not-allowed' : 'pointer',
+                                  opacity: processing.has(r.id) ? 0.6 : 1,
+                                  display: 'flex', alignItems: 'center', gap: 4,
+                                  transition: 'all 0.15s',
+                                }}
                               >
-                                Cancel
+                                <HiXMark size={14} /> Reject
                               </button>
                             </div>
                           </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        {/* Reject reason input row */}
+                        {showRejectInput.has(r.id) && (
+                          <tr style={{ borderBottom: `1px solid ${BORDER}`, background: '#FFF5F5' }}>
+                            <td colSpan={6} style={{ padding: '10px 12px' }}>
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Reason for rejection (optional)…"
+                                  value={rejectReasons[r.id] || ''}
+                                  onChange={e => setRejectReasons(prev => ({ ...prev, [r.id]: e.target.value }))}
+                                  style={{ flex: 1, padding: '7px 12px', border: `1px solid #FCA5A5`, borderRadius: 8, fontSize: 13, color: OS, background: '#fff' }}
+                                />
+                                <button
+                                  onClick={() => handleRealtorAction(r.id, 'reject')}
+                                  disabled={processing.has(r.id)}
+                                  style={{
+                                    padding: '7px 16px', borderRadius: 8, border: 'none',
+                                    background: '#991B1B', color: '#fff',
+                                    fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                                    display: 'flex', alignItems: 'center', gap: 4,
+                                  }}
+                                >
+                                  <HiXMark size={14} /> Confirm Reject
+                                </button>
+                                <button
+                                  onClick={() => toggleRejectInput(r.id)}
+                                  style={{ padding: '7px 12px', borderRadius: 8, border: `1px solid ${BORDER}`, background: '#fff', fontSize: 12, cursor: 'pointer', color: LGRAY }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="md:hidden flex flex-col gap-3">
+                {pendingRealtors.map(r => (
+                  <MobileCard key={r.id}>
+                    {/* Title row */}
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: OS }}>{r.full_name || '—'}</div>
+                      <div style={{ fontSize: 12, color: LGRAY }}>{r.email}</div>
+                    </div>
+                    <MobileCardRow label="Territory">
+                      {r.territory ? `${r.territory.city}, ${r.territory.state}` : 'Unassigned'}
+                    </MobileCardRow>
+                    <MobileCardRow label="Applied">{formatDate(r.created_at)}</MobileCardRow>
+                    <MobileCardActions>
+                      <button
+                        onClick={() => handleRealtorAction(r.id, 'approve')}
+                        disabled={processing.has(r.id)}
+                        style={{
+                          padding: '7px 16px', borderRadius: 8, border: 'none',
+                          background: processing.has(r.id) ? '#E5E7EB' : '#16A34A',
+                          color: processing.has(r.id) ? LGRAY : '#fff',
+                          fontSize: 12, fontWeight: 700,
+                          cursor: processing.has(r.id) ? 'not-allowed' : 'pointer',
+                          opacity: processing.has(r.id) ? 0.7 : 1,
+                          display: 'flex', alignItems: 'center', gap: 5,
+                          boxShadow: processing.has(r.id) ? 'none' : '0 2px 6px rgba(22,163,74,0.3)',
+                        }}
+                      >
+                        <HiCheck size={14} /> Approve
+                      </button>
+                      <button
+                        onClick={() => toggleRejectInput(r.id)}
+                        disabled={processing.has(r.id)}
+                        style={{
+                          padding: '7px 14px', borderRadius: 8, border: `1px solid #FECACA`,
+                          background: showRejectInput.has(r.id) ? '#FEE2E2' : '#fff', color: '#991B1B',
+                          fontSize: 12, fontWeight: 700, cursor: processing.has(r.id) ? 'not-allowed' : 'pointer',
+                          opacity: processing.has(r.id) ? 0.6 : 1,
+                          display: 'flex', alignItems: 'center', gap: 4,
+                        }}
+                      >
+                        <HiXMark size={14} /> Reject
+                      </button>
+                    </MobileCardActions>
+                    {/* Reject reason input — inline in card */}
+                    {showRejectInput.has(r.id) && (
+                      <div style={{ marginTop: 8, padding: '10px', background: '#FFF5F5', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <input
+                          type="text"
+                          placeholder="Reason for rejection (optional)…"
+                          value={rejectReasons[r.id] || ''}
+                          onChange={e => setRejectReasons(prev => ({ ...prev, [r.id]: e.target.value }))}
+                          style={{ width: '100%', padding: '7px 12px', border: `1px solid #FCA5A5`, borderRadius: 8, fontSize: 13, color: OS, background: '#fff', boxSizing: 'border-box' }}
+                        />
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            onClick={() => handleRealtorAction(r.id, 'reject')}
+                            disabled={processing.has(r.id)}
+                            style={{
+                              flex: 1, padding: '7px 12px', borderRadius: 8, border: 'none',
+                              background: '#991B1B', color: '#fff',
+                              fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                            }}
+                          >
+                            <HiXMark size={14} /> Confirm Reject
+                          </button>
+                          <button
+                            onClick={() => toggleRejectInput(r.id)}
+                            style={{ padding: '7px 12px', borderRadius: 8, border: `1px solid ${BORDER}`, background: '#fff', fontSize: 12, cursor: 'pointer', color: LGRAY }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </MobileCard>
+                ))}
+              </div>
+            </>
           )}
         </div>
 
@@ -382,59 +466,106 @@ export default function ApprovalsPage() {
               <p style={{ fontSize: 13, fontWeight: 500 }}>No pending listing approvals</p>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
-                    {['Listing Title', 'Location', 'Submitted By', 'Date', 'Actions'].map(h => (
-                      <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: LGRAY, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingListings.map(l => (
-                    <tr key={l.id} style={{ borderBottom: `1px solid ${BORDER}` }}>
-                      <td style={{ padding: '12px', fontWeight: 600, color: OS }}>{l.title || '—'}</td>
-                      <td style={{ padding: '12px', color: OSV }}>
-                        {[l.city, l.state].filter(Boolean).join(', ') || l.address || '—'}
-                      </td>
-                      <td style={{ padding: '12px', color: LGRAY }}>{l.realtor?.full_name || '—'}</td>
-                      <td style={{ padding: '12px', color: LGRAY, whiteSpace: 'nowrap' }}>{formatDate(l.created_at)}</td>
-                      <td style={{ padding: '12px' }}>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button
-                            onClick={() => handleListingAction(l.id, 'approve')}
-                            disabled={processing.has(l.id)}
-                            style={{
-                              padding: '6px 14px', borderRadius: 8, border: 'none',
-                              background: '#DCFCE7', color: '#166534',
-                              fontSize: 12, fontWeight: 700, cursor: processing.has(l.id) ? 'not-allowed' : 'pointer',
-                              opacity: processing.has(l.id) ? 0.6 : 1,
-                              display: 'flex', alignItems: 'center', gap: 4,
-                            }}
-                          >
-                            <HiCheck size={14} /> Approve
-                          </button>
-                          <button
-                            onClick={() => handleListingAction(l.id, 'reject')}
-                            disabled={processing.has(l.id)}
-                            style={{
-                              padding: '6px 14px', borderRadius: 8, border: 'none',
-                              background: '#FEE2E2', color: '#991B1B',
-                              fontSize: 12, fontWeight: 700, cursor: processing.has(l.id) ? 'not-allowed' : 'pointer',
-                              opacity: processing.has(l.id) ? 0.6 : 1,
-                              display: 'flex', alignItems: 'center', gap: 4,
-                            }}
-                          >
-                            <HiXMark size={14} /> Reject
-                          </button>
-                        </div>
-                      </td>
+            <>
+              {/* Desktop table */}
+              <div className="hidden md:block" style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
+                      {['Listing Title', 'Location', 'Submitted By', 'Date', 'Actions'].map(h => (
+                        <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: LGRAY, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {pendingListings.map(l => (
+                      <tr key={l.id} style={{ borderBottom: `1px solid ${BORDER}` }}>
+                        <td style={{ padding: '12px', fontWeight: 600, color: OS }}>{l.title || '—'}</td>
+                        <td style={{ padding: '12px', color: OSV }}>
+                          {[l.city, l.state].filter(Boolean).join(', ') || l.address || '—'}
+                        </td>
+                        <td style={{ padding: '12px', color: LGRAY }}>{l.realtor?.full_name || '—'}</td>
+                        <td style={{ padding: '12px', color: LGRAY, whiteSpace: 'nowrap' }}>{formatDate(l.created_at)}</td>
+                        <td style={{ padding: '12px' }}>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                              onClick={() => handleListingAction(l.id, 'approve')}
+                              disabled={processing.has(l.id)}
+                              style={{
+                                padding: '6px 14px', borderRadius: 8, border: 'none',
+                                background: '#DCFCE7', color: '#166534',
+                                fontSize: 12, fontWeight: 700, cursor: processing.has(l.id) ? 'not-allowed' : 'pointer',
+                                opacity: processing.has(l.id) ? 0.6 : 1,
+                                display: 'flex', alignItems: 'center', gap: 4,
+                              }}
+                            >
+                              <HiCheck size={14} /> Approve
+                            </button>
+                            <button
+                              onClick={() => handleListingAction(l.id, 'reject')}
+                              disabled={processing.has(l.id)}
+                              style={{
+                                padding: '6px 14px', borderRadius: 8, border: 'none',
+                                background: '#FEE2E2', color: '#991B1B',
+                                fontSize: 12, fontWeight: 700, cursor: processing.has(l.id) ? 'not-allowed' : 'pointer',
+                                opacity: processing.has(l.id) ? 0.6 : 1,
+                                display: 'flex', alignItems: 'center', gap: 4,
+                              }}
+                            >
+                              <HiXMark size={14} /> Reject
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="md:hidden flex flex-col gap-3">
+                {pendingListings.map(l => (
+                  <MobileCard key={l.id}>
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: OS }}>{l.title || '—'}</div>
+                    </div>
+                    <MobileCardRow label="Location">
+                      {[l.city, l.state].filter(Boolean).join(', ') || l.address || '—'}
+                    </MobileCardRow>
+                    <MobileCardRow label="Submitted By">{l.realtor?.full_name || '—'}</MobileCardRow>
+                    <MobileCardRow label="Date">{formatDate(l.created_at)}</MobileCardRow>
+                    <MobileCardActions>
+                      <button
+                        onClick={() => handleListingAction(l.id, 'approve')}
+                        disabled={processing.has(l.id)}
+                        style={{
+                          padding: '6px 14px', borderRadius: 8, border: 'none',
+                          background: '#DCFCE7', color: '#166534',
+                          fontSize: 12, fontWeight: 700, cursor: processing.has(l.id) ? 'not-allowed' : 'pointer',
+                          opacity: processing.has(l.id) ? 0.6 : 1,
+                          display: 'flex', alignItems: 'center', gap: 4,
+                        }}
+                      >
+                        <HiCheck size={14} /> Approve
+                      </button>
+                      <button
+                        onClick={() => handleListingAction(l.id, 'reject')}
+                        disabled={processing.has(l.id)}
+                        style={{
+                          padding: '6px 14px', borderRadius: 8, border: 'none',
+                          background: '#FEE2E2', color: '#991B1B',
+                          fontSize: 12, fontWeight: 700, cursor: processing.has(l.id) ? 'not-allowed' : 'pointer',
+                          opacity: processing.has(l.id) ? 0.6 : 1,
+                          display: 'flex', alignItems: 'center', gap: 4,
+                        }}
+                      >
+                        <HiXMark size={14} /> Reject
+                      </button>
+                    </MobileCardActions>
+                  </MobileCard>
+                ))}
+              </div>
+            </>
           )}
         </div>
 

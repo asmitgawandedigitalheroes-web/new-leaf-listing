@@ -59,8 +59,14 @@ export default function ListingDetail() {
   };
 
   const isAdminOrDirector = role === 'admin' || role === 'director';
+  const isDirector = role === 'director';
   const isOwnListing = listing?.realtor_id === profile?.id;
-  const canTransition = isAdminOrDirector || isOwnListing;
+  const canTransition = (isAdminOrDirector && !isDirector) || isOwnListing;
+
+  const backToListings =
+    role === 'admin'    ? '/admin/listings' :
+    role === 'director' ? '/director/listings' :
+                          '/realtor/listings';
 
   if (error) {
     return (
@@ -68,7 +74,7 @@ export default function ListingDetail() {
         <div className="p-6 text-center py-24">
           <div className="text-5xl mb-3">⚠️</div>
           <p className="text-gray-500 font-medium">Error loading listing: {error}</p>
-          <Button variant="outline" onClick={() => navigate('/app/listings')} className="mt-4">← Back to Listings</Button>
+          <Button variant="outline" onClick={() => navigate(backToListings)} className="mt-4">← Back to Listings</Button>
         </div>
       </AppLayout>
     );
@@ -80,7 +86,7 @@ export default function ListingDetail() {
         <div className="p-6 text-center py-24">
           <div className="text-5xl mb-3">🏠</div>
           <p className="text-gray-500 font-medium">Listing not found</p>
-          <Button variant="outline" onClick={() => navigate('/app/listings')} className="mt-4">← Back to Listings</Button>
+          <Button variant="outline" onClick={() => navigate(backToListings)} className="mt-4">← Back to Listings</Button>
         </div>
       </AppLayout>
     );
@@ -123,6 +129,10 @@ export default function ListingDetail() {
         result = await archiveListing(id);
         if (result.error) throw result.error;
         addToast({ type: 'warning', title: 'Listing archived', desc: 'Status set to expired.' });
+      }
+      // After any successful admin/director action, go back to their listings page
+      if (isAdminOrDirector) {
+        navigate(backToListings);
       }
     } catch (err) {
       addToast({ type: 'error', title: 'Action failed', desc: err?.message || 'Please try again.' });
@@ -174,10 +184,10 @@ export default function ListingDetail() {
 
   return (
     <AppLayout role={profile?.role || 'realtor'} title={isLoading ? 'Loading listing…' : listing?.title} user={layoutUser}>
-      <div className="p-4 md:p-6 max-w-5xl">
+      <div className="p-4 md:p-6 max-w-5xl mx-auto">
         {/* Back */}
         <button
-          onClick={() => navigate('/app/listings')}
+          onClick={() => navigate(backToListings)}
           className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-5 transition-colors"
         >
           ← Back to Listings
@@ -294,14 +304,14 @@ export default function ListingDetail() {
             )}
 
             <div className="flex gap-2 mt-auto">
-              {isAdminOrDirector && !isInactive && (
+              {isAdminOrDirector && !isDirector && !isInactive && (
                 <Button variant="primary" className="flex-1"
                   isLoading={isActing['feature']}
                   onClick={() => handleAction('feature')}>
                   Feature Listing
                 </Button>
               )}
-              {canTransition && (
+              {canTransition && (role !== 'admin' || isOwnListing) && (
                 <Button variant="outline"
                   onClick={() => navigate(`/listings/${id}/edit`)}>
                   Edit

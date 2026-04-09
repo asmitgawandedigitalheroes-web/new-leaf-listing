@@ -7,10 +7,12 @@ import Modal from '../../../components/ui/Modal';
 import { useAuth } from '../../../context/AuthContext';
 import { useLeads } from '../../../hooks/useLeads';
 import { useToast } from '../../../context/ToastContext';
-import { HiLockClosed, HiUsers, HiExclamationTriangle, HiTableCells, HiSquares2X2 } from 'react-icons/hi2';
+import { HiLockClosed, HiUsers, HiExclamationTriangle } from 'react-icons/hi2';
 import LeadDrawer from '../../../components/shared/LeadDrawer';
 import { maskEmail, maskName } from '../../../utils/masking';
 import { supabase } from '../../../lib/supabase';
+import { ActionPill } from '../../../components/shared/TableActions';
+import MobileCard, { MobileCardRow, MobileCardActions } from '../../../components/shared/MobileCard';
 
 const STATUS_TABS = ['all', 'new', 'contacted', 'in_progress', 'closed'];
 
@@ -51,8 +53,6 @@ export default function RealtorLeadsPage() {
   const [disputeLead, setDisputeLead] = useState(null);
   const [disputeForm, setDisputeForm] = useState({ subject: '', description: '' });
   const [disputeSubmitting, setDisputeSubmitting] = useState(false);
-  const [viewMode, setViewMode] = useState(() => localStorage.getItem('leads_view') || 'card');
-
   const { leads, updateLeadStatus, isLoading, createInquiry, addLeadNote } = useLeads();
 
   const handleAddLead = async () => {
@@ -151,125 +151,96 @@ export default function RealtorLeadsPage() {
           ))}
         </div>
 
-        {/* View toggle + Tabs */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {STATUS_TABS.map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all capitalize"
-                style={{
-                  background: activeTab === tab ? 'linear-gradient(135deg, #D4AF37 0%, #B8962E 100%)' : '#F3F4F6',
-                  color: activeTab === tab ? '#fff' : '#4B5563',
-                  boxShadow: activeTab === tab ? '0 2px 8px rgba(212,175,55,0.25)' : 'none'
-                }}
-              >
-                {STATUS_LABELS[tab] || tab.replace('_', ' ')}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-lg flex-shrink-0">
-            {[{ id: 'card', icon: HiSquares2X2 }, { id: 'table', icon: HiTableCells }].map(({ id, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => { setViewMode(id); localStorage.setItem('leads_view', id); }}
-                className="p-1.5 rounded-md transition-all"
-                style={{ background: viewMode === id ? '#fff' : 'transparent', color: viewMode === id ? '#D4AF37' : '#9CA3AF', boxShadow: viewMode === id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
-              >
-                <Icon className="w-4 h-4" />
-              </button>
-            ))}
-          </div>
+        {/* Tabs */}
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {STATUS_TABS.map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all capitalize"
+              style={{
+                background: activeTab === tab ? 'linear-gradient(135deg, #D4AF37 0%, #B8962E 100%)' : '#F3F4F6',
+                color: activeTab === tab ? '#fff' : '#4B5563',
+                boxShadow: activeTab === tab ? '0 2px 8px rgba(212,175,55,0.25)' : 'none'
+              }}
+            >
+              {STATUS_LABELS[tab] || tab.replace('_', ' ')}
+            </button>
+          ))}
         </div>
 
-        {/* List Content */}
-        {viewMode === 'table' ? (
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-            <table className="w-full text-sm text-left">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/50">
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Lead</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Received</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase text-right">Action</th>
+        {/* List Content — table on md+, cards on mobile */}
+        <div className="hidden md:block bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+          <table className="w-full text-sm text-left">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Lead</th>
+                <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Received</th>
+                <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
+                <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filtered.map(lead => (
+                <tr key={lead.id} className="hover:bg-gray-50/80 transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-gray-900">{maskName(lead.contact_name)}</div>
+                    <div className="text-xs text-gray-400">{maskEmail(lead.contact_email)}</div>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                    {new Date(lead.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge status={normalizeStatus(lead.status)} label={STATUS_LABELS[normalizeStatus(lead.status)]} />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Button variant="outline" size="sm" onClick={() => openDrawer(lead)}>View</Button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {filtered.map(lead => (
-                  <tr key={lead.id} className="hover:bg-gray-50/80 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">{maskName(lead.contact_name)}</div>
-                      <div className="text-xs text-gray-400">{maskEmail(lead.contact_email)}</div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                      {new Date(lead.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge status={normalizeStatus(lead.status)} label={STATUS_LABELS[normalizeStatus(lead.status)]} />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button variant="outline" size="sm" onClick={() => openDrawer(lead)}>View</Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
-            {filtered.map(lead => (
-              <div
-                key={lead.id}
-                className="bg-white rounded-2xl p-5 cursor-pointer transition-all hover:shadow-lg border border-gray-100"
-                onClick={() => openDrawer(lead)}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <Avatar initials={lead.contact_name?.slice(0, 2).toUpperCase() || 'L'} size="md" color="gold" />
-                    <div>
-                      <div className="font-semibold text-gray-900 text-sm">{maskName(lead.contact_name)}</div>
-                      <div className="text-xs text-gray-400 font-mono tracking-tight">{maskEmail(lead.contact_email)}</div>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded"
-                    style={{ background: SCORE_COLOR(lead.score || 0) + '22', color: SCORE_COLOR(lead.score || 0) }}>
-                    {lead.score ?? 0}
-                  </span>
-                </div>
-                <div className="flex flex-col gap-1.5 mb-3 text-xs text-gray-500">
-                  <div className="flex justify-between">
-                    <span>Budget</span>
-                    <span className="font-medium text-gray-700">${lead.budget_max?.toLocaleString() || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Source</span>
-                    <span className="capitalize text-gray-600">{lead.source?.replace('_', ' ') || 'Website'}</span>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="md:hidden flex flex-col gap-3">
+          {filtered.map(lead => (
+            <MobileCard key={lead.id} onClick={() => openDrawer(lead)}>
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <Avatar initials={lead.contact_name?.slice(0, 2).toUpperCase() || 'L'} size="md" color="gold" />
+                  <div>
+                    <div className="font-semibold text-gray-900 text-sm">{maskName(lead.contact_name)}</div>
+                    <div className="text-xs text-gray-400 font-mono tracking-tight">{maskEmail(lead.contact_email)}</div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between mt-auto">
-                  <Badge status={normalizeStatus(lead.status)} label={STATUS_LABELS[normalizeStatus(lead.status)]} />
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); openDrawer(lead); }}
-                      className="px-3 py-1 rounded-lg text-xs font-semibold border border-gray-200 text-gray-600 hover:border-yellow-400 hover:text-yellow-700 transition-all"
-                      aria-label={`View details for ${maskName(lead.contact_name)}`}
-                    >
-                      View Details
-                    </button>
-                    <button
-                      onClick={(e) => openDisputeModal(lead, e)}
-                      className="text-gray-300 hover:text-red-400 transition-colors"
-                      title="Raise Dispute"
-                    >
-                      <HiExclamationTriangle className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded"
+                  style={{ background: SCORE_COLOR(lead.score || 0) + '22', color: SCORE_COLOR(lead.score || 0) }}>
+                  {lead.score ?? 0}
+                </span>
               </div>
-            ))}
-          </div>
-        )}
+              <MobileCardRow label="Budget">${lead.budget_max?.toLocaleString() || 'N/A'}</MobileCardRow>
+              <MobileCardRow label="Source"><span className="capitalize">{lead.source?.replace('_', ' ') || 'Website'}</span></MobileCardRow>
+              <MobileCardRow label="Received">{new Date(lead.created_at).toLocaleDateString()}</MobileCardRow>
+              <MobileCardRow label="Status">
+                <Badge status={normalizeStatus(lead.status)} label={STATUS_LABELS[normalizeStatus(lead.status)]} />
+              </MobileCardRow>
+              <MobileCardActions>
+                <ActionPill
+                  label="View Details"
+                  color="#B8962E"
+                  bg="rgba(212,175,55,0.12)"
+                  onClick={(e) => { e.stopPropagation(); openDrawer(lead); }}
+                />
+                <ActionPill
+                  label="Raise Dispute"
+                  color="#DC2626"
+                  bg="#FEE2E2"
+                  onClick={(e) => openDisputeModal(lead, e)}
+                />
+              </MobileCardActions>
+            </MobileCard>
+          ))}
+        </div>
 
         {filtered.length === 0 && (
           <div className="py-20 text-center text-gray-400 flex flex-col items-center">

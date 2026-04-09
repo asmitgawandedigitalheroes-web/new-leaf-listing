@@ -6,6 +6,7 @@ import Skeleton from '../../../components/ui/Skeleton';
 import { useAuth } from '../../../context/AuthContext';
 import { useLeads } from '../../../hooks/useLeads';
 import { useToast } from '../../../context/ToastContext';
+import { supabase } from '../../../lib/supabase';
 import { HiCheckCircle, HiUserGroup, HiXMark } from 'react-icons/hi2';
 import LeadDrawer from '../../../components/shared/LeadDrawer';
 
@@ -26,7 +27,10 @@ const toColumn = (status) => {
 export default function DirectorLeadsPage() {
   const { profile } = useAuth();
   const { addToast } = useToast();
-  const { leads, isLoading, reassignLead, fetchAvailableRealtors, updateLeadStatus, addLeadNote } = useLeads();
+  const { leads, isLoading, reassignLead, fetchDirectorQueue, fetchAvailableRealtors, updateLeadStatus, addLeadNote } = useLeads();
+
+  const [directorQueue, setDirectorQueue] = useState([]);
+  const [queueLoading, setQueueLoading] = useState(false);
 
   const [assignOpen, setAssignOpen]     = useState(false);
   const [assignTarget, setAssignTarget] = useState(null);
@@ -42,10 +46,54 @@ export default function DirectorLeadsPage() {
   const [bulkAssignTo, setBulkAssignTo]   = useState('');
   const [bulkAssigning, setBulkAssigning] = useState(false);
 
-  // Pass territory_id so only territory realtors appear in assign dropdown
+  // Fetch director queue (leads assigned to director, waiting for realtor assignment)
   useEffect(() => {
-    fetchAvailableRealtors(profile?.territory_id).then(({ data }) => setAvailableRealtors(data || []));
-  }, [fetchAvailableRealtors, profile?.territory_id]);
+    if (!profile?.id) return;
+
+    const refreshQueue = async () => {
+      setQueueLoading(true);
+      const { data } = await fetchDirectorQueue();
+      setDirectorQueue(data || []);
+      setQueueLoading(false);
+    };
+
+    // Initial fetch
+    refreshQueue();
+
+    // Subscribe to real-time changes on leads table
+    const subscription = supabase
+      .channel(`leads-${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'leads',
+          filter: `assigned_director_id=eq.${profile.id}`,
+        },
+        (payload) => {
+          // Refetch director queue when any change happens
+          refreshQueue();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [profile?.id, fetchDirectorQueue]);
+
+  // Fetch realtors across all territories this director manages
+  useEffect(() => {
+    if (!profile?.id) return;
+    supabase.from('territories').select('id').eq('director_id', profile.id).then(({ data }) => {
+      const ids = (data || []).map(t => t.id);
+      if (ids.length === 0) return;
+      supabase.from('profiles').select('id, full_name, email, territory_id, status')
+        .eq('role', 'realtor').eq('status', 'active').in('territory_id', ids).order('full_name')
+        .then(({ data: realtorData }) => setAvailableRealtors(realtorData || []));
+    });
+  }, [profile?.id]);
 
   const byStatus = useMemo(() => {
     const map = {};
@@ -160,6 +208,57 @@ export default function DirectorLeadsPage() {
               >
                 <HiXMark className="w-4 h-4 text-gray-500" />
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Director Queue Section - Leads Awaiting Realtor Assignment */}
+        {directorQueue.length > 0 && (
+          <div className="bg-white rounded-xl p-6 border border-yellow-200" style={{ background: 'rgba(212,175,55,0.05)' }}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full" style={{ background: '#D4AF37' }} />
+                <h3 className="font-semibold text-gray-900">Awaiting Assignment</h3>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
+                  {directorQueue.length} {directorQueue.length === 1 ? 'lead' : 'leads'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500">Leads from admin - assign to a realtor in your territory</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {directorQueue.map(lead => (
+                <div
+                  key={lead.id}
+                  className="bg-white rounded-lg p-3 cursor-pointer transition-all hover:shadow-md border-l-3"
+                  style={{ borderColor: '#D4AF37' }}
+                  onClick={() => openDrawer(lead)}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="font-semibold text-gray-900 text-sm flex-1">{lead.contact_name || 'Unknown'}</div>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded ml-1"
+                      style={{ background: SCORE_COLOR(lead.score || 50) + '22', color: SCORE_COLOR(lead.score || 50) }}>
+                      {lead.score || 50}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-400 mb-1 truncate">{lead.contact_masked_email || lead.contact_email}</div>
+                  <div className="text-xs text-gray-500 mb-2">
+                    {lead.budget_max ? `$${lead.budget_max.toLocaleString()}` : '—'}
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="xs"
+                    className="w-full text-[11px]"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAssignTarget(lead);
+                      setAssignTo('');
+                      setAssignOpen(true);
+                    }}
+                  >
+                    Assign to Realtor
+                  </Button>
+                </div>
+              ))}
             </div>
           </div>
         )}

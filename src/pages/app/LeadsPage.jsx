@@ -11,6 +11,7 @@ import { useLeads } from '../../hooks/useLeads';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import SearchableSelect from '../../components/ui/SearchableSelect';
+import { supabase } from '../../lib/supabase';
 
 export default function LeadsPage() {
   const { profile } = useAuth();
@@ -20,15 +21,18 @@ export default function LeadsPage() {
   const [selectedLead, setSelectedLead] = useState(null);
   const [reassignLead, setReassignLead] = useState(null);
   const [realtors, setRealtors]         = useState([]);
+  const [directors, setDirectors]       = useState([]);
   const [realtorsLoading, setRealtorsLoading] = useState(false);
   const [reassignRealtorId, setReassignRealtorId] = useState('');
+  const [assignDirectorId, setAssignDirectorId] = useState('');
+  const [assignmentMode, setAssignmentMode] = useState('realtor'); // 'realtor' or 'director'
   const [addOpen, setAddOpen] = useState(false);
 
   const [addForm, setAddForm] = useState({ name: '', email: '', interest: 'Buying', message: '' });
   const [addFormErrors, setAddFormErrors] = useState({}); // FIX: CRIT-005 — inline validation errors
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { leads, isLoading, reassignLead: doReassign, fetchAvailableRealtors, createInquiry, updateLeadStatus } = useLeads();
+  const { leads, isLoading, reassignLead: doReassign, assignLeadToDirector, fetchAvailableRealtors, createInquiry, updateLeadStatus } = useLeads();
 
   const handleAddLead = async () => {
     // FIX: CRIT-005 — collect all field errors and display them inline instead of silently failing
@@ -65,9 +69,47 @@ export default function LeadsPage() {
   const openReassign = async (lead) => {
     setReassignLead(lead);
     setReassignRealtorId('');
+    setAssignDirectorId('');
+    setAssignmentMode('realtor');
     setRealtorsLoading(true);
-    const { data } = await fetchAvailableRealtors();
-    setRealtors(data);
+
+    // Fetch realtors and directors in parallel
+    const { data: realtorData } = await fetchAvailableRealtors();
+    setRealtors(realtorData);
+
+    // Fetch active directors and their territories
+    const { data: directorData } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .eq('role', 'director')
+      .eq('status', 'active')
+      .order('full_name');
+
+    if (directorData && directorData.length > 0) {
+      // Fetch territories for each director
+      const directorIds = directorData.map(d => d.id);
+      const { data: territoryData } = await supabase
+        .from('territories')
+        .select('director_id, city, state')
+        .in('director_id', directorIds);
+
+      // Map territories to directors
+      const directorMap = {};
+      (territoryData || []).forEach(t => {
+        if (!directorMap[t.director_id]) {
+          directorMap[t.director_id] = [];
+        }
+        directorMap[t.director_id].push(t);
+      });
+
+      const enrichedDirectors = directorData.map(d => ({
+        ...d,
+        territory: directorMap[d.id] || []
+      }));
+      setDirectors(enrichedDirectors);
+    } else {
+      setDirectors([]);
+    }
     setRealtorsLoading(false);
   };
 
@@ -80,17 +122,39 @@ export default function LeadsPage() {
     setReassignLead(null);
   };
 
+  const handleAssignDirector = async () => {
+    if (!assignDirectorId) return;
+    const { error } = await assignLeadToDirector(reassignLead.id, assignDirectorId);
+    addToast(error
+      ? { type: 'error', title: 'Assignment failed', desc: error.message }
+      : { type: 'success', title: 'Lead assigned to director', desc: 'Director will assign to their realtor.' });
+    setReassignLead(null);
+  };
+
+  // Groups for tab filtering
+  const STATUS_GROUPS = {
+    new:         s => s === 'new',
+    assigned:    s => s === 'assigned',
+    contacted:   s => s === 'contacted',
+    in_progress: s => s === 'showing' || s === 'offer',
+    closed:      s => s === 'converted' || s === 'lost',
+  };
+
   const tabs = [
-    { key: 'all',       label: 'All',       count: leads.length },
-    { key: 'new',       label: 'New',       count: leads.filter(l => l.status === 'new').length },
-    { key: 'contacted', label: 'Contacted', count: leads.filter(l => l.status === 'contacted').length },
-    { key: 'converted', label: 'Converted', count: leads.filter(l => l.status === 'converted').length },
-    { key: 'lost',      label: 'Lost',      count: leads.filter(l => l.status === 'lost').length },
+    { key: 'all',         label: 'All',         count: leads.length },
+    { key: 'new',         label: 'New',         count: leads.filter(l => STATUS_GROUPS.new(l.status)).length },
+    { key: 'assigned',    label: 'Assigned',    count: leads.filter(l => STATUS_GROUPS.assigned(l.status)).length },
+    { key: 'contacted',   label: 'Contacted',   count: leads.filter(l => STATUS_GROUPS.contacted(l.status)).length },
+    { key: 'in_progress', label: 'In Progress', count: leads.filter(l => STATUS_GROUPS.in_progress(l.status)).length },
+    { key: 'closed',      label: 'Closed',      count: leads.filter(l => STATUS_GROUPS.closed(l.status)).length },
   ];
 
   const filtered = useMemo(() => {
     let list = leads;
-    if (activeTab !== 'all') list = list.filter(l => l.status === activeTab);
+    if (activeTab !== 'all') {
+      const match = STATUS_GROUPS[activeTab];
+      list = match ? list.filter(l => match(l.status)) : list;
+    }
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(l =>
@@ -131,7 +195,7 @@ export default function LeadsPage() {
 
         {/* Tabs + search */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
-          <div className="overflow-x-auto">
+          <div className="min-w-0 flex-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <Tabs tabs={tabs} defaultTab="all" onChange={setActiveTab} />
           </div>
           <div className="sm:ml-auto">
@@ -216,7 +280,13 @@ export default function LeadsPage() {
                     <td className="capitalize text-gray-500">{lead.source}</td>
                     <td className="text-gray-500">{lead.interest_type}</td>
                     <td className="text-gray-500 text-[11px] font-medium">
-                      {lead.assigned_realtor?.full_name || (lead.assigned_realtor_id ? `…${lead.assigned_realtor_id.slice(-6)}` : <span style={{ color: '#D4AF37' }}>Unassigned</span>)}
+                      {lead.assigned_realtor?.full_name ? (
+                        lead.assigned_realtor.full_name
+                      ) : lead.assigned_director?.full_name ? (
+                        <span style={{ color: '#D4AF37' }}>{lead.assigned_director.full_name} <span style={{ fontSize: '9px' }}>(Director)</span></span>
+                      ) : (
+                        <span style={{ color: '#D4AF37' }}>Unassigned</span>
+                      )}
                     </td>
                     <td>
                       <div className="flex gap-1.5">
@@ -233,7 +303,7 @@ export default function LeadsPage() {
                             size="sm"
                             onClick={e => { e.stopPropagation(); openReassign(lead); }}
                           >
-                            Reassign
+                            {!lead.assigned_realtor_id && !lead.assigned_director_id ? 'Assign' : 'Reassign'}
                           </Button>
                         )}
                       </div>
@@ -260,38 +330,101 @@ export default function LeadsPage() {
         updateStatus={updateLeadStatus}
       />
 
-      {/* Reassign Lead Modal */}
+      {/* Assign Lead Modal */}
       <Modal
         open={!!reassignLead}
         onClose={() => setReassignLead(null)}
-        title="Reassign Lead"
+        title="Assign Lead"
         footer={
           <>
             <Button variant="outline" onClick={() => setReassignLead(null)}>Cancel</Button>
-            <Button variant="primary" onClick={handleReassign} disabled={!reassignRealtorId}>
-              Reassign
+            <Button
+              variant="primary"
+              onClick={assignmentMode === 'realtor' ? handleReassign : handleAssignDirector}
+              disabled={assignmentMode === 'realtor' ? !reassignRealtorId : !assignDirectorId}
+            >
+              {assignmentMode === 'realtor' ? 'Assign to Realtor' : 'Assign to Director'}
             </Button>
           </>
         }
       >
         <div className="flex flex-col gap-4">
           <p className="text-sm text-gray-600">
-            Reassigning <strong>{reassignLead?.name}</strong> will transfer this lead and reset the 180-day attribution window.
+            <strong>{reassignLead?.name || reassignLead?.contact_name}</strong>
           </p>
-          {realtorsLoading ? (
-            <div className="h-10 bg-gray-100 rounded-lg animate-pulse" />
-          ) : (
-            <SearchableSelect
-              value={reassignRealtorId}
-              onChange={val => setReassignRealtorId(val)}
-              options={realtors.map(r => ({
-                value: r.id,
-                label: r.full_name,
-                sublabel: r.email
-              }))}
-              emptyLabel="Select a realtor…"
-              placeholder="Search realtors..."
-            />
+
+          {/* Assignment Mode Tabs */}
+          <div className="flex gap-0 border-b border-gray-300 bg-white">
+            <button
+              onClick={() => setAssignmentMode('realtor')}
+              className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+                assignmentMode === 'realtor'
+                  ? 'text-blue-600 border-blue-600'
+                  : 'text-gray-600 border-transparent hover:text-gray-900'
+              }`}
+            >
+              Assign to Realtor
+            </button>
+            <button
+              onClick={() => setAssignmentMode('director')}
+              className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+                assignmentMode === 'director'
+                  ? 'text-blue-600 border-blue-600'
+                  : 'text-gray-600 border-transparent hover:text-gray-900'
+              }`}
+            >
+              Assign to Director
+            </button>
+          </div>
+
+          {/* Realtor Assignment */}
+          {assignmentMode === 'realtor' && (
+            <div className="flex flex-col gap-3">
+              <label className="text-xs font-semibold text-gray-600 uppercase">Realtor</label>
+              <p className="text-xs text-gray-500">Assign directly to a realtor. Attribution window resets to 180 days.</p>
+              {realtorsLoading ? (
+                <div className="h-10 bg-gray-100 rounded-lg animate-pulse" />
+              ) : (
+                <div className="[&_[role='listbox']]:max-h-64 [&_[role='option']]:px-4 [&_[role='option']]:py-3">
+                  <SearchableSelect
+                    value={reassignRealtorId}
+                    onChange={val => setReassignRealtorId(val)}
+                    options={realtors.map(r => ({
+                      value: r.id,
+                      label: r.full_name,
+                      sublabel: r.email
+                    }))}
+                    emptyLabel="Select a realtor…"
+                    placeholder="Search realtors..."
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Director Assignment */}
+          {assignmentMode === 'director' && (
+            <div className="flex flex-col gap-3">
+              <label className="text-xs font-semibold text-gray-600 uppercase">Director</label>
+              <p className="text-xs text-gray-500">Assign to a director. Director will then assign to a realtor in their territory.</p>
+              {realtorsLoading ? (
+                <div className="h-10 bg-gray-100 rounded-lg animate-pulse" />
+              ) : (
+                <div className="[&_[role='listbox']]:max-h-64 [&_[role='option']]:px-4 [&_[role='option']]:py-3">
+                  <SearchableSelect
+                    value={assignDirectorId}
+                    onChange={val => setAssignDirectorId(val)}
+                    options={directors.map(d => ({
+                      value: d.id,
+                      label: d.full_name,
+                      sublabel: d.territory?.[0] ? `${d.territory[0].city}, ${d.territory[0].state}` : d.email
+                    }))}
+                    emptyLabel="Select a director…"
+                    placeholder="Search directors..."
+                  />
+                </div>
+              )}
+            </div>
           )}
         </div>
       </Modal>

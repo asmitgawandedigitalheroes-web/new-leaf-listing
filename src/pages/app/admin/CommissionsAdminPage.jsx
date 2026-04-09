@@ -9,13 +9,28 @@ import Skeleton from '../../../components/ui/Skeleton';
 import { useToast } from '../../../context/ToastContext';
 import { useCommissions } from '../../../hooks/useCommissions';
 import { supabase } from '../../../lib/supabase';
+import { ActionPill } from '../../../components/shared/TableActions';
+import MobileCard, { MobileCardRow, MobileCardActions } from '../../../components/shared/MobileCard';
 import {
   HiClock,
   HiCheckBadge,
   HiCreditCard,
   HiBanknotes,
   HiArrowPath,
+  HiArrowDownTray,
 } from 'react-icons/hi2';
+
+function exportCSV(rows, filename) {
+  if (!rows.length) return;
+  const headers = Object.keys(rows[0]);
+  const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const csv = [headers.join(','), ...rows.map(r => headers.map(h => escape(r[h])).join(','))].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 // Default split percentages — overridden by platform_settings if available
 const DEFAULT_RATES = {
@@ -154,9 +169,27 @@ export default function CommissionsAdminPage() {
             <h2 className="text-xl font-bold text-gray-900">Commissions</h2>
             <p className="text-sm text-gray-400 mt-0.5">{commissions.length} total records</p>
           </div>
-          <button onClick={refresh} title="Refresh" className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors self-start sm:self-auto">
-            <HiArrowPath size={16} className="text-gray-500" />
-          </button>
+          <div className="flex gap-2 self-start sm:self-auto">
+            <button
+              onClick={() => exportCSV(filtered.map(c => ({
+                ID: c.id,
+                Type: c.type,
+                Recipient: c.recipient,
+                Role: c.role,
+                Amount: c.amount,
+                Status: c.status,
+                Date: c.date,
+              })), 'commissions.csv')}
+              title="Export CSV"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors text-sm font-medium text-gray-600"
+            >
+              <HiArrowDownTray size={15} />
+              Export CSV
+            </button>
+            <button onClick={refresh} title="Refresh" className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors">
+              <HiArrowPath size={16} className="text-gray-500" />
+            </button>
+          </div>
         </div>
 
         {/* KPIs */}
@@ -208,7 +241,7 @@ export default function CommissionsAdminPage() {
 
         {/* Table */}
         <SectionCard title={`Commissions (${filtered.length})`}>
-          <div className="data-table">
+          <div className="hidden md:block data-table">
             <table>
               <thead>
                 <tr>
@@ -296,12 +329,51 @@ export default function CommissionsAdminPage() {
             </table>
           </div>
           {!isLoading && filtered.length === 0 && (
-            <div className="py-16 text-center text-gray-400">
+            <div className="py-16 text-center text-gray-400 hidden md:block">
               <HiBanknotes className="mx-auto text-4xl text-gray-200 mb-4" />
               <p className="font-medium">No commissions found</p>
               <p className="text-sm mt-1">Commission records will appear here once created</p>
             </div>
           )}
+
+          {/* Mobile cards */}
+          <div className="md:hidden flex flex-col gap-3 p-4">
+            {isLoading ? [...Array(3)].map((_, i) => (
+              <MobileCard key={i}>
+                <Skeleton variant="text" width="60%" className="mb-2" />
+                <Skeleton variant="text" width="40%" />
+              </MobileCard>
+            )) : filtered.length > 0 ? filtered.map(c => (
+              <MobileCard key={c.id}>
+                <div style={{ fontWeight: 600, fontSize: 14, color: '#111' }}>{c.recipient || '—'}</div>
+                <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 8, textTransform: 'capitalize' }}>{c.type}</div>
+                <MobileCardRow label="Amount">${c.amount?.toLocaleString()}</MobileCardRow>
+                <MobileCardRow label="Status"><StatusBadge status={c.status} /></MobileCardRow>
+                <MobileCardRow label="Date">{c.date}</MobileCardRow>
+                <MobileCardActions>
+                  {c.status === 'pending' && (
+                    <>
+                      <ActionPill label="Approve" color="#fff" bg="#22C55E" onClick={() => handleApprove(c.id)} />
+                      <ActionPill label="Reject" color="#DC2626" bg="rgba(254,226,226,0.8)" onClick={() => handleReject(c.id)} />
+                    </>
+                  )}
+                  {c.status === 'approved' && (
+                    <ActionPill label="Mark Payable" color="#5B21B6" bg="#EDE9FE" onClick={() => handlePayable(c.id)} />
+                  )}
+                  {c.status === 'payable' && (
+                    <ActionPill label="Mark Paid" color="#15803D" bg="rgba(232,243,238,0.8)" onClick={() => handlePaid(c.id)} />
+                  )}
+                  <ActionPill label="Breakdown" color="#6B7280" bg="#F3F4F6" onClick={() => openBreakdown(c)} />
+                </MobileCardActions>
+              </MobileCard>
+            )) : (
+              <div className="py-16 text-center text-gray-400">
+                <HiBanknotes className="mx-auto text-4xl text-gray-200 mb-4" />
+                <p className="font-medium">No commissions found</p>
+                <p className="text-sm mt-1">Commission records will appear here once created</p>
+              </div>
+            )}
+          </div>
         </SectionCard>
 
       </div>

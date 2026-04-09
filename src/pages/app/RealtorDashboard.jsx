@@ -226,11 +226,11 @@ export default function RealtorDashboard() {
   };
 
   const kpis = useMemo(() => [
-    { label: 'My Listings',   value: myListings.length.toString(),                     trend: null, trendLabel: '', icon: <HiHome className="text-blue-600" /> },
-    { label: 'Active Leads',  value: myLeads.filter(l => l.status !== 'converted').length.toString(), trend: null, trendLabel: '', icon: <HiUsers className="text-purple-600" /> },
-    { label: 'Commission YTD', value: `$${commissions.reduce((s, c) => s + (Number(c.amount) || 0), 0).toLocaleString()}`, trend: null, trendLabel: '', icon: <HiBanknotes className="text-green-600" /> },
-    { label: 'Closed Deals',  value: myLeads.filter(l => l.status === 'converted').length.toString(), trend: null, trendLabel: '', icon: <HiCheckBadge className="text-yellow-600" /> },
-  ], [myListings, myLeads, commissions]);
+    { label: 'My Listings',    value: myListings.length.toString(),                                    trend: null, trendLabel: '', icon: <HiHome className="text-blue-600" />,    onClick: () => navigate('/realtor/listings') },
+    { label: 'Active Leads',   value: myLeads.filter(l => l.status !== 'converted').length.toString(), trend: null, trendLabel: '', icon: <HiUsers className="text-purple-600" />,  onClick: () => navigate('/realtor/leads') },
+    { label: 'Commission YTD', value: `$${commissions.reduce((s, c) => s + (Number(c.amount) || 0), 0).toLocaleString()}`,           trend: null, trendLabel: '', icon: <HiBanknotes className="text-green-600" />, onClick: () => navigate('/realtor/commissions') },
+    { label: 'Closed Deals',   value: myLeads.filter(l => l.status === 'converted').length.toString(), trend: null, trendLabel: '', icon: <HiCheckBadge className="text-yellow-600" />, onClick: () => navigate('/realtor/leads') },
+  ], [myListings, myLeads, commissions, navigate]);
 
   return (
     <AppLayout role="realtor" title="My Dashboard">

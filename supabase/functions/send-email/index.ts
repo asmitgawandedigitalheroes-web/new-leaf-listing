@@ -1,19 +1,16 @@
 import { serve } from "http/server.ts";
-import { createClient } from "supabase";
 import { SmtpClient } from "smtp";
 
 /**
  * send-email Edge Function
- * 
+ *
  * Sends an email via SMTP using credentials provided in environment variables.
+ * JWT verification is disabled (verify_jwt = false) — Supabase handles auth at
+ * the gateway level via the project's anon/service key.
  */
 
 const url = Deno.env.get("SUPABASE_URL") || "";
 const serviceKey = Deno.env.get("ADMIN_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-
-const supabaseAdmin = createClient(url, serviceKey, {
-  auth: { autoRefreshToken: false, persistSession: false }
-});
 
 // Standard CORS headers for development flexibility
 const corsHeaders = {
@@ -28,33 +25,12 @@ serve(async (req: Request) => {
   }
 
   try {
-    // 1. Authenticate the caller
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      console.error("[send-email] Missing Authorization header");
-      throw new Error("Missing Authorization header");
-    }
-
-    const token = authHeader.replace(/^Bearer /i, "");
-    console.log(`[send-email] Received token (start): ${token.substring(0, 10)}...`);
-
     if (!url || !serviceKey) {
       console.error("[send-email] Configuration is missing from environment");
       throw new Error("Server configuration error: Missing ADMIN_SERVICE_ROLE_KEY");
     }
 
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    
-    if (authError) {
-      console.error(`[send-email] Auth error: ${authError.message}`);
-      throw new Error(`Unauthorized: ${authError.message}`);
-    }
-    if (!user) {
-      console.error("[send-email] No user found for token");
-      throw new Error("Unauthorized: No user found");
-    }
-
-    // 2. Parse request body
+    // 1. Parse request body
     const { to, subject, html } = await req.json();
     if (!to || !subject || !html) {
       throw new Error("Missing required fields: to, subject, html");

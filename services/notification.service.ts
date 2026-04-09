@@ -221,6 +221,51 @@ export const notificationService = {
   },
 
   /**
+   * Notify a director that a lead has been assigned to them.
+   * The director will then assign it to one of their realtors.
+   */
+  notifyDirectorLead: async (leadId: string, directorId: string): Promise<void> => {
+    // Fetch director and lead details
+    const { data: director } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', directorId)
+      .single();
+
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('contact_name, contact_email, budget_min, budget_max, interest_type')
+      .eq('id', leadId)
+      .single();
+
+    if (director?.email) {
+      const budgetRange = lead?.budget_min || lead?.budget_max
+        ? `$${(lead?.budget_min ?? 0).toLocaleString()} - $${(lead?.budget_max ?? 0).toLocaleString()}`
+        : 'Not specified';
+
+      await sendEmail(
+        director.email,
+        'New Lead Assigned to Your Queue',
+        `<p>Hi ${director.full_name ?? 'there'},</p>
+         <p>A new lead has been assigned to you and is waiting for assignment to one of your realtors.</p>
+         <p><strong>Lead Contact:</strong> ${lead?.contact_name ?? 'Not provided'}</p>
+         <p><strong>Contact Email:</strong> ${lead?.contact_email ?? 'Not provided'}</p>
+         <p><strong>Budget Range:</strong> ${budgetRange}</p>
+         <p><strong>Interest Type:</strong> ${lead?.interest_type ?? 'Not specified'}</p>
+         <p>Log in to NLVListings to view and assign this lead to a realtor in your territory.</p>`
+      );
+
+      await notificationService.createInAppNotification(
+        directorId,
+        'New Lead in Your Queue',
+        `Lead (${lead?.contact_name || leadId}) is waiting for realtor assignment.`,
+        'lead',
+        leadId
+      );
+    }
+  },
+
+  /**
    * Store an in-app notification via the notify Edge Function (service_role).
    *
    * Direct client-side inserts into the notifications table are blocked after
