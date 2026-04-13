@@ -34,9 +34,9 @@ const COLS = [
   {
     heading: 'Contact',
     items: [
-      { icon: HiMapPin,  text: '3250 S Durango Dr, Suite 200\nLas Vegas, NV 89117' },
-      { icon: HiEnvelope, text: 'hello@nlvlistings.com' },
-      { icon: HiPhone,    text: '+1 (702) 555-0192' },
+      { icon: HiMapPin,  text: '8 The Green St\nDover, DE, 19901' },
+      { icon: HiEnvelope, text: 'support@nlvlistings.com' },
+      { icon: HiPhone,    text: '1-866-886-3040' },
     ],
   },
 ];
@@ -127,17 +127,43 @@ export default function PublicFooter() {
         </div>
       </div>
 
+      {/* Partners */}
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="max-w-7xl mx-auto px-6 md:px-8 py-8">
+          <p className="text-xs font-bold uppercase tracking-[0.15em] mb-5 text-center" style={{ color: G }}>Our Partners</p>
+          <div className="flex flex-wrap items-center justify-center gap-6">
+            <a
+              href="https://newleafvision.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-semibold no-underline transition-colors"
+              style={{ color: 'rgba(255,255,255,0.55)' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+              onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.55)'}
+            >
+              New Leaf Vision
+            </a>
+            <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span>
+            <span className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.55)' }}>
+              Nuevo Vizion Ingenieria Y Arquitectura
+            </span>
+            <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span>
+            <span className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.55)' }}>
+              Bold Group Development
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Bottom bar */}
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-        <div className="max-w-7xl mx-auto px-6 md:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="max-w-7xl mx-auto px-6 md:px-8 py-5 flex flex-col items-center gap-1 text-center">
           <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
-            © {new Date().getFullYear()} NLV Listings, Inc. All rights reserved.
+            © 2026 NLVListings a product of New Leaf Vision Inc. All rights reserved.
           </p>
-          <div className="flex items-center gap-1">
-            <span className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>Crafted with</span>
-            <span style={{ color: G, fontSize: 12 }}>♦</span>
-            <span className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>for elite brokerages</span>
-          </div>
+          <p className="text-xs" style={{ color: 'rgba(255,255,255,0.2)' }}>
+            IP owned by Bold Family Holdco FZCO
+          </p>
         </div>
       </div>
 

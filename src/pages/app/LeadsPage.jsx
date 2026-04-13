@@ -28,7 +28,8 @@ export default function LeadsPage() {
   const [assignmentMode, setAssignmentMode] = useState('realtor'); // 'realtor' or 'director'
   const [addOpen, setAddOpen] = useState(false);
 
-  const [addForm, setAddForm] = useState({ name: '', email: '', interest: 'Buying', message: '' });
+  const [leadTypeFilter, setLeadTypeFilter] = useState('all'); // 'all' | 'buyer' | 'realtor'
+  const [addForm, setAddForm] = useState({ name: '', email: '', interest: 'Buying', message: '', lead_type: 'buyer' });
   const [addFormErrors, setAddFormErrors] = useState({}); // FIX: CRIT-005 — inline validation errors
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -49,7 +50,8 @@ export default function LeadsPage() {
     setIsSubmitting(true);
     const { error } = await createInquiry({
       ...addForm,
-      source: 'Manual Entry',
+      source: 'manual',
+      lead_type: addForm.lead_type || 'buyer',
       territory_id: profile?.territory_id || null
     });
     setIsSubmitting(false);
@@ -59,7 +61,7 @@ export default function LeadsPage() {
     } else {
       addToast({ type: 'success', title: 'Lead added', desc: 'Successfully created manual lead entry.' });
       setAddOpen(false);
-      setAddForm({ name: '', email: '', interest: 'Buying', message: '' });
+      setAddForm({ name: '', email: '', interest: 'Buying', message: '', lead_type: 'buyer' });
       setAddFormErrors({});
     }
   };
@@ -155,6 +157,9 @@ export default function LeadsPage() {
       const match = STATUS_GROUPS[activeTab];
       list = match ? list.filter(l => match(l.status)) : list;
     }
+    if (leadTypeFilter !== 'all') {
+      list = list.filter(l => (l.lead_type || 'buyer') === leadTypeFilter);
+    }
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(l =>
@@ -163,7 +168,7 @@ export default function LeadsPage() {
       );
     }
     return list;
-  }, [activeTab, search, leads]);
+  }, [activeTab, leadTypeFilter, search, leads]);
 
   const scoreColor = (s) => {
     if (s >= 80) return '#1F4D3A';
@@ -193,6 +198,33 @@ export default function LeadsPage() {
           </Button>
         </div>
 
+        {/* Lead Type Toggle */}
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Funnel:</span>
+          {[
+            { key: 'all', label: 'All Leads' },
+            { key: 'buyer', label: 'Buyer Leads', color: '#1F4D3A' },
+            { key: 'realtor', label: 'Realtor Leads', color: '#7C3AED' },
+          ].map(opt => (
+            <button
+              key={opt.key}
+              onClick={() => setLeadTypeFilter(opt.key)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              style={{
+                background: leadTypeFilter === opt.key ? (opt.color || '#111') : '#F3F4F6',
+                color: leadTypeFilter === opt.key ? '#fff' : '#6B7280',
+              }}
+            >
+              {opt.label}
+              {opt.key !== 'all' && (
+                <span className="ml-1.5 opacity-75">
+                  ({leads.filter(l => (l.lead_type || 'buyer') === opt.key).length})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         {/* Tabs + search */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
           <div className="min-w-0 flex-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -219,6 +251,7 @@ export default function LeadsPage() {
               <thead>
                 <tr>
                   <th>Lead</th>
+                  <th>Type</th>
                   <th>Status</th>
                   <th>Score</th>
                   <th>Source</th>
@@ -240,6 +273,7 @@ export default function LeadsPage() {
                           </div>
                         </div>
                       </td>
+                      <td><Skeleton width="70px" height="20px" /></td>
                       <td><Skeleton width="60px" height="20px" /></td>
                       <td><Skeleton width="80px" height="8px" /></td>
                       <td><Skeleton width="70px" height="12px" /></td>
@@ -262,6 +296,18 @@ export default function LeadsPage() {
                           <div className="text-xs text-gray-400">{lead.contact_email}</div>
                         </div>
                       </div>
+                    </td>
+                    <td>
+                      <span
+                        className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wide"
+                        style={
+                          (lead.lead_type || 'buyer') === 'realtor'
+                            ? { background: '#EDE9FE', color: '#5B21B6' }
+                            : { background: '#E8F3EE', color: '#1F4D3A' }
+                        }
+                      >
+                        {(lead.lead_type || 'buyer') === 'realtor' ? 'Realtor' : 'Buyer'}
+                      </span>
                     </td>
                     <td><Badge status={lead.status} /></td>
                     <td>
@@ -432,11 +478,11 @@ export default function LeadsPage() {
       {/* Add Lead Modal */}
       <Modal
         open={addOpen}
-        onClose={() => { setAddOpen(false); setAddFormErrors({}); }}
+        onClose={() => { setAddOpen(false); setAddFormErrors({}); setAddForm({ name: '', email: '', interest: 'Buying', message: '', lead_type: 'buyer' }); }}
         title="Add Lead"
         footer={
           <>
-            <Button variant="outline" onClick={() => { setAddOpen(false); setAddFormErrors({}); }}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setAddOpen(false); setAddFormErrors({}); setAddForm({ name: '', email: '', interest: 'Buying', message: '', lead_type: 'buyer' }); }}>Cancel</Button>
             <Button variant="primary" onClick={handleAddLead} disabled={isSubmitting}>
               {isSubmitting ? 'Adding...' : 'Add Lead'}
             </Button>
@@ -467,6 +513,29 @@ export default function LeadsPage() {
               )}
             </div>
           ))}
+          <div>
+            <label className="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Lead Type *</label>
+            <div className="flex gap-2">
+              {[
+                { value: 'buyer', label: 'Buyer Lead', desc: 'Client from listing ad', bg: '#E8F3EE', color: '#1F4D3A' },
+                { value: 'realtor', label: 'Realtor Lead', desc: 'Realtor onboarding ad', bg: '#EDE9FE', color: '#5B21B6' },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setAddForm(p => ({ ...p, lead_type: opt.value }))}
+                  className="flex-1 px-3 py-2.5 rounded-lg border-2 text-left transition-all"
+                  style={{
+                    borderColor: addForm.lead_type === opt.value ? opt.color : '#E5E7EB',
+                    background: addForm.lead_type === opt.value ? opt.bg : '#fff',
+                  }}
+                >
+                  <div className="text-xs font-bold" style={{ color: opt.color }}>{opt.label}</div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">{opt.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
           <div>
             <label className="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Interest</label>
             <SearchableSelect

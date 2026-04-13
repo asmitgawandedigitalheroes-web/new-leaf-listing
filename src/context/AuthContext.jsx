@@ -133,7 +133,7 @@ export function AuthProvider({ children }) {
       // don't match the actual Supabase Auth IDs.
       let finalProfile = profileRes.data;
       if (!finalProfile) {
-        console.warn(`[AuthContext] Profile not found for ID ${authUser.id}. Attempting email fallback...`);
+        console.warn('[AuthContext] Profile not found by ID. Attempting email fallback...');
         const { data: emailData, error: emailError } = await supabase
           .from('profiles')
           .select('*')

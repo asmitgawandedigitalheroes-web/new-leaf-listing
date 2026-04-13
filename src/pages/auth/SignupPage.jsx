@@ -18,6 +18,8 @@ import {
   HiMapPin as HiMap,
   HiDocumentText,
   HiClipboardDocumentList,
+  HiEye,
+  HiEyeSlash,
 } from 'react-icons/hi2';
 import NLVLogo from '../../components/ui/NLVLogo';
 import Button from '../../components/ui/Button';
@@ -101,6 +103,97 @@ function InputField({ label, type = 'text', placeholder, value, onChange, icon, 
         />
       </div>
       {error && <p className="text-[11px] text-red-500 mt-1">{error}</p>}
+    </div>
+  );
+}
+
+// Password rules
+const PW_RULES = [
+  { key: 'length',    label: '8–15 characters',         test: v => v.length >= 8 && v.length <= 15 },
+  { key: 'uppercase', label: 'One uppercase letter',     test: v => /[A-Z]/.test(v) },
+  { key: 'number',    label: 'One number',               test: v => /[0-9]/.test(v) },
+  { key: 'symbol',    label: 'One symbol (!@#$…)',       test: v => /[^A-Za-z0-9\s]/.test(v) },
+  { key: 'nospace',   label: 'No spaces',                test: v => !/\s/.test(v) },
+];
+
+function PasswordField({ value, onChange, error }) {
+  const [focused, setFocused] = useState(false);
+  const [show, setShow]       = useState(false);
+  const [touched, setTouched] = useState(false);
+
+  const showRules = touched && value.length > 0;
+
+  return (
+    <div className="sm:col-span-2">
+      <label className="text-[10px] font-semibold uppercase tracking-widest block mb-1.5" style={{ color: OSV }}>
+        Password
+      </label>
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+          <HiLockClosed size={15} color={focused ? P : (error ? '#EF4444' : OSV)} />
+        </span>
+        <input
+          type={show ? 'text' : 'password'}
+          required
+          autoComplete="new-password"
+          maxLength={15}
+          placeholder="Min. 8 chars, 1 uppercase, 1 number, 1 symbol"
+          value={value}
+          onChange={e => { setTouched(true); onChange(e); }}
+          onFocus={e => {
+            setFocused(true);
+            setTouched(true);
+            e.currentTarget.style.borderColor = P;
+            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(212,175,55,0.12)';
+          }}
+          onBlur={e => {
+            setFocused(false);
+            e.currentTarget.style.borderColor = error ? '#EF4444' : BORDER;
+            e.currentTarget.style.boxShadow = '';
+          }}
+          className="w-full py-2.5 text-sm rounded-lg focus:outline-none"
+          style={{
+            paddingLeft: '36px',
+            paddingRight: '40px',
+            border: `1px solid ${error ? '#EF4444' : BORDER}`,
+            background: '#fff',
+            color: OS,
+          }}
+        />
+        <button
+          type="button"
+          aria-label={show ? 'Hide password' : 'Show password'}
+          onClick={() => setShow(v => !v)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+        >
+          {show ? <HiEyeSlash size={15} color={OSV} /> : <HiEye size={15} color={OSV} />}
+        </button>
+      </div>
+
+      {/* Inline error from parent validation */}
+      {error && <p className="text-[11px] text-red-500 mt-1">{error}</p>}
+
+      {/* Live rule checklist */}
+      {showRules && (
+        <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
+          {PW_RULES.map(rule => {
+            const pass = rule.test(value);
+            return (
+              <div key={rule.key} className="flex items-center gap-1.5">
+                <span
+                  className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0 text-[8px] font-black"
+                  style={{ background: pass ? '#D1FAE5' : '#FEE2E2', color: pass ? '#059669' : '#DC2626' }}
+                >
+                  {pass ? '✓' : '✗'}
+                </span>
+                <span className="text-[11px]" style={{ color: pass ? '#059669' : '#DC2626' }}>
+                  {rule.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -222,7 +315,11 @@ export default function SignupPage() {
       if (!form.name.trim())                          errs.name     = 'Full name is required.';
       if (!form.email.trim())                         errs.email    = 'Email address is required.';
       else if (!EMAIL_RE.test(form.email.trim()))     errs.email    = 'Enter a valid email address.';
-      if (!form.password || form.password.length < 8) errs.password = 'Password must be at least 8 characters.';
+      if (!form.password) {
+        errs.password = 'Password is required.';
+      } else if (PW_RULES.some(r => !r.test(form.password))) {
+        errs.password = 'Password does not meet all requirements.';
+      }
       if (!form.company.trim())                       errs.company  = 'Company or brokerage name is required.';
       if (!form.country.trim())                       errs.country  = 'Country is required.';
       if (!form.state.trim())                         errs.state    = 'State / province is required.';
@@ -418,14 +515,10 @@ export default function SignupPage() {
                   </div>
                 </button>
 
-                {/* Director card */}
-                <button
-                  type="button"
-                  onClick={() => { setForm(p => ({ ...p, role: 'director' })); setStep(1); }}
-                  className="flex flex-col items-center gap-4 p-6 rounded-xl text-left transition-all group"
-                  style={{ border: `1.5px solid ${BORDER}`, background: '#fff' }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = S; e.currentTarget.style.background = SCL; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.background = '#fff'; }}
+                {/* Director card — invite-only, not self-signup */}
+                <div
+                  className="flex flex-col items-center gap-4 p-6 rounded-xl text-left"
+                  style={{ border: `1.5px solid ${BORDER}`, background: SURFBG, opacity: 0.85 }}
                 >
                   <div
                     className="w-14 h-14 rounded-2xl flex items-center justify-center"
@@ -440,12 +533,19 @@ export default function SignupPage() {
                     </p>
                   </div>
                   <div
-                    className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider mt-auto"
-                    style={{ color: S }}
+                    className="flex flex-col items-center gap-1 mt-auto"
                   >
-                    Get started <HiArrowRight size={13} />
+                    <span
+                      className="inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full"
+                      style={{ background: `${S}18`, color: S }}
+                    >
+                      Invite Only
+                    </span>
+                    <p className="text-[11px] text-center mt-1" style={{ color: LGRAY }}>
+                      Contact <a href="mailto:support@nlvlistings.com" style={{ color: S, fontWeight: 700 }}>support@nlvlistings.com</a> to apply.
+                    </p>
                   </div>
-                </button>
+                </div>
               </div>
             </div>
           )}
@@ -506,7 +606,7 @@ export default function SignupPage() {
                 <InputField label="Full Name"           placeholder="John Smith"                       value={form.name}     onChange={e => { update('name')(e);     setFieldErrors(p => ({ ...p, name: '' })); }}     icon={{ component: HiIdentification }} error={fieldErrors.name} />
                 <InputField label="Company / Brokerage" placeholder="Acme Realty"                     value={form.company}  onChange={e => { update('company')(e);  setFieldErrors(p => ({ ...p, company: '' })); }} icon={{ component: HiBuildingOffice }} error={fieldErrors.company} />
                 <InputField label="Email Address"       type="email" placeholder="john@brokerage.com" value={form.email}    onChange={e => { update('email')(e);    setFieldErrors(p => ({ ...p, email: '' })); }}    icon={{ component: HiEnvelope }} error={fieldErrors.email} />
-                <InputField label="Password"            type="password" placeholder="Min. 8 characters" value={form.password} onChange={e => { update('password')(e); setFieldErrors(p => ({ ...p, password: '' })); }} icon={{ component: HiLockClosed }} error={fieldErrors.password} />
+                <PasswordField value={form.password} onChange={e => { update('password')(e); setFieldErrors(p => ({ ...p, password: '' })); }} error={fieldErrors.password} />
                 <InputField label="Country"             placeholder="United States"                    value={form.country}  onChange={e => { update('country')(e);  setFieldErrors(p => ({ ...p, country: '' })); }} icon={{ component: HiMap }} error={fieldErrors.country} />
                 <InputField label="State / Province"    placeholder="Nevada"                           value={form.state}    onChange={e => { update('state')(e);    setFieldErrors(p => ({ ...p, state: '' })); }}    icon={{ component: HiMap }} error={fieldErrors.state} />
                 <InputField label="City"                placeholder="Las Vegas"                        value={form.city}     onChange={e => { update('city')(e);     setFieldErrors(p => ({ ...p, city: '' })); }}     icon={{ component: HiMap }} error={fieldErrors.city} />

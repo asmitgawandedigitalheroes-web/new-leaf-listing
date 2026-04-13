@@ -8,7 +8,7 @@ import { useToast } from '../../context/ToastContext';
 import { useListing } from '../../hooks/useListing';
 import { useListings } from '../../hooks/useListings';
 import { supabase } from '../../lib/supabase';
-import { HiArrowUpTray, HiXMark, HiPhoto } from 'react-icons/hi2';
+import { HiArrowUpTray, HiXMark, HiPhoto, HiMapPin } from 'react-icons/hi2';
 
 const PROPERTY_TYPES = ['House', 'Condo', 'Townhouse', 'Land', 'Multi-Family', 'Commercial'];
 
@@ -48,6 +48,8 @@ export default function ListingEditPage() {
         bathrooms:     listing.bathrooms ?? '',
         sqft:          listing.sqft ?? '',
         images:        listing.images || [],
+        latitude:      listing.latitude ?? '',
+        longitude:     listing.longitude ?? '',
       });
     }
   }, [listing?.id]);
@@ -149,6 +151,8 @@ export default function ListingEditPage() {
       bathrooms:     Number(form.bathrooms) || 0,
       sqft:          Number(form.sqft) || 0,
       images:        form.images || [],
+      latitude:      form.latitude  !== '' ? Number(form.latitude)  : null,
+      longitude:     form.longitude !== '' ? Number(form.longitude) : null,
     });
     setIsSaving(false);
     if (error) {
@@ -352,6 +356,49 @@ export default function ListingEditPage() {
                     style={{ background: '#F9FAFB', border: '1px solid #F0F0F0' }}>
                     <HiPhoto size={15} className="text-gray-400 flex-shrink-0" />
                     The first uploaded photo will be used as the cover image.
+                  </div>
+                )}
+              </div>
+
+              {/* ── Map Pin ── */}
+              <div className="rounded-2xl p-6 mb-2" style={{ border: '1px solid #E5E7EB', background: '#fff' }}>
+                <div className="flex items-center gap-2 mb-1">
+                  <HiMapPin size={16} style={{ color: '#D4AF37' }} />
+                  <h3 className="text-sm font-bold text-gray-800">Map Pin Location</h3>
+                </div>
+                <p className="text-xs text-gray-400 mb-4">
+                  Listings with coordinates appear as pins on the public map.{' '}
+                  Available on <strong>Market Owner</strong> (gold priority pin) and <strong>Dominator</strong> (standard pin) plans only.
+                  Use <a href="https://www.latlong.net" target="_blank" rel="noopener noreferrer" style={{ color: '#D4AF37' }}>latlong.net</a> to find coordinates.
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Latitude</label>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      placeholder="e.g. 36.1699"
+                      value={form.latitude}
+                      onChange={e => setForm(p => ({ ...p, latitude: e.target.value }))}
+                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-yellow-400 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Longitude</label>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      placeholder="e.g. -115.1398"
+                      value={form.longitude}
+                      onChange={e => setForm(p => ({ ...p, longitude: e.target.value }))}
+                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-yellow-400 transition-colors"
+                    />
+                  </div>
+                </div>
+                {form.latitude && form.longitude && (
+                  <div className="mt-3 flex items-center gap-2 text-xs font-medium" style={{ color: '#1F4D3A' }}>
+                    <HiMapPin size={13} />
+                    Pin set: {Number(form.latitude).toFixed(5)}, {Number(form.longitude).toFixed(5)}
                   </div>
                 )}
               </div>

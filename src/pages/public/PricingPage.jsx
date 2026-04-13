@@ -1,390 +1,368 @@
-import { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import {
-  HiStar,
-  HiCheck,
-  HiSparkles,
-  HiChevronUp,
-  HiChevronDown,
-  HiCheckCircle,
-  HiMinus,
-  HiHomeModern,
-  HiUsers,
-  HiBanknotes,
-  HiPlus
-} from 'react-icons/hi2';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { HiCheck, HiCheckCircle } from 'react-icons/hi2';
 import PublicNav from '../../components/layout/PublicNav';
 import PublicFooter from '../../components/layout/PublicFooter';
-import Button from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
-import { useSubscriptions } from '../../hooks/useSubscriptions';
-import { useNavigate } from 'react-router-dom';
-import { pricingService } from '../../../services/pricing.service';
-import { useToast } from '../../context/ToastContext';
 
 // NLV Brand Colors
-const PRIMARY   = '#D4AF37';
-const PRIMARY_H = '#B8962E';
-const DEEP      = '#1F4D3A';
-const SURFACE   = '#E8F3EE';
-const GOLD      = '#D4AF37';
-const GOLD_D    = '#B8962E';
-const CHARCOAL  = '#111111';
-const GRAY      = '#4B5563';
-const LGRAY     = '#6B7280';
-const SURFBG    = '#F9FAFB';
-const SURFMID   = '#E8F3EE';
-const BORDER    = '#E5E7EB';
+const GOLD   = '#D4AF37';
+const GOLD_D = '#B8962E';
+const DEEP   = '#1F4D3A';
+const DEEP_H = '#163A2B';
+const GRAY   = '#4B5563';
+const LGRAY  = '#6B7280';
+const BORDER = '#E5E7EB';
+const DARK   = '#111111';
 
-// Removed legacy Ico function
-
-const FAQ = [
-  { q: 'Can I switch plans at any time?', a: 'Yes — upgrade or downgrade whenever you like. Changes apply at the next billing cycle. Note: the Starter plan requires a 12-month minimum commitment; early cancellation does not waive the remaining monthly fees.' },
-  { q: 'Is there a free trial?', a: 'All paid plans include a 14-day free trial. No credit card required to start.' },
-  { q: 'How does commission tracking work?', a: 'Commissions are calculated automatically from your configured split percentages. All parties are notified instantly upon disbursement.' },
-  { q: 'What payment methods do you accept?', a: 'We accept all major credit cards, ACH transfers, and wire payments for Enterprise plans.' },
-  { q: 'Do you offer discounts for larger teams?', a: 'Yes. Contact us for Enterprise pricing — we offer custom packages for brokerages with 50+ realtors.' },
+const PLANS = [
+  {
+    badge:       'Early Access',
+    badgeDark:   true,
+    tier:        'INTRO',
+    price:       99,
+    priceNote:   'Introductory pricing (limited time)',
+    desc:        'Entry access to the platform before full launch.',
+    features: [
+      'Unlimited Listings',
+      'Basic CRM',
+      'Lead Capture',
+      'Platform Access',
+    ],
+    cta:         'Get Early Access',
+    ctaVariant:  'deep',
+    slug:        'intro',
+  },
+  {
+    badge:       'Early Access',
+    badgeDark:   true,
+    tier:        'PRO AGENT',
+    price:       199,
+    priceNote:   'Introductory pricing (limited time)',
+    desc:        'Expand your pipeline with more tools and opportunities.',
+    features: [
+      'Unlimited Listings',
+      'Advanced CRM & Automation',
+      'Enhanced Analytics',
+      'Access to New Leaf Buyer Network',
+      'Earn Commissions on New Leaf Products',
+    ],
+    cta:         'Upgrade to Pro',
+    ctaVariant:  'deep',
+    slug:        'pro',
+  },
+  {
+    popular:     true,
+    badge:       'Early Access Pricing',
+    badgeDark:   false,
+    tier:        'DOMINATOR',
+    price:       299,
+    priceNote:   'Limited introductory pricing',
+    desc:        'Priority access to deals, inventory, and deal flow.',
+    features: [
+      'Unlimited Listings',
+      'Full CRM & Automation Suite',
+      'Priority Lead Routing',
+      'Access to Developer Pre-Sales (Mexico & International)',
+      'First-Look Access to New Inventory',
+      'Higher Commission Opportunities',
+    ],
+    cta:         'Subscribe Now',
+    ctaVariant:  'gold',
+    slug:        'dominator',
+  },
+  {
+    badge:       'Limited Territories',
+    badgeDark:   false,
+    tier:        'MARKET OWNER',
+    price:       null,
+    priceNote:   'Introductory rates based on territory size',
+    desc:        'Own your market before expansion.',
+    features: [
+      'Everything in Dominator',
+      'Exclusive Territory Rights',
+      'Protected Lead Flow',
+      'Priority Market Positioning',
+      'Direct Developer Access',
+      'White-Glove Support',
+    ],
+    cta:         'Apply for Territory',
+    ctaVariant:  'gold',
+    slug:        'market-owner',
+    dark:        true,
+  },
 ];
 
-const COMPARE_FEATURES = [
-  { label: 'Active Listings',       free: '2',     starter: '10',    professional: 'Unlimited', enterprise: 'Unlimited' },
-  { label: 'Team Members',          free: '1',     starter: '3',     professional: '15',        enterprise: 'Unlimited' },
-  { label: 'Lead Management',       free: 'Basic', starter: 'Standard', professional: 'Full CRM', enterprise: 'Custom' },
-  { label: 'Commission Tracking',   free: false,   starter: true,    professional: true,        enterprise: true },
-  { label: 'Analytics Dashboard',   free: false,   starter: 'Basic', professional: 'Advanced',  enterprise: 'Custom' },
-  { label: 'API Access',            free: false,   starter: false,   professional: true,        enterprise: true },
-  { label: 'Priority Support',      free: false,   starter: false,   professional: true,        enterprise: true },
-  { label: 'White-glove Onboarding',free: false,   starter: false,   professional: false,       enterprise: true },
-];
-
-const TIER_CONFIG = {
-  Free:         { accent: '#E5E7EB', headerBg: '#F9FAFB', popular: false },
-  Starter:      { accent: GOLD,      headerBg: '#FFFBEB', popular: false },
-  Professional: { accent: PRIMARY,   headerBg: SURFACE,   popular: true  },
-  Enterprise:   { accent: '#1A202C', headerBg: '#0F2318', popular: false },
-};
-
-function PlanCard({ plan, annual, adjPrice, isInvited }) {
+function PlanCard({ plan }) {
   const { user } = useAuth();
-  const { subscription, createCheckoutSession, isLoading } = useSubscriptions();
   const navigate = useNavigate();
-  const { addToast } = useToast();
 
-  const cfg   = TIER_CONFIG[plan.name] || TIER_CONFIG.Free;
-  const isG   = plan.name === 'Professional';
-  const isEnt = plan.name === 'Enterprise';
-  const isCurrent = subscription?.plan_id === plan.name.toLowerCase();
-
-  const handleAction = async (e) => {
+  function handleCta(e) {
     e.preventDefault();
+    if (plan.slug === 'market-owner') {
+      window.location.href = 'mailto:support@nlvlistings.com';
+      return;
+    }
     if (!user) {
       navigate('/signup');
-      return;
-    }
-    if (isCurrent) return;
-
-    if (plan.name === 'Enterprise') {
-      window.location.href = 'mailto:sales@nlvlistings.com';
-      return;
-    }
-
-    if (plan.price === 'Free') {
+    } else {
       navigate('/app');
-      return;
     }
+  }
 
-    const result = await createCheckoutSession(plan.name.toLowerCase(), { invitedFlow: isInvited });
-    if (result?.error) {
-      addToast({ type: 'error', title: 'Checkout unavailable', desc: 'Unable to start checkout. Please try again or contact support.' });
-    }
-  };
+  const isDark = !!plan.dark;
 
   return (
     <div
-      className="rounded-2xl flex flex-col overflow-hidden"
+      className="rounded-2xl flex flex-col overflow-hidden relative"
       style={{
-        border: isG ? `2px solid ${PRIMARY}` : isEnt ? '1px solid rgba(255,255,255,0.08)' : `1px solid ${BORDER}`,
-        boxShadow: isG
-          ? '0 16px 48px rgba(212,175,55,0.16), 0 4px 16px rgba(0,0,0,0.06)'
-          : isEnt
-          ? '0 8px 32px rgba(0,0,0,0.2)'
+        border:      plan.popular ? `2px solid ${GOLD}` : isDark ? 'none' : `1px solid ${BORDER}`,
+        background:  isDark ? DEEP : '#fff',
+        boxShadow:   plan.popular
+          ? `0 0 0 1px ${GOLD}, 0 16px 48px rgba(212,175,55,0.14)`
+          : isDark
+          ? '0 8px 32px rgba(0,0,0,0.18)'
           : '0 2px 8px rgba(0,0,0,0.05)',
-        background: isEnt ? '#111827' : '#fff',
       }}
     >
-      {/* Card header */}
-      <div className="px-6 pt-6 pb-5 relative" style={{ background: isEnt ? 'rgba(255,255,255,0.04)' : cfg.headerBg, borderBottom: `1px solid ${isEnt ? 'rgba(255,255,255,0.06)' : BORDER}` }}>
-        {/* Top accent line */}
-        <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: cfg.accent }} />
-
-        {/* Tier name + popular badge */}
-        <div className="flex items-center justify-between mb-4 pt-1">
-          <span
-            className="text-[10px] font-bold uppercase tracking-[0.15em]"
-            style={{ color: isEnt ? 'rgba(255,255,255,0.45)' : LGRAY }}
-          >
-            {plan.name}
-          </span>
-          {isCurrent ? (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-green-100 text-green-700 uppercase">Current</span>
-          ) : cfg.popular && (
-            <span
-              className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full"
-              style={{ background: PRIMARY, color: '#fff' }}
-            >
-              <HiStar size={10} color="#fff" /> Most Popular
-            </span>
-          )}
+      {/* Most Popular label above card */}
+      {plan.popular && (
+        <div
+          className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider"
+          style={{ background: GOLD, color: '#fff', whiteSpace: 'nowrap' }}
+        >
+          Most Popular
         </div>
+      )}
+
+      {/* Card body */}
+      <div className="p-6 flex flex-col flex-1">
+        {/* Badge */}
+        <div className="mb-4">
+          <span
+            className="inline-block text-[10px] font-bold uppercase tracking-[0.12em] px-2.5 py-1 rounded-full"
+            style={
+              isDark
+                ? { background: GOLD, color: '#fff' }
+                : plan.popular
+                ? { background: 'rgba(212,175,55,0.15)', color: GOLD_D }
+                : { background: DEEP, color: '#fff' }
+            }
+          >
+            {plan.badge}
+          </span>
+        </div>
+
+        {/* Tier name */}
+        <p
+          className="text-[11px] font-bold uppercase tracking-[0.18em] mb-1"
+          style={{ color: isDark ? 'rgba(255,255,255,0.5)' : LGRAY }}
+        >
+          {plan.tier}
+        </p>
 
         {/* Price */}
-        <div className="flex items-baseline gap-1.5 mb-1">
-          <span
-            className="font-headline font-black leading-none"
-            style={{ fontSize: 40, color: isEnt ? '#fff' : CHARCOAL }}
-          >
-            {adjPrice(plan.price)}
-          </span>
-          {plan.price !== 'Free' && plan.price !== 'Custom' && (
-            <span className="text-sm font-medium" style={{ color: isEnt ? 'rgba(255,255,255,0.4)' : LGRAY }}>
-              /{annual ? 'yr' : 'mo'}
+        {plan.price ? (
+          <div className="flex items-baseline gap-1 mb-1">
+            <span
+              className="font-headline font-black leading-none"
+              style={{ fontSize: 40, color: isDark ? '#fff' : DARK }}
+            >
+              ${plan.price}
             </span>
-          )}
-        </div>
-        <p className="text-[11px]" style={{ color: isEnt ? 'rgba(255,255,255,0.35)' : LGRAY }}>
-          {annual && plan.price !== 'Free' && plan.price !== 'Custom'
-            ? 'Billed annually · Save 20%'
-            : plan.period}
-        </p>
-        {plan.slug === 'starter' && (
-          <div className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
-            style={{ background: '#FEF9C3', color: '#92400E' }}>
-            12-month minimum commitment
+            <span className="text-sm" style={{ color: isDark ? 'rgba(255,255,255,0.45)' : LGRAY }}>
+              / month
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-baseline gap-1 mb-1">
+            <span
+              className="font-headline font-black leading-none"
+              style={{ fontSize: 32, color: '#fff' }}
+            >
+              Custom Pricing
+            </span>
           </div>
         )}
-      </div>
 
-      {/* Body */}
-      <div className="p-6 flex flex-col flex-1">
-        {/* Description */}
-        <p className="text-[12px] leading-relaxed mb-5" style={{ color: isEnt ? 'rgba(255,255,255,0.55)' : GRAY }}>
-          {plan.description}
+        {/* Price note */}
+        <p
+          className="text-[11px] font-semibold mb-4"
+          style={{ color: plan.popular ? GOLD : isDark ? GOLD : GOLD_D }}
+        >
+          {plan.priceNote}
         </p>
+
+        {/* Description */}
+        <p
+          className="text-[12px] leading-relaxed mb-5"
+          style={{ color: isDark ? 'rgba(255,255,255,0.6)' : GRAY }}
+        >
+          {plan.desc}
+        </p>
+
+        {/* Divider */}
+        <div
+          className="mb-5"
+          style={{ height: 1, background: isDark ? 'rgba(255,255,255,0.08)' : BORDER }}
+        />
 
         {/* Features */}
         <ul className="flex flex-col gap-3 flex-1 mb-6">
-          {plan.features?.map(f => (
-            <li key={f} className="flex items-start gap-3 text-[13px]">
-              <div
-                className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                style={{ background: isEnt ? 'rgba(212,175,55,0.15)' : (isG ? SURFACE : '#F3F4F6') }}
+          {plan.features.map(f => (
+            <li key={f} className="flex items-start gap-2.5">
+              <HiCheckCircle
+                size={16}
+                color={isDark ? GOLD : DEEP}
+                style={{ flexShrink: 0, marginTop: 1 }}
+              />
+              <span
+                className="text-[12px] leading-snug"
+                style={{ color: isDark ? 'rgba(255,255,255,0.75)' : GRAY }}
               >
-                <HiCheck size={12} color={isG ? DEEP : PRIMARY} />
-              </div>
-              <span style={{ color: isEnt ? 'rgba(255,255,255,0.7)' : GRAY }}>{f}</span>
+                {f}
+              </span>
             </li>
           ))}
         </ul>
 
-        {/* CTA — always at bottom */}
-        <Button
-          onClick={handleAction}
-          isLoading={isLoading}
-          disabled={isCurrent}
-          fullWidth
-          variant={isG ? 'primary' : isEnt ? 'outline' : 'outline'}
-          className="mt-auto"
+        {/* CTA */}
+        <button
+          onClick={handleCta}
+          className="w-full py-3 rounded-xl text-sm font-bold transition-all"
           style={
-            !isG && !isEnt ? { color: CHARCOAL, borderColor: BORDER } : {}
+            plan.ctaVariant === 'gold'
+              ? { background: GOLD, color: '#fff' }
+              : { background: DEEP, color: '#fff' }
           }
+          onMouseEnter={e => {
+            e.currentTarget.style.background =
+              plan.ctaVariant === 'gold' ? GOLD_D : DEEP_H;
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background =
+              plan.ctaVariant === 'gold' ? GOLD : DEEP;
+          }}
         >
-          {isCurrent ? 'Active Plan' : (plan.cta || 'Get Started')}
-        </Button>
+          {plan.cta}
+        </button>
       </div>
     </div>
   );
 }
 
-// Convert a DB pricing_plan row to the shape PlanCard expects
-function dbPlanToCard(p) {
-  return {
-    name:        p.name,
-    price:       p.slug === 'sponsor' ? 'Custom' : p.monthly_price === 0 ? 'Free' : `$${p.monthly_price}`,
-    annualPrice: p.annual_price,
-    period:      p.slug === 'sponsor' ? 'Contact sales' : p.monthly_price === 0 ? 'Forever' : 'per month',
-    description: p.features[0] ?? '',
-    features:    p.features,
-    cta:         p.slug === 'sponsor' ? 'Contact Sales' : p.slug === 'dominator' ? 'Go Dominator' : 'Get Started',
-    highlighted: p.slug === 'pro',
-    slug:        p.slug,
-  };
-}
-
 export default function PricingPage() {
-  const [searchParams]                = useSearchParams();
-  const isInvited = searchParams.get('invited') === 'true';
-  const wasCancelled = searchParams.get('status') === 'cancelled';
-
-  const [annual,      setAnnual]      = useState(false);
-  const [openFaq,     setOpenFaq]     = useState(null);
   const [showCompare, setShowCompare] = useState(false);
-  const [dbPlans,     setDbPlans]     = useState(null); // null = loading
-
-  useEffect(() => {
-    pricingService.getPricingPlans()
-      .then(plans => {
-        const active = plans.filter(p => p.is_active);
-        setDbPlans(active.length > 0 ? active.map(dbPlanToCard) : null);
-      })
-      .catch(() => setDbPlans(null));
-  }, []);
-
-  // Use DB plans if available
-  const activePlans = dbPlans || [];
-
-  if (dbPlans === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-400 font-medium">Loading pricing plans...</div>
-      </div>
-    );
-  }
-
-  function adjPrice(price) {
-    if (!price || price === 'Free' || price === 'Custom') return price;
-    const n = parseInt(price.replace('$', ''));
-    return annual ? `$${Math.round(n * 0.8 * 12).toLocaleString()}` : price;
-  }
 
   return (
-    <div className="min-h-screen" style={{ background: '#fff' }}>
+    <div className="min-h-screen" style={{ background: '#F7F8FA' }}>
       <PublicNav />
 
       {/* ── Hero ── */}
-      <section className="pt-32 pb-16 px-4 md:px-8 text-center" style={{ background: '#fff' }}>
+      <section className="pt-32 pb-16 px-4 md:px-8 text-center" style={{ background: '#F7F8FA' }}>
         <div
-          className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-5"
-          style={{ background: SURFACE, border: `1px solid rgba(212,175,55,0.3)` }}
+          className="inline-block px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest mb-6"
+          style={{ background: GOLD, color: '#fff' }}
         >
-          <HiSparkles size={13} color={PRIMARY} />
-          <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: DEEP }}>
-            Transparent Pricing
-          </span>
+          Limited Time
         </div>
-        <h1 className="font-headline text-3xl md:text-5xl font-black mb-4 leading-tight" style={{ color: CHARCOAL }}>
-          Choose Your <span style={{ color: PRIMARY }}>Growth</span> Plan
+        <h1
+          className="font-headline font-black text-3xl md:text-5xl leading-tight mb-4"
+          style={{ color: DARK }}
+        >
+          Introductory Pricing — Limited Early Access
         </h1>
-        <p className="text-base max-w-xl mx-auto mb-10" style={{ color: GRAY, lineHeight: 1.7 }}>
-          From solo realtors to enterprise brokerages — every tier is built to scale with your ambition.
+        <p className="text-sm md:text-base max-w-xl mx-auto" style={{ color: GRAY, lineHeight: 1.7 }}>
+          Secure early pricing before official market launch. All plans include unlimited listings.
         </p>
-
-        {/* Toggle */}
-        <div
-          className="inline-flex items-center gap-3 px-5 py-3 rounded-xl"
-          style={{ background: SURFMID, border: `1px solid ${BORDER}` }}
-        >
-          <span className="text-sm font-medium" style={{ color: !annual ? CHARCOAL : LGRAY }}>Monthly</span>
-          <button
-            onClick={() => setAnnual(v => !v)}
-            className="w-11 h-6 rounded-full relative transition-colors flex-shrink-0"
-            style={{ background: annual ? PRIMARY : '#CBD5E0' }}
-          >
-            <div
-              className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all"
-              style={{ left: annual ? '22px' : '2px' }}
-            />
-          </button>
-          <span className="text-sm font-medium" style={{ color: annual ? CHARCOAL : LGRAY }}>
-            Annual{' '}
-            <span
-              className="text-[11px] font-bold px-1.5 py-0.5 rounded-md"
-              style={{ background: SURFACE, color: DEEP }}
-            >
-              Save 20%
-            </span>
-          </span>
-        </div>
       </section>
 
-      {/* ── Invite banner (shown when redirected from admin invite flow) ── */}
-      {isInvited && (
-        <section className="px-4 md:px-8 pb-2" style={{ background: '#fff' }}>
-          <div className="max-w-3xl mx-auto rounded-2xl px-6 py-5 flex flex-col sm:flex-row items-center gap-4"
-            style={{ background: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)', border: '1.5px solid #D4AF37' }}>
-            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ background: '#D4AF37' }}>
-              <HiSparkles size={20} color="#fff" />
-            </div>
-            <div className="flex-1 text-center sm:text-left">
-              <p className="font-bold text-sm" style={{ color: '#92400E' }}>
-                {wasCancelled ? 'No plan selected yet — your account is waiting!' : 'Step 2 of 2 — Activate your account'}
-              </p>
-              <p className="text-xs mt-0.5" style={{ color: '#B45309' }}>
-                Select a plan below to get started. Your <strong>14-day free trial</strong> begins immediately — no charge until the trial ends.
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0"
-              style={{ background: '#D4AF37', color: '#fff' }}>
-              <HiCheckCircle size={13} /> Trial included
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* ── Plans ── */}
-      <section className="pb-20 px-4 md:px-8" style={{ background: '#fff' }}>
-        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 items-stretch">
-          {activePlans.map(plan => (
-            <PlanCard key={plan.name} plan={plan} annual={annual} adjPrice={adjPrice} isInvited={isInvited} />
+      <section className="pb-20 px-4 md:px-8" style={{ background: '#F7F8FA' }}>
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start pt-6">
+          {PLANS.map(plan => (
+            <PlanCard key={plan.slug} plan={plan} />
           ))}
         </div>
 
-        {/* Compare link */}
+        {/* Footer notes */}
         <div className="text-center mt-12">
+          <p className="text-xs mb-1" style={{ color: LGRAY }}>
+            All pricing shown is introductory and subject to change after initial rollout.
+          </p>
+          <p className="text-xs font-semibold mb-4" style={{ color: DARK }}>
+            Early adopters lock in pricing and positioning.
+          </p>
           <button
             onClick={() => setShowCompare(v => !v)}
-            className="text-sm font-medium flex items-center gap-1 mx-auto transition-colors"
-            style={{ color: LGRAY }}
-            onMouseEnter={e => e.currentTarget.style.color = PRIMARY}
-            onMouseLeave={e => e.currentTarget.style.color = LGRAY}
+            className="text-sm font-medium transition-colors"
+            style={{ color: GOLD }}
+            onMouseEnter={e => e.currentTarget.style.color = GOLD_D}
+            onMouseLeave={e => e.currentTarget.style.color = GOLD}
           >
-            {showCompare ? 'Hide' : 'Compare'} all features
-            {showCompare ? <HiChevronUp size={18} color="inherit" /> : <HiChevronDown size={18} color="inherit" />}
+            {showCompare ? 'Hide' : 'View'} full plan comparison →
           </button>
         </div>
       </section>
 
       {/* ── Comparison table ── */}
       {showCompare && (
-        <section className="py-12 px-8" style={{ background: SURFBG }}>
+        <section className="py-12 px-4 md:px-8" style={{ background: '#fff' }}>
           <div className="max-w-5xl mx-auto">
-            <h2 className="font-headline text-2xl font-black text-center mb-8" style={{ color: CHARCOAL }}>
-              Full Feature Comparison
+            <h2
+              className="font-headline text-2xl font-black text-center mb-8"
+              style={{ color: DARK }}
+            >
+              Full Plan Comparison
             </h2>
-            <div className="rounded-xl overflow-hidden" style={{ background: '#fff', boxShadow: '0 2px 16px rgba(26,32,44,0.06)', border: `1px solid ${BORDER}` }}>
+            <div
+              className="rounded-2xl overflow-hidden"
+              style={{ border: `1px solid ${BORDER}`, background: '#fff' }}
+            >
               <table className="w-full">
                 <thead>
-                  <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
-                    <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-widest" style={{ color: LGRAY, width: '30%' }}>Feature</th>
-                    {['Free', 'Starter', 'Professional', 'Enterprise'].map(n => (
+                  <tr style={{ borderBottom: `1px solid ${BORDER}`, background: '#F9FAFB' }}>
+                    <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-widest" style={{ color: LGRAY, width: '30%' }}>
+                      Feature
+                    </th>
+                    {['Intro', 'Pro Agent', 'Dominator', 'Market Owner'].map(n => (
                       <th key={n} className="px-4 py-4 text-center text-[11px] font-semibold uppercase tracking-widest"
-                        style={{ color: n === 'Professional' ? DEEP : LGRAY }}>
+                        style={{ color: n === 'Dominator' ? DEEP : LGRAY }}>
                         {n}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {COMPARE_FEATURES.map((row, i) => (
-                    <tr key={row.label} style={{
-                      borderBottom: i < COMPARE_FEATURES.length - 1 ? `1px solid ${BORDER}` : 'none',
-                      background: i % 2 === 0 ? '#fff' : SURFBG,
-                    }}>
-                      <td className="px-5 py-3 text-[13px]" style={{ color: CHARCOAL }}>{row.label}</td>
-                      {[row.free, row.starter, row.professional, row.enterprise].map((val, ci) => (
+                  {[
+                    { label: 'Unlimited Listings',                intro: true,  pro: true,  dom: true,  mo: true  },
+                    { label: 'CRM',                               intro: 'Basic', pro: 'Advanced', dom: 'Full Suite', mo: 'Full Suite' },
+                    { label: 'Lead Capture',                      intro: true,  pro: true,  dom: true,  mo: true  },
+                    { label: 'Analytics',                         intro: false, pro: true,  dom: true,  mo: true  },
+                    { label: 'New Leaf Buyer Network',            intro: false, pro: true,  dom: true,  mo: true  },
+                    { label: 'New Leaf Commissions',              intro: false, pro: true,  dom: true,  mo: true  },
+                    { label: 'Priority Lead Routing',             intro: false, pro: false, dom: true,  mo: true  },
+                    { label: 'Developer Pre-Sales Access',        intro: false, pro: false, dom: true,  mo: true  },
+                    { label: 'First-Look New Inventory',          intro: false, pro: false, dom: true,  mo: true  },
+                    { label: 'Higher Commission Opportunities',   intro: false, pro: false, dom: true,  mo: true  },
+                    { label: 'Exclusive Territory Rights',        intro: false, pro: false, dom: false, mo: true  },
+                    { label: 'Protected Lead Flow',               intro: false, pro: false, dom: false, mo: true  },
+                    { label: 'Priority Market Positioning',       intro: false, pro: false, dom: false, mo: true  },
+                    { label: 'Direct Developer Access',           intro: false, pro: false, dom: false, mo: true  },
+                    { label: 'White-Glove Support',               intro: false, pro: false, dom: false, mo: true  },
+                  ].map((row, i) => (
+                    <tr
+                      key={row.label}
+                      style={{
+                        borderBottom: i < 14 ? `1px solid ${BORDER}` : 'none',
+                        background: i % 2 === 0 ? '#fff' : '#F9FAFB',
+                      }}
+                    >
+                      <td className="px-5 py-3 text-[13px]" style={{ color: DARK }}>{row.label}</td>
+                      {[row.intro, row.pro, row.dom, row.mo].map((val, ci) => (
                         <td key={ci} className="px-4 py-3 text-center text-[12px]" style={{ color: GRAY }}>
-                          {val === true  ? <HiCheckCircle size={16} color={PRIMARY} /> :
-                           val === false ? <HiMinus size={16} color={BORDER} /> :
+                          {val === true  ? <HiCheck size={16} color={DEEP} style={{ margin: '0 auto' }} /> :
+                           val === false ? <span style={{ color: BORDER }}>—</span> :
                            <span>{val}</span>}
                         </td>
                       ))}
@@ -397,107 +375,34 @@ export default function PricingPage() {
         </section>
       )}
 
-      {/* ── Trust stats ── */}
-      <section className="py-16 px-8" style={{ background: SURFMID }}>
-        <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6">
-          {[
-            { icon: HiHomeModern, val: '2,400+', label: 'Active Listings' },
-            { icon: HiUsers,   val: '340+',   label: 'Top Realtors' },
-            { icon: HiBanknotes, val: '$1.2B',  label: 'Transactions' },
-            { icon: HiStar,     val: '4.9/5',  label: 'Avg. Rating' },
-          ].map(stat => (
-            <div
-              key={stat.label}
-              className="text-center rounded-xl py-7 px-4"
-              style={{ background: '#fff', boxShadow: '0 2px 8px rgba(26,32,44,0.05)', border: `1px solid ${BORDER}` }}
-            >
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3"
-                style={{ background: SURFACE }}
-              >
-                <stat.icon size={20} color={PRIMARY} />
-              </div>
-              <p className="font-headline font-black text-xl mb-0.5" style={{ color: CHARCOAL }}>{stat.val}</p>
-              <p className="text-[11px]" style={{ color: LGRAY }}>{stat.label}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── FAQ ── */}
-      <section className="py-20 px-8" style={{ background: '#fff' }}>
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-12">
-            <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: PRIMARY }}>FAQ</p>
-            <h2 className="font-headline text-3xl font-black" style={{ color: CHARCOAL }}>Common Questions</h2>
-          </div>
-          <div className="flex flex-col gap-3">
-            {FAQ.map((item, i) => (
-              <div
-                key={i}
-                className="rounded-xl overflow-hidden transition-all"
-                style={{
-                  border: openFaq === i ? `1px solid rgba(212,175,55,0.4)` : `1px solid ${BORDER}`,
-                  background: '#fff',
-                }}
-              >
-                <button
-                  className="w-full flex items-center justify-between px-5 py-4 text-left"
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                >
-                  <span className="font-medium text-sm pr-4" style={{ color: CHARCOAL }}>{item.q}</span>
-                  <div
-                    className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-colors"
-                    style={{ background: openFaq === i ? SURFACE : SURFMID }}
-                  >
-                    {openFaq === i ? <HiMinus size={14} color={PRIMARY} /> : <HiPlus size={14} color={LGRAY} />}
-                  </div>
-                </button>
-                {openFaq === i && (
-                  <div
-                    className="px-5 pb-4 text-sm leading-relaxed"
-                    style={{ color: GRAY, borderTop: `1px solid ${BORDER}` }}
-                  >
-                    <div className="pt-3">{item.a}</div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Enterprise CTA ── */}
-      <section className="py-20 px-8 relative overflow-hidden" style={{ background: DEEP }}>
-        {/* Ambient green glow */}
-        <div className="absolute inset-0 pointer-events-none" />
-        <div className="max-w-3xl mx-auto text-center relative">
-          <p className="text-[11px] font-semibold uppercase tracking-widest mb-3" style={{ color: PRIMARY }}>Enterprise</p>
-          <h2 className="font-headline text-4xl font-black text-white mb-4">
-            Need a Custom Plan?
+      {/* ── CTA ── */}
+      <section className="py-20 px-8" style={{ background: DEEP }}>
+        <div className="max-w-2xl mx-auto text-center">
+          <h2 className="font-headline font-black text-3xl md:text-4xl text-white mb-4">
+            Ready to Secure Your Position?
           </h2>
-          <p className="text-base mb-10" style={{ color: '#9CA3AF', lineHeight: 1.7 }}>
-            For brokerages with 50+ realtors, we offer white-glove onboarding, custom SLAs, and dedicated account management.
+          <p className="text-sm mb-8" style={{ color: 'rgba(255,255,255,0.6)', lineHeight: 1.7 }}>
+            Early access pricing won't last. Lock in your tier before the platform officially launches.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              to="/signup"
-              className="px-8 py-3.5 rounded-xl text-sm font-semibold no-underline font-headline transition-all"
-              style={{ background: PRIMARY, color: '#fff' }}
-              onMouseEnter={e => e.currentTarget.style.background = PRIMARY_H}
-              onMouseLeave={e => e.currentTarget.style.background = PRIMARY}
+            <a
+              href="/signup"
+              className="px-8 py-3.5 rounded-xl text-sm font-bold no-underline transition-all"
+              style={{ background: GOLD, color: '#fff' }}
+              onMouseEnter={e => e.currentTarget.style.background = GOLD_D}
+              onMouseLeave={e => e.currentTarget.style.background = GOLD}
             >
-              Contact Sales
-            </Link>
-            <Link
-              to="/"
-              className="px-8 py-3.5 rounded-xl text-sm font-semibold no-underline font-headline transition-all"
-              style={{ border: '1px solid rgba(212,175,55,0.4)', color: '#fff' }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = PRIMARY; e.currentTarget.style.color = PRIMARY; }}
+              Get Early Access
+            </a>
+            <a
+              href="mailto:support@nlvlistings.com"
+              className="px-8 py-3.5 rounded-xl text-sm font-bold no-underline transition-all"
+              style={{ border: '1.5px solid rgba(212,175,55,0.4)', color: '#fff' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.color = GOLD; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(212,175,55,0.4)'; e.currentTarget.style.color = '#fff'; }}
             >
-              Learn More
-            </Link>
+              Contact Sales
+            </a>
           </div>
         </div>
       </section>
@@ -506,4 +411,3 @@ export default function PricingPage() {
     </div>
   );
 }
-  

@@ -160,10 +160,10 @@ export default function LoginPage() {
           <p className="text-[11px] font-semibold uppercase tracking-widest mb-4" style={{ color: P }}>
             The Digital Curator
           </p>
-          <h2 className="font-headline text-4xl font-black text-white leading-snug mb-5">
+          <p className="font-headline text-4xl font-black text-white leading-snug mb-5">
             The Premium Platform<br />
             for <span style={{ color: P }}>Top Realtors</span>
-          </h2>
+          </p>
           <p className="text-sm leading-relaxed" style={{ color: '#9CA3AF' }}>
             Manage listings, track leads, and close more deals with the platform trusted by elite brokerages nationwide.
           </p>
@@ -224,7 +224,7 @@ export default function LoginPage() {
 
             {/* Email */}
             <div>
-              <label className="text-[10px] font-semibold uppercase tracking-widest block mb-1.5" style={{ color: OSV }}>
+              <label htmlFor="login-email" className="text-[10px] font-semibold uppercase tracking-widest block mb-1.5" style={{ color: OSV }}>
                 Email Address
               </label>
               <div className="relative">
@@ -232,8 +232,11 @@ export default function LoginPage() {
                   <HiEnvelope size={16} color={OSV} />
                 </span>
                 <input
+                  id="login-email"
                   type="email"
                   required
+                  autoComplete="email"
+                  maxLength={254}
                   placeholder="you@brokerage.com"
                   value={form.email}
                   onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
@@ -248,7 +251,7 @@ export default function LoginPage() {
             {/* Password */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: OSV }}>
+                <label htmlFor="login-password" className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: OSV }}>
                   Password
                 </label>
                 <button
@@ -268,8 +271,11 @@ export default function LoginPage() {
                   <HiLockClosed size={16} color={OSV} />
                 </span>
                 <input
+                  id="login-password"
                   type={showPw ? 'text' : 'password'}
                   required
+                  autoComplete="current-password"
+                  maxLength={15}
                   placeholder="••••••••"
                   value={form.password}
                   onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
@@ -280,6 +286,7 @@ export default function LoginPage() {
                 />
                 <button
                   type="button"
+                  aria-label={showPw ? 'Hide password' : 'Show password'}
                   className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
                   onClick={() => setShowPw(v => !v)}
                 >

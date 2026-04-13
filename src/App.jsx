@@ -14,6 +14,7 @@ function ScrollToTop() {
 // ── Public pages ──────────────────────────────────────────────────
 import HomePage        from './pages/public/HomePage';
 import BrowseListings  from './pages/public/BrowseListings';
+import MapPage         from './pages/public/MapPage';
 import PricingPage     from './pages/public/PricingPage';
 import AboutPage       from './pages/public/AboutPage';
 import ContactPage     from './pages/public/ContactPage';
@@ -54,13 +55,14 @@ import DisputesPage         from './pages/app/admin/DisputesPage';
 import PayoutsPage          from './pages/app/admin/PayoutsPage';
 
 // ── Director pages ────────────────────────────────────────────────
-import DirectorListingsPage     from './pages/app/director/DirectorListingsPage';
-import DirectorLeadsPage       from './pages/app/director/DirectorLeadsPage';
-import DirectorRealtorsPage    from './pages/app/director/DirectorRealtorsPage';
-import DirectorCommissionsPage from './pages/app/director/DirectorCommissionsPage';
-import DirectorReportsPage     from './pages/app/director/DirectorReportsPage';
-import DirectorContractsPage   from './pages/app/director/DirectorContractsPage';
-import DirectorBillingPage     from './pages/app/director/DirectorBillingPage';
+import DirectorListingsPage       from './pages/app/director/DirectorListingsPage';
+import DirectorLeadsPage         from './pages/app/director/DirectorLeadsPage';
+import DirectorRealtorsPage      from './pages/app/director/DirectorRealtorsPage';
+import DirectorCommissionsPage   from './pages/app/director/DirectorCommissionsPage';
+import DirectorReportsPage       from './pages/app/director/DirectorReportsPage';
+import DirectorContractsPage     from './pages/app/director/DirectorContractsPage';
+import DirectorBillingPage       from './pages/app/director/DirectorBillingPage';
+import DirectorConversationsPage from './pages/app/director/DirectorConversationsPage';
 
 // ── Realtor pages ─────────────────────────────────────────────────
 import RealtorListingsPage    from './pages/app/realtor/RealtorListingsPage';
@@ -90,6 +92,7 @@ export default function App() {
             {/* ── Public ──────────────────────────────────────── */}
             <Route path="/"                element={<HomePage />} />
             <Route path="/browse"          element={<BrowseListings />} />
+            <Route path="/map"             element={<MapPage />} />
             <Route path="/listing/:id"     element={<ListingDetail />} />
             <Route path="/pricing"         element={<PricingPage />} />
             <Route path="/about"   element={<AboutPage />} />
@@ -251,6 +254,11 @@ export default function App() {
             <Route path="/director/billing" element={
               <ProtectedRoute allowedRoles={['director']}>
                 <DirectorBillingPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/director/conversations" element={
+              <ProtectedRoute allowedRoles={['director']}>
+                <DirectorConversationsPage />
               </ProtectedRoute>
             } />
             {/* BUG-005: /director/legal → /director/contracts redirect */}

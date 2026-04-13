@@ -23,6 +23,7 @@ import {
   HiDocumentText,
   HiCheckBadge,
   HiUserPlus,
+  HiShieldCheck,
 } from 'react-icons/hi2';
 
 // Reusable icon wrapper for consistency
@@ -49,14 +50,15 @@ const NAV = {
     { key: 'settings',     label: 'Settings',      icon: HiCog6Tooth,             to: '/admin/settings' },
   ],
   director: [
-    { key: 'dashboard',    label: 'Dashboard',     icon: HiViewColumns,         to: '/director/dashboard' },
-    { key: 'listings',     label: 'Listings',      icon: HiHomeModern,          to: '/director/listings' },
-    { key: 'leads',        label: 'My Leads',      icon: HiChatBubbleLeftRight,  to: '/director/leads' },
-    { key: 'realtors',     label: 'My Realtors',   icon: HiIdentification,      to: '/director/realtors' },
-    { key: 'commissions',  label: 'My Commissions',icon: HiBanknotes,           to: '/director/commissions' },
-    { key: 'billing',      label: 'Earnings & Payouts', icon: HiCreditCard,      to: '/director/billing' },
-    { key: 'reports',      label: 'Reports',       icon: HiChartBar,            to: '/director/reports' },
-    { key: 'contracts',    label: 'Legal & Contracts', icon: HiDocumentText,    to: '/director/contracts' },
+    { key: 'dashboard',       label: 'Dashboard',          icon: HiViewColumns,          to: '/director/dashboard' },
+    { key: 'listings',        label: 'Listings',           icon: HiHomeModern,           to: '/director/listings' },
+    { key: 'leads',           label: 'My Leads',           icon: HiChatBubbleLeftRight,  to: '/director/leads' },
+    { key: 'conversations',   label: 'Conversations',      icon: HiShieldCheck,          to: '/director/conversations' },
+    { key: 'realtors',        label: 'My Realtors',        icon: HiIdentification,       to: '/director/realtors' },
+    { key: 'commissions',     label: 'My Commissions',     icon: HiBanknotes,            to: '/director/commissions' },
+    { key: 'billing',         label: 'Earnings & Payouts', icon: HiCreditCard,           to: '/director/billing' },
+    { key: 'reports',         label: 'Reports',            icon: HiChartBar,             to: '/director/reports' },
+    { key: 'contracts',       label: 'Legal & Contracts',  icon: HiDocumentText,         to: '/director/contracts' },
   ],
   realtor: [
     { key: 'dashboard',    label: 'Dashboard',     icon: HiViewColumns,         to: '/realtor/dashboard' },

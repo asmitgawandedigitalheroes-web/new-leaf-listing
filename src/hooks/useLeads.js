@@ -148,7 +148,8 @@ export function useLeads() {
           status: assignedRealtorId ? 'assigned' : 'new',
           budget_min: inquiryData.budget_min || null,
           budget_max: inquiryData.budget_max || null,
-          source: inquiryData.source || 'website'
+          source: inquiryData.source || 'website',
+          lead_type: inquiryData.lead_type || 'buyer',
         })
         .select('*, listing:listings(title, address, city, state), assigned_realtor:profiles!leads_assigned_realtor_id_fkey(full_name, email)')
         .single();
@@ -276,7 +277,7 @@ export function useLeads() {
     try {
       const lockUntil = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString();
 
-      const { data, error: updateError } = await supabase
+      const { data: rows, error: updateError } = await supabase
         .from('leads')
         .update({
           assigned_realtor_id: newRealtorId,
@@ -285,26 +286,29 @@ export function useLeads() {
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
-        .select('*, listing:listings(title, address, city, state), assigned_realtor:profiles!leads_assigned_realtor_id_fkey(full_name, email)')
-        .single();
+        .select('id, assigned_realtor_id, status');
 
       if (updateError) throw updateError;
 
+      // If RLS or trigger silently blocked the update, rows will be empty
+      if (!rows || rows.length === 0) {
+        throw new Error('Lead cannot be reassigned before expiry (protected for 180 days).');
+      }
+
+      // Fetch full lead data separately to avoid .single() 400 errors
+      const { data: freshLead } = await supabase
+        .from('leads')
+        .select('*, listing:listings(title, address, city, state), assigned_realtor:profiles!leads_assigned_realtor_id_fkey(full_name, email)')
+        .eq('id', id)
+        .single();
+
       audit(user.id, 'lead.reassigned', id, { new_realtor_id: newRealtorId, lock_until: lockUntil }).catch(() => {});
-      
-      // Email Notification — directorId not available in reassign context, pass null
+
       notificationService.notifyNewLead(id, newRealtorId, null).catch(console.error);
 
-      if (data) {
-        setLeads(prev => prev.map(l => l.id === id ? data : l));
-        return { data, error: null };
-      } else {
-        setLeads(prev => prev.map(l => l.id === id
-          ? { ...l, assigned_realtor_id: newRealtorId, status: 'assigned' }
-          : l
-        ));
-        return { data: { id, assigned_realtor_id: newRealtorId }, error: null };
-      }
+      const updated = freshLead || { id, assigned_realtor_id: newRealtorId, status: 'assigned' };
+      setLeads(prev => prev.map(l => l.id === id ? { ...l, ...updated } : l));
+      return { data: updated, error: null };
     } catch (err) {
       console.error('[useLeads] Reassign error:', err);
       return { data: null, error: err };
@@ -318,7 +322,7 @@ export function useLeads() {
    */
   const assignLeadToDirector = async (id, directorId) => {
     try {
-      const { data, error: updateError } = await supabase
+      const { data: rows, error: updateError } = await supabase
         .from('leads')
         .update({
           assigned_director_id: directorId,
@@ -327,26 +331,22 @@ export function useLeads() {
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
-        .select('*, listing:listings(title, address, city, state), assigned_director:profiles!leads_assigned_director_id_fkey(full_name, email)')
-        .single();
+        .select('id');
 
       if (updateError) throw updateError;
 
-      audit(user.id, 'lead.assigned_to_director', id, { director_id: directorId }).catch(() => {});
+      if (!rows || rows.length === 0) {
+        throw new Error('Assignment failed: permission denied or lead not found.');
+      }
 
-      // Notify director of new lead assignment
+      audit(user.id, 'lead.assigned_to_director', id, { director_id: directorId }).catch(() => {});
       notificationService.notifyDirectorLead(id, directorId).catch(console.error);
 
-      // Update state with full lead data including director info
-      if (data) {
-        setLeads(prev => prev.map(l => l.id === id ? data : l));
-      } else {
-        setLeads(prev => prev.map(l => l.id === id
-          ? { ...l, assigned_director_id: directorId, assigned_realtor_id: null, assigned_realtor: null, status: 'assigned' }
-          : l
-        ));
-      }
-      return { data, error: null };
+      setLeads(prev => prev.map(l => l.id === id
+        ? { ...l, assigned_director_id: directorId, assigned_realtor_id: null, assigned_realtor: null, status: 'assigned' }
+        : l
+      ));
+      return { data: { id, assigned_director_id: directorId }, error: null };
     } catch (err) {
       console.error('[useLeads] Assign to director error:', err);
       return { data: null, error: err };

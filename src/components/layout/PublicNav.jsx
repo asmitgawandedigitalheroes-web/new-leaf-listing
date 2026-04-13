@@ -10,6 +10,7 @@ const DG = '#1F4D3A';
 const LINKS = [
   { label: 'Home', to: '/' },
   { label: 'Browse', to: '/browse' },
+  { label: 'Map', to: '/map' },
   { label: 'Pricing', to: '/pricing' },
   { label: 'About', to: '/about' },
 ];

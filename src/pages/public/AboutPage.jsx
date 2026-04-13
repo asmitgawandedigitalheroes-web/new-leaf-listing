@@ -113,6 +113,43 @@ export default function AboutPage() {
         </div>
       </section>
 
+      {/* ── Our Story ── */}
+      <section className="py-20 px-6 md:px-8">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <span className="text-xs font-bold uppercase tracking-[0.12em] mb-3 block" style={{ color: G }}>Our Story</span>
+            <h2 className="font-headline font-black text-3xl md:text-4xl" style={{ color: TX }}>How NLVListings Began</h2>
+          </div>
+          <div className="max-w-3xl mx-auto">
+            <p className="text-sm leading-relaxed mb-4" style={{ color: TS }}>
+              NLVListings didn't start as just another real estate platform. It started from real demand.
+            </p>
+            <p className="text-sm leading-relaxed mb-4" style={{ color: TS }}>
+              Through New Leaf Vision Panelized homes sales, we were already generating a significant volume of inbound interest from buyers across North America — individuals looking not only to purchase homes, but to build, invest, and develop.
+            </p>
+            <p className="text-sm leading-relaxed mb-6" style={{ color: TS }}>
+              What we quickly realized was this: many of these buyers weren't just looking for a product — they were also looking for land, opportunities, and guidance on where to build. We saw a clear gap. NLVListings was built to bridge that gap.
+            </p>
+            <p className="text-sm font-semibold mb-4" style={{ color: TX }}>We created a platform where:</p>
+            <ul className="flex flex-col gap-3 mb-4">
+              {[
+                'Buyers from the New Leaf ecosystem can connect with Realtors',
+                'Realtors can access real demand — not just listings',
+                'Opportunities extend beyond transactions into full projects',
+              ].map(item => (
+                <li key={item} className="flex items-start gap-3">
+                  <span className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full" style={{ background: G }} />
+                  <span className="text-sm leading-relaxed" style={{ color: TS }}>{item}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-sm leading-relaxed mt-6 font-medium" style={{ color: TX }}>
+              This is not just about buying and selling homes. It's about connecting: land + buyers + construction + opportunity.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* ── Mission ── */}
       <section className="py-20 px-6 md:px-8">
         <div className="max-w-5xl mx-auto">
@@ -138,6 +175,79 @@ export default function AboutPage() {
                 className="w-full h-72 md:h-80 object-cover"
               />
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── More Than Listings ── */}
+      <section className="py-20 px-6 md:px-8" style={{ background: '#F9FAFB' }}>
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <span className="text-xs font-bold uppercase tracking-[0.12em] mb-3 block" style={{ color: G }}>More Than Listings</span>
+            <h2 className="font-headline font-black text-3xl md:text-4xl" style={{ color: TX }}>Traditional platforms focus on listings.<br />NLVListings focuses on outcomes.</h2>
+          </div>
+          <div className="max-w-3xl mx-auto mb-16">
+            <p className="text-sm leading-relaxed mb-4" style={{ color: TS }}>
+              By integrating directly with New Leaf Vision, Realtors on the platform have the ability to:
+            </p>
+            <ul className="flex flex-col gap-3 mb-8">
+              {[
+                'Work with buyers already interested in building',
+                'Offer New Leaf products directly to their clients',
+                'Earn additional commissions beyond standard real estate deals',
+                'Participate in a larger ecosystem of development and investment',
+              ].map(item => (
+                <li key={item} className="flex items-start gap-3">
+                  <span className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full" style={{ background: G }} />
+                  <span className="text-sm leading-relaxed" style={{ color: TS }}>{item}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-sm leading-relaxed font-medium" style={{ color: TS }}>
+              This creates a new layer of opportunity — one that doesn't exist on traditional platforms.
+            </p>
+          </div>
+
+          {/* Building a Real Estate Ecosystem */}
+          <div
+            className="rounded-2xl p-8 md:p-12"
+            style={{ background: DG }}
+          >
+            <div className="text-center mb-8">
+              <span className="text-xs font-bold uppercase tracking-[0.12em] mb-3 block" style={{ color: G }}>Building a Real Estate Ecosystem</span>
+              <h3 className="font-headline font-black text-2xl md:text-3xl text-white mb-4">
+                NLVListings is more than a platform.<br />It's a growing community.
+              </h3>
+              <p className="text-sm max-w-2xl mx-auto" style={{ color: 'rgba(255,255,255,0.65)' }}>
+                Realtors, developers, and buyers aligned around one goal: creating and closing better opportunities. As the platform expands, so does access:
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+              {[
+                'New developments',
+                'Pre-sale inventory',
+                'Territory-based opportunities',
+                'Integrated deal flow',
+              ].map(item => (
+                <div
+                  key={item}
+                  className="rounded-xl px-5 py-4 text-center text-sm font-semibold"
+                  style={{ background: 'rgba(255,255,255,0.07)', color: '#fff', border: '1px solid rgba(212,175,55,0.2)' }}
+                >
+                  {item}
+                </div>
+              ))}
+            </div>
+            <p className="text-center text-sm" style={{ color: 'rgba(255,255,255,0.65)' }}>
+              Early adopters aren't just joining a platform — they're positioning themselves inside an ecosystem.
+            </p>
+          </div>
+
+          {/* Closing line */}
+          <div className="text-center mt-12">
+            <p className="font-headline font-bold text-lg md:text-xl" style={{ color: TX }}>
+              This is where listings turn into projects — and transactions turn into long-term opportunities.
+            </p>
           </div>
         </div>
       </section>

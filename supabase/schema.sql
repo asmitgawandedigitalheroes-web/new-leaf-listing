@@ -168,6 +168,8 @@ CREATE TABLE IF NOT EXISTS leads (
   interest_type        text,
   notes                text,
   score                int DEFAULT 0 CHECK (score >= 0 AND score <= 100),
+  lead_type            text NOT NULL DEFAULT 'buyer'
+                         CHECK (lead_type IN ('buyer','realtor')),
   status               text NOT NULL DEFAULT 'new'
                          CHECK (status IN ('new','assigned','contacted','showing','offer','converted','lost')),
   attribution_expiry   timestamptz,
@@ -648,16 +650,16 @@ CREATE POLICY "leads_update_assigned_realtor"
   USING (assigned_realtor_id = auth.uid())
   WITH CHECK (assigned_realtor_id = auth.uid());
 
--- Directors can update leads in their territory
+-- Directors can update leads in their territory (or directly assigned to them)
 CREATE POLICY "leads_update_director_territory"
   ON leads FOR UPDATE
   USING (
     EXISTS (
-      SELECT 1 FROM profiles p
-      WHERE p.id = auth.uid()
-        AND p.role = 'director'
-        AND p.territory_id = leads.territory_id
+      SELECT 1 FROM territories t
+      WHERE t.director_id = auth.uid()
+        AND t.id = leads.territory_id
     )
+    OR leads.assigned_director_id = auth.uid()
   );
 
 -- Admins can update any lead
@@ -816,6 +818,35 @@ CREATE POLICY "messages_select_participants"
 CREATE POLICY "messages_select_admin"
   ON messages FOR SELECT
   USING (is_admin());
+
+-- Directors can read messages for leads in their territory OR assigned to their realtors
+CREATE POLICY "messages_select_director"
+  ON messages FOR SELECT
+  USING (
+    -- Lead belongs to a territory this director manages
+    EXISTS (
+      SELECT 1 FROM leads l
+      JOIN territories t ON t.id = l.territory_id
+      WHERE l.id = messages.lead_id
+        AND t.director_id = auth.uid()
+    )
+    OR
+    -- Lead was directly assigned to this director
+    EXISTS (
+      SELECT 1 FROM leads l
+      WHERE l.id = messages.lead_id
+        AND l.assigned_director_id = auth.uid()
+    )
+    OR
+    -- Lead is assigned to a realtor who belongs to this director's territory
+    EXISTS (
+      SELECT 1 FROM leads l
+      JOIN profiles p ON p.id = l.assigned_realtor_id
+      JOIN territories t ON t.id = p.territory_id
+      WHERE l.id = messages.lead_id
+        AND t.director_id = auth.uid()
+    )
+  );
 
 -- Authenticated users can send messages
 CREATE POLICY "messages_insert_sender"

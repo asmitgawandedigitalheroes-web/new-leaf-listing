@@ -43,6 +43,9 @@ export default function DirectorLeadsPage() {
   const [bulkAssignTo, setBulkAssignTo]   = useState('');
   const [bulkAssigning, setBulkAssigning] = useState(false);
 
+  // Lead type filter
+  const [leadTypeFilter, setLeadTypeFilter] = useState('all'); // 'all' | 'buyer' | 'realtor'
+
   // Director queue state
   const [directorQueue, setDirectorQueue] = useState([]);
   const [queueLoading, setQueueLoading] = useState(false);
@@ -96,21 +99,26 @@ export default function DirectorLeadsPage() {
     });
   }, [profile?.id]);
 
+  const filteredLeads = useMemo(() => {
+    if (leadTypeFilter === 'all') return leads;
+    return leads.filter(l => (l.lead_type || 'buyer') === leadTypeFilter);
+  }, [leads, leadTypeFilter]);
+
   const byStatus = useMemo(() => {
     const map = {};
     COLUMNS.forEach(c => { map[c] = []; });
-    leads.forEach(l => {
+    filteredLeads.forEach(l => {
       const col = toColumn(l.status);
       map[col].push(l);
     });
     return map;
-  }, [leads]);
+  }, [filteredLeads]);
 
   const stats = [
-    { label: 'Total Leads', value: leads.length },
-    { label: 'Assigned %', value: leads.length > 0 ? `${Math.round((leads.filter(l => l.assigned_realtor_id).length / leads.length) * 100)}%` : '0%' },
-    { label: 'Avg Score', value: leads.length > 0 ? Math.round(leads.reduce((a, l) => a + (l.score || 50), 0) / leads.length) : 0 },
-    { label: 'Conversion', value: leads.length > 0 ? `${Math.round((leads.filter(l => l.status === 'converted' || l.status === 'closed').length / leads.length) * 100)}%` : '0%' },
+    { label: 'Total Leads', value: filteredLeads.length },
+    { label: 'Assigned %', value: filteredLeads.length > 0 ? `${Math.round((filteredLeads.filter(l => l.assigned_realtor_id).length / filteredLeads.length) * 100)}%` : '0%' },
+    { label: 'Avg Score', value: filteredLeads.length > 0 ? Math.round(filteredLeads.reduce((a, l) => a + (l.score || 50), 0) / filteredLeads.length) : 0 },
+    { label: 'Conversion', value: filteredLeads.length > 0 ? `${Math.round((filteredLeads.filter(l => l.status === 'converted' || l.status === 'closed').length / filteredLeads.length) * 100)}%` : '0%' },
   ];
 
   const openAssign = (lead) => { setAssignTarget(lead); setAssignTo(''); setAssignOpen(true); };
@@ -181,6 +189,33 @@ export default function DirectorLeadsPage() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Lead Type Filter */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Funnel:</span>
+          {[
+            { key: 'all', label: 'All Leads' },
+            { key: 'buyer', label: 'Buyer Leads', color: '#1F4D3A' },
+            { key: 'realtor', label: 'Realtor Leads', color: '#7C3AED' },
+          ].map(opt => (
+            <button
+              key={opt.key}
+              onClick={() => setLeadTypeFilter(opt.key)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              style={{
+                background: leadTypeFilter === opt.key ? (opt.color || '#111827') : '#F3F4F6',
+                color: leadTypeFilter === opt.key ? '#fff' : '#6B7280',
+              }}
+            >
+              {opt.label}
+              {opt.key !== 'all' && (
+                <span className="ml-1.5 opacity-75">
+                  ({leads.filter(l => (l.lead_type || 'buyer') === opt.key).length})
+                </span>
+              )}
+            </button>
+          ))}
         </div>
 
         {/* Bulk Selection Bar */}
@@ -325,7 +360,19 @@ export default function DirectorLeadsPage() {
                           {lead.budget_max ? `$${lead.budget_max.toLocaleString()}` : '—'}
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500 capitalize">{lead.source || 'web'}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500 capitalize">{lead.source || 'web'}</span>
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded font-bold"
+                              style={
+                                (lead.lead_type || 'buyer') === 'realtor'
+                                  ? { background: '#EDE9FE', color: '#5B21B6' }
+                                  : { background: '#E8F3EE', color: '#1F4D3A' }
+                              }
+                            >
+                              {(lead.lead_type || 'buyer') === 'realtor' ? 'Realtor' : 'Buyer'}
+                            </span>
+                          </div>
                           <span className="text-[10px] text-gray-400">
                             {new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                           </span>

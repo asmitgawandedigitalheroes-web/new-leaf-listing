@@ -304,7 +304,7 @@ export default function ListingDetail() {
             )}
 
             <div className="flex gap-2 mt-auto">
-              {isAdminOrDirector && !isDirector && !isInactive && (
+              {isAdminOrDirector && !isDirector && !isInactive && listing?.status === 'active' && (
                 <Button variant="primary" className="flex-1"
                   isLoading={isActing['feature']}
                   onClick={() => handleAction('feature')}>
