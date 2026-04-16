@@ -18,6 +18,7 @@ import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { APP_URL } from '../../utils/appUrl';
 
 // Demo credentials — available in all builds for easy testing.
 // Set VITE_DEMO_ADMIN_EMAIL etc. in .env.local to override defaults.
@@ -101,7 +102,7 @@ export default function LoginPage() {
     }
     setResetLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(form.email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${APP_URL}/reset-password`,
     });
     setResetLoading(false);
     if (error) {

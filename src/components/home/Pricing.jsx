@@ -2,261 +2,211 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { HiStar, HiCheck, HiArrowRight } from 'react-icons/hi2';
 import Label from '../shared/Label';
+import { usePricing } from '../../hooks/usePricing';
 
-const S = 'var(--color-gold)';   // Accent Gold
-const S_HV = 'var(--color-gold-dark)';   // Gold Hover
-const S_DK = 'var(--color-primary-dark)';   // Deep Emerald Green
-const P_LT = 'var(--color-gold-light)';   // Light Gold tint
-const OS = 'var(--color-on-surface)';   // Midnight Black
-const OSV = 'var(--color-on-surface-variant)';   // Warm Gray
-const SURF = 'var(--color-surface-ivory)';
-const GM = 'var(--color-gold-muted)';   // Muted Gold
+const GOLD    = '#D4AF37';
+const GOLD_DK = '#B8962E';
+const DEEP    = '#1F4D3A';
+const OS      = '#111111';
+const OSV     = '#4B5563';
+const SURF    = 'var(--color-surface-ivory)';
+
+// Skeleton card shown while loading
+function PricingCardSkeleton() {
+  return (
+    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 16, padding: 24, minHeight: 320 }}>
+      <div style={{ height: 10, width: 80, background: '#F3F4F6', borderRadius: 6, marginBottom: 16 }} />
+      <div style={{ height: 40, width: 100, background: '#F3F4F6', borderRadius: 6, marginBottom: 12 }} />
+      <div style={{ height: 10, width: '100%', background: '#F3F4F6', borderRadius: 6, marginBottom: 8 }} />
+      <div style={{ height: 10, width: '70%', background: '#F3F4F6', borderRadius: 6, marginBottom: 24 }} />
+      {[1,2,3].map(i => (
+        <div key={i} style={{ height: 10, width: '90%', background: '#F3F4F6', borderRadius: 6, marginBottom: 10 }} />
+      ))}
+    </div>
+  );
+}
 
 export default function Pricing() {
-  const plans = [
-    { tier: 'Standard',          price: '$499',   period: '/mo', desc: 'Perfect entry point for individual realtors.',         features: ['10 Listings', 'Basic CRM', 'Email Support', 'Basic Analytics'],                                          hi: false, ent: false, cta: 'Select Plan'   },
-    { tier: 'Professional',       price: '$1,299', period: '/mo', desc: 'Scale your pipeline with advanced tools and reach.',  features: ['50 Listings', 'Advanced CRM', 'Priority Support', 'Deal Pipeline'],                                       hi: false, ent: false, cta: 'Select Plan'   },
-    { tier: 'The Elite Standard', price: '$2,499', period: '/mo', desc: 'Unlimited power for top-performing brokers.',         features: ['Unlimited Listings', 'AI Lead Scoring', 'Dedicated Concierge', 'First-Look Access', 'Territories'],    hi: true,  ent: false, cta: 'Subscribe Now' },
-    { tier: 'Enterprise',         price: 'Custom', period: '',    desc: 'Tailored solutions for large brokerages and teams.',  features: ['Custom Terms', 'White-label', 'SLA Guarantee', 'Onboarding Team'],                                         hi: false, ent: true,  cta: 'Inquire'       },
-  ];
+  const { plans, loading } = usePricing();
 
   return (
     <section style={{ background: SURF }} className="py-24 px-4 md:px-8 lg:px-14">
       <div className="max-w-7xl mx-auto">
+
+        {/* Header */}
         <div className="text-center mb-16">
-          <Label t="Pricing" />
-          <h2 className="font-headline font-black mb-3"
-            style={{ fontSize: 'clamp(1.9rem,3.5vw,2.8rem)', color: OS, letterSpacing: '-0.025em' }}>
-            Subscription Models
+          <Label t="Limited Time" />
+          <h2
+            className="font-headline font-black mb-3"
+            style={{ fontSize: 'clamp(1.9rem,3.5vw,2.8rem)', color: OS, letterSpacing: '-0.025em' }}
+          >
+            Introductory Pricing — Limited Early Access
           </h2>
-          <p className="text-sm max-w-md mx-auto" style={{ color: OSV, lineHeight: 1.75 }}>
-            Select the tier that matches your market dominance and growth goals.
+          <p className="text-sm max-w-lg mx-auto" style={{ color: OSV, lineHeight: 1.75 }}>
+            Secure early pricing before official market launch. All plans include unlimited listings.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-center">
-          {plans.map(plan => {
-            const baseStyle = {
-              borderRadius: 16,
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-              transition: 'transform 0.22s ease, box-shadow 0.22s ease',
-              ...(plan.hi ? {
-                background: '#fff',
-                border: `2px solid ${S}`,
-                boxShadow: `0 20px 56px rgba(212,175,55,0.22), 0 6px 20px rgba(0,0,0,0.07)`,
-                zIndex: 2,
-                transform: 'translateY(-12px)', // Standard focus for all screens
-              } : plan.ent ? {
-                background: `linear-gradient(155deg, var(--color-primary-dark) 0%, #09281F 50%, #051813 100%)`,
-                border: `1px solid ${GM}`,
-                boxShadow: '0 8px 32px rgba(9,40,31,0.45)',
-              } : {
-                background: '#fff',
-                border: '1px solid var(--color-surface-container)',
-                boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
-              }),
-            };
-
-            return (
-              <div
-                key={plan.tier}
-                style={baseStyle}
-                onMouseEnter={e => {
-                  if (!plan.hi) {
-                    e.currentTarget.style.transform = 'translateY(-5px)';
-                    e.currentTarget.style.boxShadow = plan.ent
-                      ? '0 16px 48px rgba(15,35,24,0.55)'
-                      : '0 10px 32px rgba(0,0,0,0.1)';
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!plan.hi) {
-                    e.currentTarget.style.transform = 'none';
-                    e.currentTarget.style.boxShadow = plan.ent
-                      ? '0 8px 32px rgba(15,35,24,0.45)'
-                      : '0 2px 12px rgba(0,0,0,0.05)';
-                  }
-                }}
-              >
-                {/* Most Popular banner */}
-                {plan.hi && (
-                  <div
-                    className="flex items-center justify-center gap-2 py-3"
-                    style={{ background: `linear-gradient(90deg, ${S_HV}, ${S}, ${P_LT}, ${S})`, backgroundSize: '200% 100%' }}
-                  >
-                    <HiStar size={12} color="#fff" />
-                    <span className="font-headline font-black uppercase text-white" style={{ fontSize: 10, letterSpacing: '0.22em' }}>
-                      Most Popular
-                    </span>
-                  </div>
-                )}
-
-                {/* Card header */}
-                <div
-                  className="px-7 pt-7 pb-6 relative"
-                  style={{
-                    background: plan.ent
-                      ? 'rgba(255,255,255,0.04)'
-                      : plan.hi
-                      ? 'var(--color-surface-ivory)'
-                      : 'var(--color-surface)',
-                    borderBottom: `1px solid ${plan.ent ? 'var(--color-gold-muted)' : plan.hi ? 'var(--color-gold-muted)' : 'var(--color-surface-container)'}`,
-                  }}
-                >
-                  {!plan.hi && (
-                    <div
-                      className="absolute top-0 left-0 right-0 h-[3px]"
-                      style={{
-                        background: plan.ent
-                          ? `linear-gradient(90deg, ${S}, ${P_LT})`
-                          : '#E5E7EB',
-                        borderRadius: '20px 20px 0 0',
-                      }}
-                    />
-                  )}
-
-                  <div className="flex items-center justify-between mb-5">
-                    <span
-                      className="inline-block font-headline font-bold uppercase"
-                      style={{
-                        fontSize: 10,
-                        letterSpacing: '0.2em',
-                        color: plan.ent ? S : S_DK,
-                        background: plan.ent ? GM : plan.hi ? GM : 'rgba(31,77,58,0.07)',
-                        padding: '4px 10px',
-                        borderRadius: 20,
-                      }}
-                    >
-                      {plan.tier}
-                    </span>
-                  </div>
-
-                  <div className="flex items-end gap-1.5 mb-1">
-                    <span
-                      className="font-headline font-black leading-none"
-                      style={{
-                        fontSize: plan.price === 'Custom' ? 38 : 44,
-                        color: plan.ent ? '#fff' : OS,
-                        letterSpacing: '-0.02em',
-                      }}
-                    >
-                      {plan.price}
-                    </span>
-                    {plan.period && (
-                      <span
-                        className="font-medium mb-1.5"
-                        style={{ fontSize: 14, color: plan.ent ? 'rgba(255,255,255,0.45)' : 'var(--color-on-surface-muted)' }}
-                      >
-                        {plan.period}
-                      </span>
-                    )}
-                  </div>
-                  <p style={{ fontSize: 11, color: plan.ent ? 'rgba(255,255,255,0.35)' : '#9CA3AF' }}>
-                    {plan.price === 'Custom' ? 'Contact us for pricing' : 'Billed monthly'}
-                  </p>
-                </div>
-
-                {/* Card body */}
-                <div className="px-7 py-6 flex flex-col flex-1">
-                  <p
-                    className="leading-relaxed mb-6"
-                    style={{ fontSize: 13, color: plan.ent ? 'rgba(255,255,255,0.55)' : OSV }}
-                  >
-                    {plan.desc}
-                  </p>
-
-                  <div
-                    className="mb-5"
-                    style={{ height: 1, background: plan.ent ? 'rgba(255,255,255,0.08)' : '#F3F4F6' }}
-                  />
-
-                  <ul className="flex flex-col gap-3.5 flex-1 mb-7">
-                    {plan.features.map(f => (
-                      <li key={f} className="flex items-center gap-3">
-                        <div
-                          className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-                          style={{
-                            background: plan.ent
-                              ? GM
-                              : plan.hi
-                              ? GM
-                              : 'rgba(31,77,58,0.08)',
-                          }}
-                        >
-                          <HiCheck size={11} color={plan.ent ? S : plan.hi ? S : S_DK} />
-                        </div>
-                        <span style={{ fontSize: 13, color: plan.ent ? 'rgba(255,255,255,0.72)' : OSV }}>
-                          {f}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Link
-                    to="/pricing"
-                    className="block text-center rounded-xl font-headline font-bold no-underline transition-all mt-auto"
-                    style={{
-                      padding: '13px 20px',
-                      fontSize: 13,
-                      letterSpacing: '0.04em',
-                      ...(plan.hi ? {
-                        background: 'var(--color-gold)',
-                        color: OS,
-                        boxShadow: '0 4px 18px rgba(212,175,55,0.4)',
-                      } : plan.ent ? {
-                        background: 'var(--color-gold)',
-                        color: OS,
-                        boxShadow: '0 4px 16px rgba(212,175,55,0.3)',
-                      } : {
-                        background: 'transparent',
-                        color: 'var(--color-gold)',
-                        border: '1.5px solid var(--color-gold)',
-                      }),
-                    }}
-                    onMouseEnter={e => {
-                      if (plan.hi) {
-                        e.currentTarget.style.background = 'var(--color-gold-light)';
-                        e.currentTarget.style.boxShadow = '0 6px 24px rgba(212,175,55,0.52)';
-                      } else if (plan.ent) {
-                        e.currentTarget.style.background = 'var(--color-gold-light)';
-                      } else {
-                        e.currentTarget.style.background = 'var(--color-primary-dark)';
-                      }
-                    }}
-                    onMouseLeave={e => {
-                      if (plan.hi) {
-                        e.currentTarget.style.background = 'var(--color-gold)';
-                        e.currentTarget.style.boxShadow = '0 4px 18px rgba(212,175,55,0.4)';
-                      } else if (plan.ent) {
-                        e.currentTarget.style.background = 'var(--color-gold)';
-                      } else {
-                        e.currentTarget.style.background = 'transparent';
-                      }
-                    }}
-                  >
-                    {plan.cta}
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
+        {/* Cards grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
+          {loading
+            ? [1,2,3,4].map(i => <PricingCardSkeleton key={i} />)
+            : plans.map(plan => <PricingCard key={plan.id} plan={plan} />)
+          }
         </div>
 
-        <div className="text-center mt-10">
+        {/* Footer */}
+        <div className="text-center mt-10 flex flex-col items-center gap-2">
+          <p className="text-xs" style={{ color: OSV }}>
+            All pricing shown is introductory and subject to change after initial rollout.{' '}
+            <span className="font-semibold" style={{ color: OS }}>Early adopters lock in pricing and positioning.</span>
+          </p>
           <Link
             to="/pricing"
-            className="inline-flex items-center gap-1.5 text-sm font-medium no-underline transition-colors"
+            className="inline-flex items-center gap-1.5 text-sm font-medium no-underline transition-colors mt-1"
             style={{ color: OSV }}
-            onMouseEnter={e => e.currentTarget.style.color = S_DK}
+            onMouseEnter={e => e.currentTarget.style.color = DEEP}
             onMouseLeave={e => e.currentTarget.style.color = OSV}
           >
             View full plan comparison
-            <HiArrowRight size={16} color="inherit" />
+            <HiArrowRight size={16} />
           </Link>
         </div>
       </div>
     </section>
+  );
+}
+
+function PricingCard({ plan }) {
+  const cardStyle = plan.dark ? {
+    background: `linear-gradient(155deg, ${DEEP} 0%, #09281F 50%, #051813 100%)`,
+    border: `1px solid rgba(212,175,55,0.3)`,
+    boxShadow: '0 8px 32px rgba(9,40,31,0.45)',
+    borderRadius: 16,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  } : plan.popular ? {
+    background: '#fff',
+    border: `2px solid ${GOLD}`,
+    boxShadow: `0 20px 56px rgba(212,175,55,0.22), 0 6px 20px rgba(0,0,0,0.07)`,
+    borderRadius: 16,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    transform: 'translateY(-10px)',
+  } : {
+    background: '#fff',
+    border: '1px solid #E5E7EB',
+    boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+    borderRadius: 16,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  };
+
+  const isCustom   = plan.monthlyPrice === 0;
+  const checkBg    = plan.dark ? 'rgba(212,175,55,0.18)' : plan.popular ? 'rgba(212,175,55,0.12)' : 'rgba(31,77,58,0.08)';
+  const checkColor = plan.dark ? GOLD : plan.popular ? GOLD_DK : DEEP;
+
+  return (
+    <div style={cardStyle}>
+      {plan.popular && (
+        <div
+          className="flex items-center justify-center gap-2 py-2.5"
+          style={{ background: `linear-gradient(90deg, ${GOLD_DK}, ${GOLD}, #F0D060, ${GOLD})` }}
+        >
+          <HiStar size={11} color="#fff" />
+          <span className="font-headline font-black uppercase text-white" style={{ fontSize: 9, letterSpacing: '0.22em' }}>
+            Most Popular
+          </span>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="px-6 pt-6 pb-5" style={{
+        borderBottom: `1px solid ${plan.dark ? 'rgba(212,175,55,0.15)' : plan.popular ? 'rgba(212,175,55,0.2)' : '#F3F4F6'}`,
+      }}>
+        <span
+          className="inline-block font-bold uppercase mb-4"
+          style={{
+            fontSize: 9, letterSpacing: '0.18em',
+            color:      plan.dark ? GOLD : plan.popular ? GOLD : DEEP,
+            background: plan.dark ? 'rgba(212,175,55,0.15)' : plan.popular ? 'rgba(212,175,55,0.12)' : 'rgba(31,77,58,0.08)',
+            padding: '3px 10px', borderRadius: 20,
+          }}
+        >
+          {plan.badge}
+        </span>
+
+        <div className="font-headline font-black uppercase mb-2"
+          style={{ fontSize: 11, letterSpacing: '0.18em', color: plan.dark ? 'rgba(255,255,255,0.45)' : OSV }}>
+          {plan.tier}
+        </div>
+
+        <div className="flex items-end gap-1 mb-1">
+          <span className="font-headline font-black leading-none"
+            style={{ fontSize: isCustom ? 32 : 42, color: plan.dark ? '#fff' : OS, letterSpacing: '-0.02em' }}>
+            {isCustom ? 'Custom' : `$${plan.monthlyPrice}`}
+          </span>
+          {!isCustom && (
+            <span className="mb-1.5 font-medium" style={{ fontSize: 13, color: plan.dark ? 'rgba(255,255,255,0.35)' : '#9CA3AF' }}>
+              / month
+            </span>
+          )}
+        </div>
+        <p className="text-[11px] italic" style={{ color: GOLD }}>{plan.priceNote}</p>
+      </div>
+
+      {/* Body */}
+      <div className="px-6 py-5 flex flex-col flex-1">
+        <p className="leading-relaxed mb-5" style={{ fontSize: 12, color: plan.dark ? 'rgba(255,255,255,0.55)' : OSV }}>
+          {plan.desc}
+        </p>
+        <div className="mb-4" style={{ height: 1, background: plan.dark ? 'rgba(255,255,255,0.08)' : '#F3F4F6' }} />
+
+        <ul className="flex flex-col gap-3 flex-1 mb-6">
+          {plan.features.map(f => (
+            <li key={f} className="flex items-start gap-2.5">
+              <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                style={{ background: checkBg }}>
+                <HiCheck size={9} color={checkColor} />
+              </div>
+              <span style={{ fontSize: 12, color: plan.dark ? 'rgba(255,255,255,0.72)' : OSV, lineHeight: 1.5 }}>{f}</span>
+            </li>
+          ))}
+        </ul>
+
+        <Link
+          to={plan.ctaHref}
+          className="block text-center rounded-xl font-headline font-bold no-underline transition-all"
+          style={{
+            padding: '12px 16px', fontSize: 12, letterSpacing: '0.05em',
+            ...(plan.popular || plan.dark
+              ? { background: GOLD, color: OS, boxShadow: '0 4px 18px rgba(212,175,55,0.38)' }
+              : { background: 'transparent', color: DEEP, border: `1.5px solid ${DEEP}` }),
+          }}
+          onMouseEnter={e => {
+            if (plan.popular || plan.dark) {
+              e.currentTarget.style.background = GOLD_DK;
+            } else {
+              e.currentTarget.style.background = DEEP;
+              e.currentTarget.style.color = '#fff';
+            }
+          }}
+          onMouseLeave={e => {
+            if (plan.popular || plan.dark) {
+              e.currentTarget.style.background = GOLD;
+              e.currentTarget.style.color = OS;
+            } else {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.color = DEEP;
+            }
+          }}
+        >
+          {plan.cta}
+        </Link>
+      </div>
+    </div>
   );
 }

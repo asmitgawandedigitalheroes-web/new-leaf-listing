@@ -8,8 +8,8 @@ import {
   HiMagnifyingGlass,
   HiInbox,
   HiShieldCheck,
-  HiUserCircle,
   HiEyeSlash,
+  HiArrowLeft,
 } from 'react-icons/hi2';
 
 const P      = '#D4AF37';
@@ -31,24 +31,22 @@ export default function DirectorConversationsPage() {
 
   const [leads, setLeads]               = useState([]);
   const [selectedLead, setSelectedLead] = useState(null);
+  // Mobile: show chat panel (true) or lead list (false)
+  const [showChat, setShowChat]         = useState(false);
   const [messages, setMessages]         = useState([]);
-  const [senderMap, setSenderMap]       = useState({}); // id → { full_name, role }
+  const [senderMap, setSenderMap]       = useState({});
   const [search, setSearch]             = useState('');
   const [loadingLeads, setLoadingLeads] = useState(true);
   const [loadingMsgs, setLoadingMsgs]   = useState(false);
   const bottomRef = useRef(null);
 
-  // Fetch all leads visible to this director:
-  // 1. Leads in their territory (by territory_id)
-  // 2. Leads directly assigned to them (assigned_director_id)
-  // 3. Leads assigned to ANY realtor who belongs to their territories
+  // Fetch all leads visible to this director
   useEffect(() => {
     if (!profile?.id) return;
 
     async function fetchTerritoryLeads() {
       setLoadingLeads(true);
 
-      // Step 1: Get director's territory IDs
       const { data: territories } = await supabase
         .from('territories')
         .select('id')
@@ -56,7 +54,6 @@ export default function DirectorConversationsPage() {
 
       const territoryIds = (territories || []).map(t => t.id);
 
-      // Step 2: Get all realtor IDs whose territory belongs to this director
       let realtorIds = [];
       if (territoryIds.length > 0) {
         const { data: realtors } = await supabase
@@ -67,7 +64,6 @@ export default function DirectorConversationsPage() {
         realtorIds = (realtors || []).map(r => r.id);
       }
 
-      // Step 3: Build query covering all three scopes
       let query = supabase
         .from('leads')
         .select(`
@@ -80,7 +76,6 @@ export default function DirectorConversationsPage() {
       const orParts = [`assigned_director_id.eq.${profile.id}`];
       if (territoryIds.length > 0) orParts.push(`territory_id.in.(${territoryIds.join(',')})`);
       if (realtorIds.length > 0)   orParts.push(`assigned_realtor_id.in.(${realtorIds.join(',')})`);
-
       query = query.or(orParts.join(','));
 
       const { data } = await query;
@@ -105,19 +100,16 @@ export default function DirectorConversationsPage() {
         const msgList = msgs || [];
         setMessages(msgList);
 
-        // Collect unique sender IDs and resolve names + roles
         const senderIds = [...new Set(msgList.map(m => m.sender_id).filter(Boolean))];
         if (senderIds.length > 0) {
           const { data: profiles } = await supabase
             .from('profiles')
             .select('id, full_name, role')
             .in('id', senderIds);
-
           const map = {};
           (profiles || []).forEach(p => { map[p.id] = p; });
           setSenderMap(map);
         }
-
         setLoadingMsgs(false);
       });
   }, [selectedLead]);
@@ -127,21 +119,25 @@ export default function DirectorConversationsPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const handleSelectLead = (lead) => {
+    setSelectedLead(lead);
+    setShowChat(true);
+  };
+
+  const handleBack = () => {
+    setShowChat(false);
+  };
+
   const filteredLeads = leads.filter(l =>
     (l.contact_name || '').toLowerCase().includes(search.toLowerCase()) ||
     (l.contact_email || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  const leadsWithMessages = filteredLeads; // all leads in territory are shown; messages load on select
-
   const getSenderLabel = (senderId) => {
     const p = senderMap[senderId];
     if (!p) return 'Unknown';
-    return p.role === 'realtor'
-      ? `${p.full_name} (Realtor)`
-      : p.role === 'director'
-      ? `${p.full_name} (Director)`
-      : p.full_name;
+    return p.role === 'realtor'  ? `${p.full_name} (Realtor)`  :
+           p.role === 'director' ? `${p.full_name} (Director)` : p.full_name;
   };
 
   const getSenderColor = (senderId) => {
@@ -152,27 +148,34 @@ export default function DirectorConversationsPage() {
 
   return (
     <AppLayout role="director" title="Conversation Monitor">
-      <div className="p-4 md:p-6 max-w-6xl mx-auto h-[calc(100vh-80px)]">
+      <div className="p-3 md:p-6 max-w-6xl mx-auto flex flex-col" style={{ height: 'calc(100vh - 80px)' }}>
 
         {/* Read-only warning banner */}
         <div
-          className="flex items-center gap-3 px-4 py-3 rounded-xl mb-4 text-sm font-medium"
+          className="flex items-start md:items-center gap-3 px-4 py-3 rounded-xl mb-3 text-sm font-medium flex-shrink-0"
           style={{ background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.25)', color: '#92400E' }}
         >
-          <HiShieldCheck size={18} style={{ color: P, flexShrink: 0 }} />
-          <span>
-            <strong>Director Oversight Mode</strong> — Read-only view of realtor–client conversations in your territory.
-            Realtors cannot see that you are monitoring.
+          <HiShieldCheck size={18} style={{ color: P, flexShrink: 0, marginTop: 1 }} />
+          <span className="flex-1 leading-snug">
+            <strong>Director Oversight Mode</strong>
+            <span className="hidden sm:inline"> — Read-only view of realtor–client conversations in your territory. Realtors cannot see that you are monitoring.</span>
           </span>
-          <HiEyeSlash size={16} style={{ marginLeft: 'auto', flexShrink: 0, color: P }} />
+          <HiEyeSlash size={16} style={{ flexShrink: 0, color: P }} />
         </div>
 
-        <div className="flex bg-white rounded-2xl overflow-hidden shadow-xl border border-gray-100" style={{ height: 'calc(100% - 60px)' }}>
+        {/* Main chat container */}
+        <div
+          className="flex bg-white rounded-2xl overflow-hidden shadow-xl border border-gray-100 flex-1 min-h-0"
+        >
 
-          {/* ── Left: Lead list ── */}
+          {/* ── LEFT: Lead list ─────────────────────────────────────────── */}
           <div
-            className="w-72 flex-shrink-0 flex flex-col"
-            style={{ borderRight: `1px solid ${BORDER}`, background: '#fff' }}
+            className={`
+              flex flex-col flex-shrink-0
+              w-full md:w-72
+              ${showChat ? 'hidden md:flex' : 'flex'}
+            `}
+            style={{ borderRight: `1px solid ${BORDER}` }}
           >
             <div className="p-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
               <h2 className="font-bold text-base mb-3" style={{ color: OS }}>Territory Leads</h2>
@@ -202,23 +205,23 @@ export default function DirectorConversationsPage() {
                     </div>
                   ))}
                 </div>
-              ) : leadsWithMessages.length === 0 ? (
+              ) : filteredLeads.length === 0 ? (
                 <div className="p-6 flex flex-col items-center gap-2 text-center">
                   <HiInbox size={32} color={LGRAY} />
                   <p className="text-sm font-medium" style={{ color: OSV }}>No leads found</p>
                   <p className="text-xs" style={{ color: LGRAY }}>Leads in your territory will appear here.</p>
                 </div>
-              ) : leadsWithMessages.map(lead => {
+              ) : filteredLeads.map(lead => {
                 const isSelected = selectedLead?.id === lead.id;
                 const lt = lead.lead_type || 'buyer';
                 return (
                   <button
                     key={lead.id}
-                    onClick={() => setSelectedLead(lead)}
+                    onClick={() => handleSelectLead(lead)}
                     className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors"
                     style={{
-                      background: isSelected ? `${S}08` : 'transparent',
-                      borderLeft: isSelected ? `3px solid ${S}` : '3px solid transparent',
+                      background:   isSelected ? `${S}08` : 'transparent',
+                      borderLeft:   isSelected ? `3px solid ${S}` : '3px solid transparent',
                       borderBottom: `1px solid ${BORDER}`,
                     }}
                   >
@@ -238,7 +241,7 @@ export default function DirectorConversationsPage() {
                           style={
                             lt === 'realtor'
                               ? { background: '#EDE9FE', color: '#5B21B6' }
-                              : { background: '#E8F3EE', color: '#1F4D3A' }
+                              : { background: '#E8F3EE', color: S }
                           }
                         >
                           {lt === 'realtor' ? 'Realtor' : 'Buyer'}
@@ -256,14 +259,16 @@ export default function DirectorConversationsPage() {
             </div>
           </div>
 
-          {/* ── Right: Conversation view (read-only) ── */}
-          <div className="flex-1 flex flex-col">
+          {/* ── RIGHT: Conversation view (read-only) ─────────────────────── */}
+          <div
+            className={`
+              flex-1 flex flex-col min-w-0
+              ${showChat ? 'flex' : 'hidden md:flex'}
+            `}
+          >
             {!selectedLead ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-8">
-                <div
-                  className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                  style={{ background: `${P}14` }}
-                >
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: `${P}14` }}>
                   <HiChatBubbleLeftRight size={28} color={P} />
                 </div>
                 <h3 className="text-lg font-bold" style={{ color: OS }}>Select a lead to monitor</h3>
@@ -273,39 +278,53 @@ export default function DirectorConversationsPage() {
               </div>
             ) : (
               <>
-                {/* Header */}
+                {/* Chat header */}
                 <div
-                  className="flex items-center justify-between px-6 py-4"
+                  className="flex items-center justify-between px-4 md:px-6 py-4"
                   style={{ borderBottom: `1px solid ${BORDER}`, background: '#fff' }}
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {/* Back button — mobile only */}
+                    <button
+                      onClick={handleBack}
+                      className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-gray-100 flex-shrink-0"
+                      aria-label="Back to list"
+                    >
+                      <HiArrowLeft size={18} color={OS} />
+                    </button>
+
                     <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm"
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm flex-shrink-0"
                       style={{ background: `linear-gradient(135deg, ${P}, ${S})` }}
                     >
                       {getInitials(selectedLead.contact_name)}
                     </div>
-                    <div>
-                      <p className="font-bold text-sm" style={{ color: OS }}>{selectedLead.contact_name}</p>
-                      <p className="text-xs" style={{ color: LGRAY }}>
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm truncate" style={{ color: OS }}>
+                        {selectedLead.contact_name}
+                      </p>
+                      <p className="text-xs truncate" style={{ color: LGRAY }}>
                         {selectedLead.contact_masked_email || selectedLead.contact_email}
                         {selectedLead.assigned_realtor?.full_name && (
-                          <span style={{ color: S }}> · Realtor: {selectedLead.assigned_realtor.full_name}</span>
+                          <span className="hidden sm:inline" style={{ color: S }}>
+                            {' '}· Realtor: {selectedLead.assigned_realtor.full_name}
+                          </span>
                         )}
                       </p>
                     </div>
                   </div>
+
                   <div
-                    className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg"
+                    className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0 ml-2"
                     style={{ background: 'rgba(212,175,55,0.1)', color: '#92400E' }}
                   >
                     <HiShieldCheck size={14} />
-                    Monitoring
+                    <span className="hidden sm:inline">Monitoring</span>
                   </div>
                 </div>
 
                 {/* Messages — read-only */}
-                <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
+                <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5 flex flex-col gap-4">
                   {loadingMsgs ? (
                     <div className="flex flex-col gap-3">
                       {[...Array(4)].map((_, i) => (
@@ -323,25 +342,25 @@ export default function DirectorConversationsPage() {
                     </div>
                   ) : messages.map(msg => {
                     const senderInfo = senderMap[msg.sender_id];
-                    const isRealtor = senderInfo?.role === 'realtor';
+                    const isRealtor  = senderInfo?.role === 'realtor';
                     return (
                       <div
                         key={msg.id}
                         className={`flex flex-col gap-1 ${isRealtor ? 'items-end' : 'items-start'}`}
                       >
-                        {/* Sender label */}
                         <span className="text-[10px] font-semibold px-1" style={{ color: getSenderColor(msg.sender_id) }}>
                           {getSenderLabel(msg.sender_id)}
                         </span>
                         <div
-                          className="max-w-sm px-4 py-2.5 text-sm"
+                          className="text-sm px-4 py-2.5"
                           style={{
-                            background: isRealtor ? S : '#F3F4F6',
-                            color: isRealtor ? '#fff' : OS,
+                            maxWidth: 'min(80%, 320px)',
+                            background:   isRealtor ? S : '#F3F4F6',
+                            color:        isRealtor ? '#fff' : OS,
                             borderRadius: isRealtor ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
                           }}
                         >
-                          <p>{msg.content}</p>
+                          <p style={{ wordBreak: 'break-word' }}>{msg.content}</p>
                           <p
                             className="text-[10px] mt-1"
                             style={{ color: isRealtor ? 'rgba(255,255,255,0.55)' : LGRAY }}
@@ -358,14 +377,14 @@ export default function DirectorConversationsPage() {
                   <div ref={bottomRef} />
                 </div>
 
-                {/* Read-only footer — no input */}
+                {/* Read-only footer */}
                 <div
-                  className="flex items-center gap-3 px-6 py-4"
+                  className="flex items-center gap-3 px-4 md:px-6 py-4"
                   style={{ borderTop: `1px solid ${BORDER}`, background: '#F9FAFB' }}
                 >
                   <HiEyeSlash size={16} color={LGRAY} />
                   <p className="text-xs" style={{ color: LGRAY }}>
-                    You are viewing this conversation in read-only mode. Realtors are not notified.
+                    Read-only mode. Realtors are not notified.
                   </p>
                 </div>
               </>

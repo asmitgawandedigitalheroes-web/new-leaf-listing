@@ -85,11 +85,12 @@ export default function AdminPricingPage() {
     }
   };
 
+  // Slug → display label (DB slugs are immutable; names come from the DB)
   const PLAN_ACCENTS = {
-    starter:  { bg: '#FFFBEB', border: '#FDE68A', badge: '#B8962E' },
-    pro:      { bg: '#E8F3EE', border: '#BBF7D0', badge: '#15803D' },
-    dominator:{ bg: '#EDE9FE', border: '#DDD6FE', badge: '#7C3AED' },
-    sponsor:  { bg: '#F0F9FF', border: '#BAE6FD', badge: '#0369A1' },
+    starter:  { bg: '#E8F3EE', border: '#BBF7D0', badge: '#1F4D3A', label: 'Intro'         },
+    pro:      { bg: '#FFFBEB', border: '#FDE68A', badge: '#B8962E', label: 'Pro Agent'     },
+    dominator:{ bg: 'rgba(212,175,55,0.08)', border: 'rgba(212,175,55,0.35)', badge: '#B8962E', label: 'Dominator'    },
+    sponsor:  { bg: '#1A202C', border: 'rgba(212,175,55,0.3)', badge: '#D4AF37', label: 'Market Owner' },
   };
 
   return (

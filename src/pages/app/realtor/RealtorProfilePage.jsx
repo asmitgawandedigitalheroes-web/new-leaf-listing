@@ -3,6 +3,7 @@ import AppLayout from '../../../components/layout/AppLayout';
 import { SectionCard } from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import Skeleton from '../../../components/ui/Skeleton';
+import { APP_URL } from '../../../utils/appUrl';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { supabase } from '../../../lib/supabase';
@@ -86,7 +87,7 @@ export default function RealtorProfilePage() {
   const referralCode = profile?.full_name
     ? profile.full_name.toUpperCase().replace(/\s+/g, '_').slice(0, 20)
     : (profile?.id?.slice(0, 8) || 'MY_REF');
-  const referralLink = `${window.location.origin}/join?ref=${referralCode}`;
+  const referralLink = `${APP_URL}/join?ref=${referralCode}`;
 
   const handlePasswordChange = async () => {
     const errors = {};

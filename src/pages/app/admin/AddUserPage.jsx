@@ -3,6 +3,7 @@ import AppLayout from '../../../components/layout/AppLayout';
 import Button from '../../../components/ui/Button';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../context/ToastContext';
+import { APP_URL } from '../../../utils/appUrl';
 import { useAuth } from '../../../context/AuthContext';
 // Note: Using local sendInviteEmailImpl function instead of external import
 import {
@@ -256,7 +257,7 @@ function DetailedInviteTab({ territories, currentUserId, onNewInvite }) {
       return;
     }
 
-    const url = `${window.location.origin}/accept-invite?token=${token}`;
+    const url = `${APP_URL}/accept-invite?token=${token}`;
     // Save email/name BEFORE resetting form so we can send email after
     setPendingEmail({ to: form.email.trim().toLowerCase(), name: form.full_name.trim(), role: form.role });
     setEmailSent(false);
@@ -500,7 +501,7 @@ function QuickLinkTab({ territories, currentUserId, onNewInvite }) {
       return;
     }
 
-    const url = `${window.location.origin}/signup?invite_token=${token}`;
+    const url = `${APP_URL}/signup?invite_token=${token}`;
     setSavedRole(form.role);
     setEmailSent(false);
     setGeneratedUrl(url);

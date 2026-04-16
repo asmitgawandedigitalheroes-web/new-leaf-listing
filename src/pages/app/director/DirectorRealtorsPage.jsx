@@ -3,6 +3,7 @@ import AppLayout from '../../../components/layout/AppLayout';
 import { SectionCard } from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import Badge from '../../../components/ui/Badge';
+import { APP_URL } from '../../../utils/appUrl';
 import Avatar from '../../../components/ui/Avatar';
 import Skeleton from '../../../components/ui/Skeleton';
 import Modal from '../../../components/ui/Modal';
@@ -121,7 +122,7 @@ export default function DirectorRealtorsPage() {
     });
     if (territoryIds.length > 0) params.set('territory_id', territoryIds[0]);
     else if (profile?.territory_id) params.set('territory_id', profile.territory_id);
-    setInviteLink(`${window.location.origin}/signup?${params.toString()}`);
+    setInviteLink(`${APP_URL}/signup?${params.toString()}`);
     setInviteGenerated(true);
     setEmailSent(false);
   };

@@ -3,6 +3,7 @@ import AppLayout from '../../../components/layout/AppLayout';
 import Button from '../../../components/ui/Button';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../context/ToastContext';
+import { APP_URL } from '../../../utils/appUrl';
 import {
   HiUserGroup,
   HiMap,
@@ -39,8 +40,7 @@ export default function InviteDirectorPage() {
       addToast({ type: 'error', title: 'Territory required', desc: 'Please select a territory for this director.' });
       return;
     }
-    const base = window.location.origin;
-    const url  = `${base}/signup?role=director&territory_id=${selectedTerritory}`;
+    const url  = `${APP_URL}/signup?role=director&territory_id=${selectedTerritory}`;
     setInviteUrl(url);
     setCopied(false);
   };

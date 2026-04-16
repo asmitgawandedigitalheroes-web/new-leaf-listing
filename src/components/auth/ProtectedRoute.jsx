@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { APP_URL } from '../../utils/appUrl';
 
 const GOLD  = '#D4AF37';
 const GREEN = '#1F4D3A';
@@ -39,7 +40,7 @@ function EmailVerificationRequired({ email }) {
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email,
-      options: { emailRedirectTo: `${window.location.origin}/login` },
+      options: { emailRedirectTo: `${APP_URL}/login` },
     });
     setSending(false);
     if (error) {

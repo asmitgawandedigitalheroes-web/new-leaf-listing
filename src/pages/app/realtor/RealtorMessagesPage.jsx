@@ -6,20 +6,20 @@ import { supabase } from '../../../lib/supabase';
 import {
   HiChatBubbleLeftRight,
   HiPaperAirplane,
-  HiUser,
   HiMagnifyingGlass,
   HiInbox,
   HiUserCircle,
+  HiArrowLeft,
 } from 'react-icons/hi2';
 import Badge from '../../../components/ui/Badge';
 import LeadDrawer from '../../../components/shared/LeadDrawer';
 import { useLeads } from '../../../hooks/useLeads';
 
-const P     = '#D4AF37';
-const S     = '#1F4D3A';
-const OS    = '#111111';
-const OSV   = '#4B5563';
-const LGRAY = '#6B7280';
+const P      = '#D4AF37';
+const S      = '#1F4D3A';
+const OS     = '#111111';
+const OSV    = '#4B5563';
+const LGRAY  = '#6B7280';
 const BORDER = '#E5E7EB';
 
 function getInitials(name = '') {
@@ -34,16 +34,16 @@ export default function RealtorMessagesPage() {
   const { addToast } = useToast();
 
   const [selectedLead, setSelectedLead] = useState(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [messages, setMessages]     = useState([]);
-  const [newMsg, setNewMsg]         = useState('');
-  const [sending, setSending]       = useState(false);
+  // Mobile: show chat panel (true) or lead list (false)
+  const [showChat, setShowChat]         = useState(false);
+  const [drawerOpen, setDrawerOpen]     = useState(false);
+  const [messages, setMessages]         = useState([]);
+  const [newMsg, setNewMsg]             = useState('');
+  const [sending, setSending]           = useState(false);
   const { leads, updateLeadStatus, addLeadNote, isLoading: loadingLeads } = useLeads();
-  const [loadingMsgs, setLoadingMsgs]  = useState(false);
-  const [search, setSearch]         = useState('');
+  const [loadingMsgs, setLoadingMsgs]   = useState(false);
+  const [search, setSearch]             = useState('');
   const bottomRef = useRef(null);
-
-  // useLeads handles fetching automatically
 
   // Fetch messages for selected lead
   useEffect(() => {
@@ -69,6 +69,15 @@ export default function RealtorMessagesPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const handleSelectLead = (lead) => {
+    setSelectedLead(lead);
+    setShowChat(true);   // switch to chat panel on mobile
+  };
+
+  const handleBack = () => {
+    setShowChat(false);  // back to list on mobile
+  };
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -110,193 +119,214 @@ export default function RealtorMessagesPage() {
 
   return (
     <AppLayout role="realtor" title="Messages">
-      <div className="p-4 md:p-6 max-w-6xl mx-auto h-[calc(100vh-80px)]">
-        <div className="flex bg-white rounded-2xl overflow-hidden h-full shadow-xl border border-gray-100">
-
-        {/* ── Left: Lead list ── */}
+      <div className="p-3 md:p-6 max-w-6xl mx-auto" style={{ height: 'calc(100vh - 80px)' }}>
         <div
-          className="w-72 flex-shrink-0 flex flex-col"
-          style={{ borderRight: `1px solid ${BORDER}`, background: '#fff' }}
+          className="flex bg-white rounded-2xl overflow-hidden shadow-xl border border-gray-100 h-full"
         >
-          {/* Search */}
-          <div className="p-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
-            <h2 className="font-bold text-base mb-3" style={{ color: OS }}>Messages</h2>
-            <div className="relative">
-              <HiMagnifyingGlass size={15} color={LGRAY} className="absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search leads…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 text-sm rounded-lg focus:outline-none"
-                style={{ border: `1px solid ${BORDER}`, background: '#F9FAFB', color: OS }}
-              />
-            </div>
-          </div>
 
-          {/* Lead list */}
-          <div className="flex-1 overflow-y-auto">
-            {loadingLeads ? (
-              <div className="p-4 text-center text-sm" style={{ color: LGRAY }}>Loading…</div>
-            ) : filteredLeads.length === 0 ? (
-              <div className="p-6 flex flex-col items-center gap-2 text-center">
-                <HiInbox size={32} color={LGRAY} />
-                <p className="text-sm font-medium" style={{ color: OSV }}>No leads yet</p>
-                <p className="text-xs" style={{ color: LGRAY }}>Leads from your listings will appear here.</p>
-              </div>
-            ) : filteredLeads.map(lead => {
-              const isSelected = selectedLead?.id === lead.id;
-              const sc = statusColor(lead.status);
-              return (
-                <button
-                  key={lead.id}
-                  onClick={() => setSelectedLead(lead)}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors"
-                  style={{
-                    background: isSelected ? `${S}08` : 'transparent',
-                    borderLeft: isSelected ? `3px solid ${S}` : '3px solid transparent',
-                    borderBottom: `1px solid ${BORDER}`,
-                  }}
-                >
-                  <div
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 text-white"
-                    style={{ background: `linear-gradient(135deg, ${P}, ${S})` }}
-                  >
-                    {getInitials(lead.contact_name)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-1 mb-0.5">
-                      <span className="text-sm font-semibold truncate" style={{ color: OS }}>{lead.contact_name || 'Unknown'}</span>
-                      <Badge status={lead.status} label={lead.status} />
-                    </div>
-                    <p className="text-xs truncate" style={{ color: LGRAY }}>{lead.contact_email}</p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* ── Right: Conversation ── */}
-        <div className="flex-1 flex flex-col">
-          {!selectedLead ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-8">
-              <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                style={{ background: `${P}14` }}
-              >
-                <HiChatBubbleLeftRight size={28} color={P} />
-              </div>
-              <h3 className="text-lg font-bold" style={{ color: OS }}>Select a lead to message</h3>
-              <p className="text-sm max-w-xs" style={{ color: OSV }}>
-                Choose a lead from the list on the left to view and send messages.
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Header */}
-              <div
-                className="flex items-center justify-between px-6 py-4"
-                style={{ borderBottom: `1px solid ${BORDER}`, background: '#fff' }}
-              >
-                <div className="flex items-center gap-4">
-                  <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm"
-                    style={{ background: `linear-gradient(135deg, ${P}, ${S})` }}
-                  >
-                    {getInitials(selectedLead.contact_name)}
-                  </div>
-                  <div>
-                    <p className="font-bold text-sm" style={{ color: OS }}>{selectedLead.contact_name}</p>
-                    <p className="text-xs" style={{ color: LGRAY }}>{selectedLead.contact_email}</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setDrawerOpen(true)}
-                  className="flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all hover:bg-gray-50 border border-gray-100 shadow-sm"
-                  style={{ color: S }}
-                >
-                  <HiUserCircle size={16} />
-                  View Profile
-                </button>
-              </div>
-
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-3">
-                {loadingMsgs ? (
-                  <div className="text-center text-sm" style={{ color: LGRAY }}>Loading messages…</div>
-                ) : messages.length === 0 ? (
-                  <div className="text-center text-sm mt-8" style={{ color: LGRAY }}>
-                    No messages yet. Start the conversation!
-                  </div>
-                ) : messages.map(msg => {
-                  const isMine = msg.sender_id === profile?.id;
-                  return (
-                    <div
-                      key={msg.id}
-                      className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className="max-w-xs px-4 py-2.5 rounded-2xl text-sm"
-                        style={{
-                          background: isMine ? S : '#F3F4F6',
-                          color: isMine ? '#fff' : OS,
-                          borderRadius: isMine ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                        }}
-                      >
-                        <p>{msg.content}</p>
-                        <p
-                          className="text-[10px] mt-1"
-                          style={{ color: isMine ? 'rgba(255,255,255,0.6)' : LGRAY }}
-                        >
-                          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-                <div ref={bottomRef} />
-              </div>
-
-              {/* Compose */}
-              <form
-                onSubmit={handleSend}
-                className="flex items-center gap-3 px-6 py-4"
-                style={{ borderTop: `1px solid ${BORDER}`, background: '#fff' }}
-              >
+          {/* ── LEFT: Lead list ─────────────────────────────────────────── */}
+          {/* On mobile: visible only when showChat is false */}
+          <div
+            className={`
+              flex flex-col flex-shrink-0
+              w-full md:w-72
+              ${showChat ? 'hidden md:flex' : 'flex'}
+            `}
+            style={{ borderRight: `1px solid ${BORDER}` }}
+          >
+            {/* Header + search */}
+            <div className="p-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
+              <h2 className="font-bold text-base mb-3" style={{ color: OS }}>Messages</h2>
+              <div className="relative">
+                <HiMagnifyingGlass size={15} color={LGRAY} className="absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Type a message…"
-                  value={newMsg}
-                  onChange={e => setNewMsg(e.target.value)}
-                  className="flex-1 px-4 py-2.5 text-sm rounded-xl focus:outline-none"
+                  placeholder="Search leads…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 text-sm rounded-lg focus:outline-none"
                   style={{ border: `1px solid ${BORDER}`, background: '#F9FAFB', color: OS }}
-                  onFocus={e => { e.currentTarget.style.borderColor = P; }}
-                  onBlur={e => { e.currentTarget.style.borderColor = BORDER; }}
                 />
-                <button
-                  type="submit"
-                  disabled={sending || !newMsg.trim()}
-                  className="w-10 h-10 rounded-xl flex items-center justify-center transition-all"
-                  style={{
-                    background: newMsg.trim() ? S : '#E5E7EB',
-                    color: '#fff',
-                    cursor: newMsg.trim() ? 'pointer' : 'default',
-                  }}
+              </div>
+            </div>
+
+            {/* Lead list */}
+            <div className="flex-1 overflow-y-auto">
+              {loadingLeads ? (
+                <div className="p-4 text-center text-sm" style={{ color: LGRAY }}>Loading…</div>
+              ) : filteredLeads.length === 0 ? (
+                <div className="p-6 flex flex-col items-center gap-2 text-center">
+                  <HiInbox size={32} color={LGRAY} />
+                  <p className="text-sm font-medium" style={{ color: OSV }}>No leads yet</p>
+                  <p className="text-xs" style={{ color: LGRAY }}>Leads from your listings will appear here.</p>
+                </div>
+              ) : filteredLeads.map(lead => {
+                const isSelected = selectedLead?.id === lead.id;
+                return (
+                  <button
+                    key={lead.id}
+                    onClick={() => handleSelectLead(lead)}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors"
+                    style={{
+                      background:  isSelected ? `${S}08` : 'transparent',
+                      borderLeft:  isSelected ? `3px solid ${S}` : '3px solid transparent',
+                      borderBottom: `1px solid ${BORDER}`,
+                    }}
+                  >
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 text-white"
+                      style={{ background: `linear-gradient(135deg, ${P}, ${S})` }}
+                    >
+                      {getInitials(lead.contact_name)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1 mb-0.5">
+                        <span className="text-sm font-semibold truncate" style={{ color: OS }}>
+                          {lead.contact_name || 'Unknown'}
+                        </span>
+                        <Badge status={lead.status} label={lead.status} />
+                      </div>
+                      <p className="text-xs truncate" style={{ color: LGRAY }}>{lead.contact_email}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── RIGHT: Conversation ─────────────────────────────────────── */}
+          {/* On mobile: visible only when showChat is true */}
+          <div
+            className={`
+              flex-1 flex flex-col min-w-0
+              ${showChat ? 'flex' : 'hidden md:flex'}
+            `}
+          >
+            {!selectedLead ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-8">
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: `${P}14` }}>
+                  <HiChatBubbleLeftRight size={28} color={P} />
+                </div>
+                <h3 className="text-lg font-bold" style={{ color: OS }}>Select a lead to message</h3>
+                <p className="text-sm max-w-xs" style={{ color: OSV }}>
+                  Choose a lead from the list to view and send messages.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Chat header */}
+                <div
+                  className="flex items-center justify-between px-4 md:px-6 py-4"
+                  style={{ borderBottom: `1px solid ${BORDER}`, background: '#fff' }}
                 >
-                  <HiPaperAirplane size={18} />
-                </button>
-              </form>
-            </>
-          )}
-        </div>
+                  <div className="flex items-center gap-3">
+                    {/* Back button — mobile only */}
+                    <button
+                      onClick={handleBack}
+                      className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-gray-100 flex-shrink-0"
+                      aria-label="Back to list"
+                    >
+                      <HiArrowLeft size={18} color={OS} />
+                    </button>
+
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm flex-shrink-0"
+                      style={{ background: `linear-gradient(135deg, ${P}, ${S})` }}
+                    >
+                      {getInitials(selectedLead.contact_name)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm truncate" style={{ color: OS }}>
+                        {selectedLead.contact_name}
+                      </p>
+                      <p className="text-xs truncate" style={{ color: LGRAY }}>
+                        {selectedLead.contact_email}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setDrawerOpen(true)}
+                    className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl transition-all hover:bg-gray-50 border border-gray-100 shadow-sm flex-shrink-0 ml-2"
+                    style={{ color: S }}
+                  >
+                    <HiUserCircle size={15} />
+                    <span className="hidden sm:inline">View Profile</span>
+                  </button>
+                </div>
+
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5 flex flex-col gap-3">
+                  {loadingMsgs ? (
+                    <div className="text-center text-sm" style={{ color: LGRAY }}>Loading messages…</div>
+                  ) : messages.length === 0 ? (
+                    <div className="text-center text-sm mt-8" style={{ color: LGRAY }}>
+                      No messages yet. Start the conversation!
+                    </div>
+                  ) : messages.map(msg => {
+                    const isMine = msg.sender_id === profile?.id;
+                    return (
+                      <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                        <div
+                          className="px-4 py-2.5 text-sm"
+                          style={{
+                            maxWidth: 'min(80%, 320px)',
+                            background: isMine ? S : '#F3F4F6',
+                            color:      isMine ? '#fff' : OS,
+                            borderRadius: isMine ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                          }}
+                        >
+                          <p style={{ wordBreak: 'break-word' }}>{msg.content}</p>
+                          <p className="text-[10px] mt-1" style={{ color: isMine ? 'rgba(255,255,255,0.6)' : LGRAY }}>
+                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div ref={bottomRef} />
+                </div>
+
+                {/* Compose */}
+                <form
+                  onSubmit={handleSend}
+                  className="flex items-center gap-2 md:gap-3 px-4 md:px-6 py-4"
+                  style={{ borderTop: `1px solid ${BORDER}`, background: '#fff' }}
+                >
+                  <input
+                    type="text"
+                    placeholder="Type a message…"
+                    value={newMsg}
+                    onChange={e => setNewMsg(e.target.value)}
+                    className="flex-1 px-4 py-2.5 text-sm rounded-xl focus:outline-none"
+                    style={{ border: `1px solid ${BORDER}`, background: '#F9FAFB', color: OS }}
+                    onFocus={e => { e.currentTarget.style.borderColor = P; }}
+                    onBlur={e => { e.currentTarget.style.borderColor = BORDER; }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={sending || !newMsg.trim()}
+                    className="w-10 h-10 rounded-xl flex items-center justify-center transition-all flex-shrink-0"
+                    style={{
+                      background: newMsg.trim() ? S : '#E5E7EB',
+                      color: '#fff',
+                      cursor: newMsg.trim() ? 'pointer' : 'default',
+                    }}
+                  >
+                    <HiPaperAirplane size={18} />
+                  </button>
+                </form>
+              </>
+            )}
+          </div>
+
         </div>
       </div>
 
-      <LeadDrawer 
-        lead={leads.find(l => l.id === selectedLead?.id)} 
-        open={drawerOpen} 
-        onClose={() => setDrawerOpen(false)} 
+      <LeadDrawer
+        lead={leads.find(l => l.id === selectedLead?.id)}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
         updateStatus={updateLeadStatus}
         addNote={addLeadNote}
       />

@@ -8,6 +8,8 @@ import Stats from '../../components/home/Stats';
 import FeaturedListings from '../../components/home/FeaturedListings';
 import Process from '../../components/home/Process';
 import Pricing from '../../components/home/Pricing';
+import Partners from '../../components/home/Partners';
+import ContactSection from '../../components/home/ContactSection';
 import ProfessionalSection from '../../components/home/ProfessionalSection';
 import CollectorSection from '../../components/home/CollectorSection';
 import NetworkCTA from '../../components/home/NetworkCTA';
@@ -42,21 +44,25 @@ export default function HomePage() {
         {/* Section 5: Process */}
         <Process />
 
-
-
-        {/* Section 7: For Professionals */}
+        {/* Section 6: For Professionals */}
         <ProfessionalSection />
 
-        {/* Section 8: For Collectors */}
+        {/* Section 7: For Collectors */}
         <CollectorSection />
 
-        {/* Section 6: Pricing */}
+        {/* Section 8: Pricing — updated introductory pricing */}
         <Pricing />
 
-        {/* Section 9: Social Proof & Trust */}
+        {/* Section 9: Partner Network */}
+        <Partners />
+
+        {/* Section 10: Social Proof & Trust */}
         <TrustBadges />
 
-        {/* Section 10: Final CTA */}
+        {/* Section 11: Contact */}
+        <ContactSection />
+
+        {/* Section 12: Final CTA */}
         <NetworkCTA />
       </main>
 
