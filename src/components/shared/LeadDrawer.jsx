@@ -43,13 +43,12 @@ function ContactGate({ lead, type }) {
 
   const handleRequest = async () => {
     setSent(true);
-    await supabase.from('audit_logs').insert({
-      user_id: user?.id,
-      action: 'lead.contact_requested',
-      entity_type: 'lead',
-      entity_id: lead.id,
-      timestamp: new Date().toISOString(),
-      metadata: { contact_type: type, lead_name: lead.contact_name },
+    await supabase.rpc('log_audit_event', {
+      p_user_id:     user?.id,
+      p_action:      'lead.contact_requested',
+      p_entity_type: 'lead',
+      p_entity_id:   lead.id,
+      p_metadata:    { contact_type: type, lead_name: lead.contact_name },
     });
     addToast({
       type: 'success',
@@ -227,9 +226,21 @@ export default function LeadDrawer({ lead, open, onClose, onAssign, updateStatus
           <div className="flex items-center gap-2 mt-2">
             <Badge status={displayLead.status} />
             {displayLead.crm_sync_status === 'synced' && (
-              <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-widest">
-                CRM SYNCED
-              </span>
+              displayLead.ghl_contact_id ? (
+                <a
+                  href={`https://app.gohighlevel.com/contacts/${displayLead.ghl_contact_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2 py-0.5 rounded-md text-[9px] font-black bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-widest hover:bg-blue-100 transition-colors"
+                  title="Open in GoHighLevel"
+                >
+                  GHL SYNCED ↗
+                </a>
+              ) : (
+                <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-widest">
+                  CRM SYNCED
+                </span>
+              )
             )}
           </div>
         </div>
@@ -414,13 +425,12 @@ export default function LeadDrawer({ lead, open, onClose, onAssign, updateStatus
                       return;
                     }
                     setIsSendingMessage(true);
-                    const { error } = await supabase.from('audit_logs').insert({
-                      user_id: user?.id,
-                      action: 'lead.message_sent',
-                      entity_type: 'lead',
-                      entity_id: lead.id,
-                      timestamp: new Date().toISOString(),
-                      metadata: { message: messageText.trim() },
+                    const { error } = await supabase.rpc('log_audit_event', {
+                      p_user_id:     user?.id,
+                      p_action:      'lead.message_sent',
+                      p_entity_type: 'lead',
+                      p_entity_id:   lead.id,
+                      p_metadata:    { message: messageText.trim() },
                     });
                     setIsSendingMessage(false);
                     if (!error) {

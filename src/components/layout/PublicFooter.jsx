@@ -1,12 +1,6 @@
 import { Link } from 'react-router-dom';
-import { 
-  HiMapPin, 
-  HiEnvelope, 
-  HiPhone, 
-  HiAtSymbol, 
-  HiCamera, 
-  HiBriefcase 
-} from 'react-icons/hi2';
+import { HiMapPin, HiEnvelope, HiPhone } from 'react-icons/hi2';
+import { FaXTwitter, FaInstagram, FaLinkedinIn } from 'react-icons/fa6';
 import NLVLogo from '../ui/NLVLogo';
 
 const G  = '#D4AF37';
@@ -42,9 +36,9 @@ const COLS = [
 ];
 
 const SOCIALS = [
-  { icon: HiAtSymbol, label: 'Twitter' },
-  { icon: HiCamera,    label: 'Instagram' },
-  { icon: HiBriefcase,            label: 'LinkedIn' },
+  { icon: FaXTwitter,    label: 'Twitter / X',  href: 'https://www.linkedin.com/showcase/nlv-listings/about/?viewAsMember=true' },
+  { icon: FaInstagram,   label: 'Instagram',    href: 'https://www.instagram.com/nlvlistingz?igsh=MXhnZm50NWJxeHh1YQ%3D%3D&utm_source=qr' },
+  { icon: FaLinkedinIn,  label: 'LinkedIn',     href: 'https://www.linkedin.com/showcase/nlv-listings/about/?viewAsMember=true' },
 ];
 
 // Removed legacy Ico function
@@ -69,16 +63,19 @@ export default function PublicFooter() {
             {/* Social icons */}
             <div className="flex items-center gap-2">
               {SOCIALS.map(s => (
-                <button
+                <a
                   key={s.label}
+                  href={s.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   title={s.label}
-                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all no-underline"
                   style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.55)' }}
                   onMouseEnter={e => { e.currentTarget.style.background = G; e.currentTarget.style.color = '#fff'; }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'rgba(255,255,255,0.55)'; }}
                 >
                   <s.icon size={16} />
-                </button>
+                </a>
               ))}
             </div>
           </div>
@@ -131,26 +128,34 @@ export default function PublicFooter() {
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
         <div className="max-w-7xl mx-auto px-6 md:px-8 py-8">
           <p className="text-xs font-bold uppercase tracking-[0.15em] mb-5 text-center" style={{ color: G }}>Our Partners</p>
-          <div className="flex flex-wrap items-center justify-center gap-6">
-            <a
-              href="https://newleafvision.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs font-semibold no-underline transition-colors"
-              style={{ color: 'rgba(255,255,255,0.55)' }}
-              onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-              onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.55)'}
-            >
-              New Leaf Vision
-            </a>
-            <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span>
-            <span className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.55)' }}>
-              Nuevo Vizion Ingenieria Y Arquitectura
-            </span>
-            <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span>
-            <span className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.55)' }}>
-              Bold Group Development
-            </span>
+          <div className="flex flex-wrap items-center justify-center gap-8">
+            {[
+              { src: '/partners/nuevo-vizion.svg', alt: 'Nuevo Vizion', href: 'https://www.nuevovizion.com' },
+              { src: '/partners/new-leaf.svg',     alt: 'New Leaf Vision', href: 'https://www.newleafvision.com' },
+              { src: '/partners/bold-group-dev.svg', alt: 'Bold Group Development', href: 'https://www.boldgroup.dev' },
+            ].map(p => (
+              <a
+                key={p.alt}
+                href={p.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="opacity-60 transition-opacity no-underline"
+                onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
+                title={p.alt}
+              >
+                <img
+                  src={p.src}
+                  alt={p.alt}
+                  style={{ height: 36, width: 'auto', maxWidth: 140, objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
+                  onError={e => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextSibling.style.display = 'inline';
+                  }}
+                />
+                <span className="text-xs font-semibold hidden" style={{ color: 'rgba(255,255,255,0.55)' }}>{p.alt}</span>
+              </a>
+            ))}
           </div>
         </div>
       </div>

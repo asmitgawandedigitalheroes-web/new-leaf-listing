@@ -6,6 +6,8 @@ import Skeleton from '../../../components/ui/Skeleton';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../context/ToastContext';
 import { useAuth } from '../../../context/AuthContext';
+import { notificationService } from '../../../../services/notification.service';
+import { createRealtorSubAccount } from '../../../../lib/ghl/createSubAccount';
 import MobileCard, { MobileCardRow, MobileCardActions } from '../../../components/shared/MobileCard';
 import {
   HiCheck,
@@ -63,6 +65,9 @@ export default function ApprovalsPage() {
   // rejection reason state: { [userId]: string }
   const [rejectReasons, setRejectReasons] = useState({});
   const [showRejectInput, setShowRejectInput] = useState(new Set());
+  // listing rejection reason state
+  const [listingRejectReasons, setListingRejectReasons] = useState({});
+  const [showListingRejectInput, setShowListingRejectInput] = useState(new Set());
 
   const fetchApprovals = useCallback(async () => {
     setIsLoading(true);
@@ -72,13 +77,17 @@ export default function ApprovalsPage() {
           .from('profiles')
           .select('id, full_name, email, role, created_at, assigned_director_id, territory:territories!profiles_territory_id_fkey(city, state)')
           .eq('status', 'pending')
+          .in('role', ['realtor', 'director'])
           .order('created_at', { ascending: false }),
         supabase
           .from('listings')
-          .select('id, title, address, city, state, status, created_at, realtor:profiles!listings_realtor_id_fkey(full_name, email)')
+          .select('id, title, address, city, state, status, created_at, realtor_id, realtor:profiles!listings_realtor_id_fkey(full_name, email)')
           .eq('status', 'pending')
           .order('created_at', { ascending: false }),
       ]);
+
+      if (realtorsRes.error) throw realtorsRes.error;
+      if (listingsRes.error) throw listingsRes.error;
 
       setPendingRealtors(realtorsRes.data || []);
       setPendingListings(listingsRes.data || []);
@@ -115,14 +124,46 @@ export default function ApprovalsPage() {
           : 'The realtor application has been rejected.',
       });
 
+      if (action === 'approve') {
+        notificationService.notifyRealtorApproved(userId).then(emailSent => {
+          if (!emailSent) {
+            addToast({
+              type: 'warning',
+              title: 'Approval email not sent',
+              desc: 'The realtor was approved but their confirmation email could not be delivered. Check your SMTP settings in the Supabase Dashboard.',
+            });
+          }
+        }).catch(err => {
+          console.error('[ApprovalsPage] Realtor approval notification failed:', err);
+        });
+
+        // Create GHL sub-account for the approved realtor (fire-and-forget)
+        const { data: realtorProfile } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, territories(name)')
+          .eq('id', userId)
+          .single();
+
+        if (realtorProfile) {
+          const territoryName = realtorProfile.territories?.name ?? 'General';
+          createRealtorSubAccount(
+            realtorProfile.id,
+            realtorProfile.full_name ?? 'Realtor',
+            realtorProfile.email,
+            territoryName
+          ).catch(err =>
+            console.warn('[ApprovalsPage] GHL sub-account creation failed (non-fatal):', err)
+          );
+        }
+      }
+
       // Audit log
-      await supabase.from('audit_logs').insert({
-        user_id: currentUser?.id,
-        action: action === 'approve' ? 'realtor.approved' : 'realtor.rejected',
-        entity_type: 'profile',
-        entity_id: userId,
-        timestamp: new Date().toISOString(),
-        metadata: { new_status: newStatus, ...(reason ? { reject_reason: reason } : {}) },
+      await supabase.rpc('log_audit_event', {
+        p_user_id:     currentUser?.id,
+        p_action:      action === 'approve' ? 'realtor.approved' : 'realtor.rejected',
+        p_entity_type: 'profile',
+        p_entity_id:   userId,
+        p_metadata:    { new_status: newStatus, ...(reason ? { reject_reason: reason } : {}) },
       });
     } catch (err) {
       addToast({ type: 'error', title: 'Action failed', desc: err.message });
@@ -139,19 +180,35 @@ export default function ApprovalsPage() {
     });
   };
 
+  const toggleListingRejectInput = (listingId) => {
+    setShowListingRejectInput(prev => {
+      const s = new Set(prev);
+      if (s.has(listingId)) { s.delete(listingId); } else { s.add(listingId); }
+      return s;
+    });
+  };
+
   // ── Approve / reject a listing ────────────────────────────────────────────────
   const handleListingAction = async (listingId, action) => {
     const newStatus = action === 'approve' ? 'active' : 'draft';
+    const reason    = listingRejectReasons[listingId] || 'Did not meet requirements.';
     setProcessing(prev => new Set(prev).add(listingId));
     try {
+      const updateFields = {
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+        ...(action === 'reject' ? { rejection_reason: reason } : { rejection_reason: null }),
+      };
+
       const { error } = await supabase
         .from('listings')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .update(updateFields)
         .eq('id', listingId);
 
       if (error) throw error;
 
       setPendingListings(prev => prev.filter(l => l.id !== listingId));
+      setShowListingRejectInput(prev => { const s = new Set(prev); s.delete(listingId); return s; });
       addToast({
         type: action === 'approve' ? 'success' : 'error',
         title: action === 'approve' ? 'Listing Approved' : 'Listing Rejected',
@@ -160,13 +217,12 @@ export default function ApprovalsPage() {
           : 'The listing has been returned to draft.',
       });
 
-      await supabase.from('audit_logs').insert({
-        user_id: currentUser?.id,
-        action: action === 'approve' ? 'listing.approved' : 'listing.rejected',
-        entity_type: 'listing',
-        entity_id: listingId,
-        timestamp: new Date().toISOString(),
-        metadata: { new_status: newStatus },
+      await supabase.rpc('log_audit_event', {
+        p_user_id:     currentUser?.id,
+        p_action:      action === 'approve' ? 'listing.approved' : 'listing.returned_to_draft',
+        p_entity_type: 'listing',
+        p_entity_id:   listingId,
+        p_metadata:    { new_status: newStatus, ...(action === 'reject' ? { rejection_reason: reason } : {}) },
       });
     } catch (err) {
       addToast({ type: 'error', title: 'Action failed', desc: err.message });
@@ -479,44 +535,79 @@ export default function ApprovalsPage() {
                   </thead>
                   <tbody>
                     {pendingListings.map(l => (
-                      <tr key={l.id} style={{ borderBottom: `1px solid ${BORDER}` }}>
-                        <td style={{ padding: '12px', fontWeight: 600, color: OS }}>{l.title || '—'}</td>
-                        <td style={{ padding: '12px', color: OSV }}>
-                          {[l.city, l.state].filter(Boolean).join(', ') || l.address || '—'}
-                        </td>
-                        <td style={{ padding: '12px', color: LGRAY }}>{l.realtor?.full_name || '—'}</td>
-                        <td style={{ padding: '12px', color: LGRAY, whiteSpace: 'nowrap' }}>{formatDate(l.created_at)}</td>
-                        <td style={{ padding: '12px' }}>
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button
-                              onClick={() => handleListingAction(l.id, 'approve')}
-                              disabled={processing.has(l.id)}
-                              style={{
-                                padding: '6px 14px', borderRadius: 8, border: 'none',
-                                background: '#DCFCE7', color: '#166534',
-                                fontSize: 12, fontWeight: 700, cursor: processing.has(l.id) ? 'not-allowed' : 'pointer',
-                                opacity: processing.has(l.id) ? 0.6 : 1,
-                                display: 'flex', alignItems: 'center', gap: 4,
-                              }}
-                            >
-                              <HiCheck size={14} /> Approve
-                            </button>
-                            <button
-                              onClick={() => handleListingAction(l.id, 'reject')}
-                              disabled={processing.has(l.id)}
-                              style={{
-                                padding: '6px 14px', borderRadius: 8, border: 'none',
-                                background: '#FEE2E2', color: '#991B1B',
-                                fontSize: 12, fontWeight: 700, cursor: processing.has(l.id) ? 'not-allowed' : 'pointer',
-                                opacity: processing.has(l.id) ? 0.6 : 1,
-                                display: 'flex', alignItems: 'center', gap: 4,
-                              }}
-                            >
-                              <HiXMark size={14} /> Reject
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                      <React.Fragment key={l.id}>
+                        <tr style={{ borderBottom: showListingRejectInput.has(l.id) ? 'none' : `1px solid ${BORDER}` }}>
+                          <td style={{ padding: '12px', fontWeight: 600, color: OS }}>{l.title || '—'}</td>
+                          <td style={{ padding: '12px', color: OSV }}>
+                            {[l.city, l.state].filter(Boolean).join(', ') || l.address || '—'}
+                          </td>
+                          <td style={{ padding: '12px', color: LGRAY }}>{l.realtor?.full_name || '—'}</td>
+                          <td style={{ padding: '12px', color: LGRAY, whiteSpace: 'nowrap' }}>{formatDate(l.created_at)}</td>
+                          <td style={{ padding: '12px' }}>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button
+                                onClick={() => handleListingAction(l.id, 'approve')}
+                                disabled={processing.has(l.id)}
+                                style={{
+                                  padding: '6px 14px', borderRadius: 8, border: 'none',
+                                  background: '#DCFCE7', color: '#166534',
+                                  fontSize: 12, fontWeight: 700, cursor: processing.has(l.id) ? 'not-allowed' : 'pointer',
+                                  opacity: processing.has(l.id) ? 0.6 : 1,
+                                  display: 'flex', alignItems: 'center', gap: 4,
+                                }}
+                              >
+                                <HiCheck size={14} /> Approve
+                              </button>
+                              <button
+                                onClick={() => toggleListingRejectInput(l.id)}
+                                disabled={processing.has(l.id)}
+                                style={{
+                                  padding: '6px 14px', borderRadius: 8, border: 'none',
+                                  background: showListingRejectInput.has(l.id) ? '#FCA5A5' : '#FEE2E2', color: '#991B1B',
+                                  fontSize: 12, fontWeight: 700, cursor: processing.has(l.id) ? 'not-allowed' : 'pointer',
+                                  opacity: processing.has(l.id) ? 0.6 : 1,
+                                  display: 'flex', alignItems: 'center', gap: 4,
+                                }}
+                              >
+                                <HiXMark size={14} /> Reject
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        {showListingRejectInput.has(l.id) && (
+                          <tr style={{ borderBottom: `1px solid ${BORDER}`, background: '#FFF5F5' }}>
+                            <td colSpan={5} style={{ padding: '10px 12px' }}>
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Reason for rejection (optional)…"
+                                  value={listingRejectReasons[l.id] || ''}
+                                  onChange={e => setListingRejectReasons(prev => ({ ...prev, [l.id]: e.target.value }))}
+                                  style={{ flex: 1, padding: '7px 12px', border: `1px solid #FCA5A5`, borderRadius: 8, fontSize: 13, color: OS, background: '#fff' }}
+                                />
+                                <button
+                                  onClick={() => handleListingAction(l.id, 'reject')}
+                                  disabled={processing.has(l.id)}
+                                  style={{
+                                    padding: '7px 16px', borderRadius: 8, border: 'none',
+                                    background: '#991B1B', color: '#fff',
+                                    fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                                    display: 'flex', alignItems: 'center', gap: 4,
+                                  }}
+                                >
+                                  <HiXMark size={14} /> Confirm Reject
+                                </button>
+                                <button
+                                  onClick={() => toggleListingRejectInput(l.id)}
+                                  style={{ padding: '7px 12px', borderRadius: 8, border: `1px solid ${BORDER}`, background: '#fff', fontSize: 12, cursor: 'pointer', color: LGRAY }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -549,11 +640,11 @@ export default function ApprovalsPage() {
                         <HiCheck size={14} /> Approve
                       </button>
                       <button
-                        onClick={() => handleListingAction(l.id, 'reject')}
+                        onClick={() => toggleListingRejectInput(l.id)}
                         disabled={processing.has(l.id)}
                         style={{
                           padding: '6px 14px', borderRadius: 8, border: 'none',
-                          background: '#FEE2E2', color: '#991B1B',
+                          background: showListingRejectInput.has(l.id) ? '#FCA5A5' : '#FEE2E2', color: '#991B1B',
                           fontSize: 12, fontWeight: 700, cursor: processing.has(l.id) ? 'not-allowed' : 'pointer',
                           opacity: processing.has(l.id) ? 0.6 : 1,
                           display: 'flex', alignItems: 'center', gap: 4,
@@ -562,6 +653,37 @@ export default function ApprovalsPage() {
                         <HiXMark size={14} /> Reject
                       </button>
                     </MobileCardActions>
+                    {showListingRejectInput.has(l.id) && (
+                      <div style={{ marginTop: 8, padding: '10px', background: '#FFF5F5', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <input
+                          type="text"
+                          placeholder="Reason for rejection (optional)…"
+                          value={listingRejectReasons[l.id] || ''}
+                          onChange={e => setListingRejectReasons(prev => ({ ...prev, [l.id]: e.target.value }))}
+                          style={{ width: '100%', padding: '7px 12px', border: `1px solid #FCA5A5`, borderRadius: 8, fontSize: 13, color: OS, background: '#fff', boxSizing: 'border-box' }}
+                        />
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            onClick={() => handleListingAction(l.id, 'reject')}
+                            disabled={processing.has(l.id)}
+                            style={{
+                              flex: 1, padding: '7px 12px', borderRadius: 8, border: 'none',
+                              background: '#991B1B', color: '#fff',
+                              fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                            }}
+                          >
+                            <HiXMark size={14} /> Confirm Reject
+                          </button>
+                          <button
+                            onClick={() => toggleListingRejectInput(l.id)}
+                            style={{ padding: '7px 12px', borderRadius: 8, border: `1px solid ${BORDER}`, background: '#fff', fontSize: 12, cursor: 'pointer', color: LGRAY }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </MobileCard>
                 ))}
               </div>

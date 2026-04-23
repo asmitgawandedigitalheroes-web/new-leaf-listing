@@ -56,6 +56,7 @@ const NAV = {
     { key: 'leads',           label: 'My Leads',           icon: HiChatBubbleLeftRight,  to: '/director/leads' },
     { key: 'conversations',   label: 'Conversations',      icon: HiShieldCheck,          to: '/director/conversations' },
     { key: 'realtors',        label: 'My Realtors',        icon: HiIdentification,       to: '/director/realtors' },
+    { key: 'approvals',       label: 'Approvals',          icon: HiCheckBadge,           to: '/director/approvals' },
     { key: 'commissions',     label: 'My Commissions',     icon: HiBanknotes,            to: '/director/commissions' },
     { key: 'billing',         label: 'Earnings & Payouts', icon: HiCreditCard,           to: '/director/billing' },
     { key: 'reports',         label: 'Reports',            icon: HiChartBar,             to: '/director/reports' },

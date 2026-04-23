@@ -3,13 +3,12 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
 async function audit(userId, action, entityId, meta = {}) {
-  await supabase.from('audit_logs').insert({
-    user_id: userId,
-    action,
-    entity_type: 'profile',
-    entity_id: entityId,
-    timestamp: new Date().toISOString(),
-    metadata: meta,
+  await supabase.rpc('log_audit_event', {
+    p_user_id:     userId,
+    p_action:      action,
+    p_entity_type: 'profile',
+    p_entity_id:   entityId,
+    p_metadata:    meta,
   });
 }
 

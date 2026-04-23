@@ -569,7 +569,7 @@ export default function SignupPage() {
               <p className="text-sm mb-6" style={{ color: OSV }}>
                 {isDirector
                   ? 'Set up your Regional Director account.'
-                  : 'Start your 14-day free trial. No credit card required.'}
+                  : 'Create your account to get started.'}
               </p>
 
               {/* Director invite banner */}
@@ -650,7 +650,7 @@ export default function SignupPage() {
           {step === 2 && (
             <div className="p-5 md:p-8">
               <h2 className="font-headline text-xl font-black mb-1" style={{ color: OS }}>Choose a plan</h2>
-              <p className="text-sm mb-6" style={{ color: OSV }}>You can change this anytime. 14-day free trial included.</p>
+              <p className="text-sm mb-6" style={{ color: OSV }}>You can change your plan anytime.</p>
 
               <div className="flex flex-col gap-3 mb-6">
                 {pricingPlans.map(plan => (
@@ -708,7 +708,7 @@ export default function SignupPage() {
             <div className="p-5 md:p-8">
               <h2 className="font-headline text-xl font-black mb-1" style={{ color: OS }}>Review & Confirm</h2>
               <p className="text-sm mb-6" style={{ color: OSV }}>
-                {isDirector ? 'Review your details and accept the Director Agreement.' : 'Your 14-day free trial starts today. Cancel anytime.'}
+                {isDirector ? 'Review your details and accept the Director Agreement.' : 'Review your details and confirm your subscription.'}
               </p>
 
               <div className="rounded-xl mb-6 overflow-hidden" style={{ border: `1px solid ${BORDER}` }}>
@@ -737,12 +737,12 @@ export default function SignupPage() {
                 ))}
               </div>
 
-              {/* Realtor: trial notice */}
+              {/* Realtor: plan notice */}
               {!isDirector && (
                 <div className="flex items-start gap-3 p-4 rounded-xl mb-6" style={{ background: SCL, border: `1px solid rgba(212,175,55,0.3)` }}>
                   <HiCheckBadge size={18} color={P} />
                   <p className="text-[12px] leading-relaxed" style={{ color: S }}>
-                    <strong>14-day free trial</strong> included — no charges until your trial ends. Cancel anytime from account settings.
+                    Your subscription begins immediately upon confirmation. Cancel anytime from account settings.
                   </p>
                 </div>
               )}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { HiMapPin, HiEnvelope, HiPhone, HiAtSymbol, HiBriefcase, HiCamera } from 'react-icons/hi2';
+import { HiMapPin, HiEnvelope, HiPhone } from 'react-icons/hi2';
+import { FaXTwitter, FaInstagram, FaLinkedinIn } from 'react-icons/fa6';
 import NLVLogo from '../ui/NLVLogo';
 
 const G  = 'var(--color-gold)';
@@ -28,17 +29,17 @@ const COLS = [
   {
     heading: 'Contact',
     items: [
-      { icon: HiMapPin, text: '3250 S Durango Dr, Suite 200\nLas Vegas, NV 89117' },
-      { icon: HiEnvelope,        text: 'hello@nlvlistings.com' },
-      { icon: HiPhone,       text: '+1 (702) 555-0192' },
+      { icon: HiMapPin, text: '8 The Green St\nDover, DE, 19901' },
+      { icon: HiEnvelope,        text: 'support@nlvlistings.com' },
+      { icon: HiPhone,       text: '1-866-886-3040' },
     ],
   },
 ];
 
 const SOCIALS = [
-  { icon: HiAtSymbol, label: 'Twitter' },
-  { icon: HiCamera,    label: 'Instagram' },
-  { icon: HiBriefcase,            label: 'LinkedIn' },
+  { icon: FaXTwitter,   label: 'Twitter / X', href: 'https://www.linkedin.com/showcase/nlv-listings/about/?viewAsMember=true' },
+  { icon: FaInstagram,  label: 'Instagram',   href: 'https://www.instagram.com/nlvlistingz?igsh=MXhnZm50NWJxeHh1YQ%3D%3D&utm_source=qr' },
+  { icon: FaLinkedinIn, label: 'LinkedIn',    href: 'https://www.linkedin.com/showcase/nlv-listings/about/?viewAsMember=true' },
 ];
 
 export default function Footer() {
@@ -63,16 +64,19 @@ export default function Footer() {
               {SOCIALS.map(s => {
                 const IconComp = s.icon;
                 return (
-                  <button
+                  <a
                     key={s.label}
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     title={s.label}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center transition-all"
+                    className="w-9 h-9 rounded-xl flex items-center justify-center transition-all no-underline"
                     style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.55)' }}
                     onMouseEnter={e => { e.currentTarget.style.background = G; e.currentTarget.style.color = '#fff'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'rgba(255,255,255,0.55)'; }}
                   >
                     <IconComp size={16} />
-                  </button>
+                  </a>
                 );
               })}
             </div>
@@ -125,17 +129,51 @@ export default function Footer() {
         </div>
       </div>
 
+      {/* Partners */}
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="max-w-7xl mx-auto px-6 md:px-8 py-8">
+          <p className="text-xs font-bold uppercase tracking-[0.15em] mb-5 text-center" style={{ color: G }}>Our Partners</p>
+          <div className="flex flex-wrap items-center justify-center gap-8">
+            {[
+              { src: '/partners/nuevo-vizion.svg', alt: 'Nuevo Vizion', href: 'https://www.nuevovizion.com' },
+              { src: '/partners/new-leaf.svg',     alt: 'New Leaf Vision', href: 'https://www.newleafvision.com' },
+              { src: '/partners/bold-group-dev.svg', alt: 'Bold Group Development', href: 'https://www.boldgroup.dev' },
+            ].map(p => (
+              <a
+                key={p.alt}
+                href={p.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="opacity-60 transition-opacity no-underline"
+                onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
+                title={p.alt}
+              >
+                <img
+                  src={p.src}
+                  alt={p.alt}
+                  style={{ height: 36, width: 'auto', maxWidth: 140, objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
+                  onError={e => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextSibling.style.display = 'inline';
+                  }}
+                />
+                <span className="text-xs font-semibold hidden" style={{ color: 'rgba(255,255,255,0.55)' }}>{p.alt}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Bottom bar */}
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
         <div className="max-w-7xl mx-auto px-6 md:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
-            © {new Date().getFullYear()} NLV Listings, Inc. All rights reserved.
+            © 2026 NLVListings a product of New Leaf Vision Inc. All rights reserved.
           </p>
-          <div className="flex items-center gap-1">
-            <span className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>Crafted with</span>
-            <span style={{ color: G, fontSize: 12 }}>♦</span>
-            <span className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>for elite brokerages</span>
-          </div>
+          <p className="text-xs" style={{ color: 'rgba(255,255,255,0.2)' }}>
+            IP owned by Bold Family Holdco FZCO
+          </p>
         </div>
       </div>
 

@@ -16,8 +16,9 @@ export interface InAppNotification {
 
 /**
  * Send an email via the send-email Edge Function.
+ * Returns true if the email was accepted by the mail server, false otherwise.
  */
-const sendEmail = async (to: string, subject: string, html: string): Promise<void> => {
+const sendEmail = async (to: string, subject: string, html: string): Promise<boolean> => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     const supabaseUrl = (supabase as any).supabaseUrl as string;
@@ -34,11 +35,14 @@ const sendEmail = async (to: string, subject: string, html: string): Promise<voi
     if (!res.ok) {
       const text = await res.text();
       console.error('[NotificationService] sendEmail failed:', text);
-    } else {
-      console.log(`[NotificationService] Email sent successfully to ${to}`);
+      return false;
     }
+
+    console.log(`[NotificationService] Email sent successfully to ${to}`);
+    return true;
   } catch (err: any) {
     console.error('[NotificationService] sendEmail failed:', err.message);
+    return false;
   }
 };
 
@@ -304,6 +308,102 @@ export const notificationService = {
       console.error('[NotificationService] createInAppNotification failed:', err.message);
       return { data: null, error: err };
     }
+  },
+
+  /**
+   * Notify all admin users that a new realtor has signed up and needs approval.
+   */
+  notifyAdminsNewSignup: async (profile: {
+    id: string;
+    full_name?: string;
+    email?: string;
+    company?: string;
+    city?: string;
+    state?: string;
+  }): Promise<void> => {
+    const { data: admins } = await supabase
+      .from('profiles')
+      .select('id, email, full_name')
+      .eq('role', 'admin')
+      .eq('status', 'active');
+
+    if (!admins || admins.length === 0) return;
+
+    const location = [profile.city, profile.state].filter(Boolean).join(', ') || '—';
+
+    for (const admin of admins) {
+      if (admin.email) {
+        await sendEmail(
+          admin.email,
+          'New Realtor Account Pending Approval',
+          `<p>Hi ${admin.full_name ?? 'Admin'},</p>
+           <p>A new realtor has signed up and is waiting for your approval.</p>
+           <p><strong>Name:</strong> ${profile.full_name ?? '—'}</p>
+           <p><strong>Email:</strong> ${profile.email ?? '—'}</p>
+           <p><strong>Company:</strong> ${profile.company ?? '—'}</p>
+           <p><strong>Location:</strong> ${location}</p>
+           <p>Please log in to the admin panel and go to <strong>Approvals</strong> to review their application.</p>`
+        );
+      }
+
+      await notificationService.createInAppNotification(
+        admin.id,
+        'New Realtor Pending Approval',
+        `${profile.full_name ?? 'A new realtor'} (${profile.email ?? ''}) has signed up and is awaiting approval.`,
+        'system',
+        profile.id
+      );
+    }
+  },
+
+  /**
+   * Notify a realtor that their account has been approved by an admin.
+   * Returns true if the approval email was sent successfully.
+   */
+  notifyRealtorApproved: async (realtorId: string): Promise<boolean> => {
+    const { data: realtor } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', realtorId)
+      .single();
+
+    let emailSent = false;
+
+    if (realtor?.email) {
+      const appUrl = import.meta.env.VITE_APP_URL ?? 'https://nlvlistings.com';
+      const loginUrl = `${appUrl}/login`;
+      emailSent = await sendEmail(
+        realtor.email,
+        'Your NLVListings Account Has Been Approved',
+        `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;color:#111111;">
+           <img src="${appUrl}/logo.png" alt="NLV Listings" style="height:48px;margin-bottom:24px;" />
+           <h2 style="color:#1F4D3A;margin-bottom:8px;">Your Account Has Been Approved!</h2>
+           <p style="font-size:15px;line-height:1.6;">Hi ${realtor.full_name ?? 'there'},</p>
+           <p style="font-size:15px;line-height:1.6;">Great news! Your NLVListings account has been approved. You can now log in and start using the platform.</p>
+           <div style="text-align:center;margin:32px 0;">
+             <a href="${loginUrl}"
+                style="display:inline-block;background-color:#1F4D3A;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 36px;border-radius:8px;">
+               Log In to Your Dashboard
+             </a>
+           </div>
+           <p style="font-size:13px;color:#6B7280;">If the button above doesn't work, copy and paste this link into your browser:<br/>
+             <a href="${loginUrl}" style="color:#1F4D3A;">${loginUrl}</a>
+           </p>
+           <hr style="border:none;border-top:1px solid #E5E7EB;margin:24px 0;" />
+           <p style="font-size:12px;color:#9CA3AF;text-align:center;">New Leaf Vision Inc. &mdash; NLVListings Platform</p>
+         </div>`
+      );
+    }
+
+    await notificationService.createInAppNotification(
+      realtorId,
+      'Account Approved',
+      'Your account has been approved. Welcome to NLVListings!',
+      'system',
+      null
+    );
+
+    return emailSent;
   },
 
   /**

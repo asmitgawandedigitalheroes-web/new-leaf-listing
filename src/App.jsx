@@ -63,6 +63,7 @@ import DirectorReportsPage       from './pages/app/director/DirectorReportsPage'
 import DirectorContractsPage     from './pages/app/director/DirectorContractsPage';
 import DirectorBillingPage       from './pages/app/director/DirectorBillingPage';
 import DirectorConversationsPage from './pages/app/director/DirectorConversationsPage';
+import DirectorApprovalsPage    from './pages/app/director/DirectorApprovalsPage';
 
 // ── Realtor pages ─────────────────────────────────────────────────
 import RealtorListingsPage    from './pages/app/realtor/RealtorListingsPage';
@@ -236,6 +237,11 @@ export default function App() {
             <Route path="/director/realtors" element={
               <ProtectedRoute allowedRoles={['director']}>
                 <DirectorRealtorsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/director/approvals" element={
+              <ProtectedRoute allowedRoles={['director']}>
+                <DirectorApprovalsPage />
               </ProtectedRoute>
             } />
             <Route path="/director/commissions" element={

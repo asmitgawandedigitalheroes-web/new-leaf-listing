@@ -1,13 +1,6 @@
 import { useState } from 'react';
-import { 
-  HiMapPin, 
-  HiEnvelope, 
-  HiPhone, 
-  HiAtSymbol, 
-  HiBriefcase, 
-  HiCheckCircle,
-  HiCamera
-} from 'react-icons/hi2';
+import { HiMapPin, HiEnvelope, HiPhone, HiCheckCircle } from 'react-icons/hi2';
+import { FaXTwitter, FaInstagram, FaLinkedinIn } from 'react-icons/fa6';
 import PublicNav from '../../components/layout/PublicNav';
 import PublicFooter from '../../components/layout/PublicFooter';
 import { useEnquiries } from '../../hooks/useEnquiries';
@@ -27,7 +20,7 @@ const CONTACT_INFO = [
   {
     icon: HiMapPin,
     title: 'Headquarters',
-    lines: ['3250 S Durango Dr, Suite 200', 'Las Vegas, NV 89117'],
+    lines: ['8 The Green St', 'Dover, DE, 19901'],
   },
   {
     icon: HiEnvelope,
@@ -37,7 +30,7 @@ const CONTACT_INFO = [
   {
     icon: HiPhone,
     title: 'Call Us',
-    lines: ['+1 (702) 555-0192', 'Mon–Fri, 9am – 6pm PST'],
+    lines: ['1-866-886-3040', 'Mon–Fri, 9am – 6pm PST'],
   },
 ];
 
@@ -185,20 +178,23 @@ export default function ContactPage() {
               <div className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: 'rgba(255,255,255,0.5)' }}>Follow NLV</div>
               <div className="flex gap-3">
                 {[
-                  { icon: HiAtSymbol, label: 'Twitter / X' },
-                  { icon: HiCamera, label: 'Instagram' },
-                  { icon: HiBriefcase, label: 'LinkedIn' },
+                  { icon: FaXTwitter,   label: 'Twitter / X', href: 'https://www.linkedin.com/showcase/nlv-listings/about/?viewAsMember=true' },
+                  { icon: FaInstagram,  label: 'Instagram',   href: 'https://www.instagram.com/nlvlistingz?igsh=MXhnZm50NWJxeHh1YQ%3D%3D&utm_source=qr' },
+                  { icon: FaLinkedinIn, label: 'LinkedIn',    href: 'https://www.linkedin.com/showcase/nlv-listings/about/?viewAsMember=true' },
                 ].map(s => (
-                  <button
+                  <a
                     key={s.label}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center transition-all"
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center transition-all no-underline"
                     style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)' }}
                     onMouseEnter={e => { e.currentTarget.style.background = G; e.currentTarget.style.color = '#fff'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'rgba(255,255,255,0.7)'; }}
                     title={s.label}
                   >
                     <s.icon size={18} color="currentColor" />
-                  </button>
+                  </a>
                 ))}
               </div>
             </div>
@@ -331,9 +327,9 @@ export default function ContactPage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {[
               { q: 'How do I apply for membership?', a: 'Click "Apply for Membership" and complete the 3-step onboarding. Approval takes 1–2 business days.' },
-              { q: 'Is NLV Listings free to try?', a: 'Yes — all plans include a 14-day free trial. No credit card required to start.' },
+              { q: 'What is the difference between a Realtor and a Regional Director?', a: 'Realtors use the platform to access listings, generate leads, and earn commissions on deals. Regional Directors work directly with New Leaf Vision, overseeing specific territories, managing operations, and driving growth within their region using advanced tools and dashboards.' },
               { q: 'Can I list off-market properties?', a: 'Absolutely. NLV supports confidential and off-market listings with full privacy controls.' },
-              { q: 'What markets do you cover?', a: 'We currently operate in 18 major US markets with international expansion planned for 2026.' },
+              { q: 'What markets do you cover?', a: 'We operate across multiple key markets throughout the United States, Canada, and Mexico.' },
               { q: 'How is lead routing handled?', a: 'Our smart routing engine assigns inbound leads to the best-matched realtor based on territory, plan tier, and availability.' },
               { q: 'How do I cancel my subscription?', a: 'You can cancel at any time from your Billing page. Your access continues until the end of the billing period.' },
               { q: 'Do you offer refunds?', a: 'We offer a 7-day money-back guarantee on all new subscriptions. Contact support to request a refund.' },

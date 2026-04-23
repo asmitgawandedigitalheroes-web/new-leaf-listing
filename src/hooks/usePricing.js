@@ -13,6 +13,7 @@ const PLAN_META = {
     ctaHref:   '/signup',
     popular:   false,
     dark:      false,
+    features:  ['Unlimited Listings', 'Basic CRM', 'Lead Capture', 'Platform Access'],
   },
   pro: {
     badge:     'Early Access',
@@ -23,6 +24,7 @@ const PLAN_META = {
     ctaHref:   '/signup',
     popular:   false,
     dark:      false,
+    features:  ['Unlimited Listings', 'Advanced CRM & Automation', 'Enhanced Analytics', 'Access to New Leaf Buyer Network', 'Earn Commissions on New Leaf Products'],
   },
   dominator: {
     badge:     'Early Access Pricing',
@@ -33,6 +35,7 @@ const PLAN_META = {
     ctaHref:   '/signup',
     popular:   true,
     dark:      false,
+    features:  ['Unlimited Listings', 'Full CRM & Automation Suite', 'Priority Lead Routing', 'Access to Developer Pre-Sales (Mexico & International)', 'First-Look Access to New Inventory', 'Higher Commission Opportunities'],
   },
   sponsor: {
     badge:     'Limited Territories',
@@ -43,6 +46,7 @@ const PLAN_META = {
     ctaHref:   '/contact',
     popular:   false,
     dark:      true,
+    features:  ['Everything in Dominator', 'Exclusive Territory Rights', 'Protected Lead Flow', 'Priority Market Positioning', 'Direct Developer Access', 'White-Glove Support'],
   },
 };
 
@@ -98,7 +102,7 @@ export function usePricing({ adminView = false } = {}) {
           slug:         p.slug,
           monthlyPrice: p.monthly_price,
           annualPrice:  p.annual_price,
-          features:     Array.isArray(p.features) ? p.features : [],
+          features:     (Array.isArray(p.features) && p.features.length > 0) ? p.features : (meta.features ?? []),
           isActive:     p.is_active,
           sortOrder:    p.sort_order,
           // UI metadata

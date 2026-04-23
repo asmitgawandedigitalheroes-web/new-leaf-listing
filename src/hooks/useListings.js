@@ -2,19 +2,20 @@ import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { notificationService } from '../../services/notification.service';
+import { onListingSold } from '../../lib/ghl/commissionTrigger';
+import { syncPipelineStage } from '../../lib/ghl/pipelineStages';
 
 // Tier priority for marketplace display: lower number = higher priority
 const TIER_PRIORITY = { top: 1, featured: 2, standard: 3 };
 
-/** Write to the generic audit_logs table — fire-and-forget, never throws. */
+/** Write audit log via SECURITY DEFINER RPC — fire-and-forget, never throws. */
 async function audit(userId, action, entityId, meta = {}) {
-  await supabase.from('audit_logs').insert({
-    user_id: userId,
-    action,
-    entity_type: 'listing',
-    entity_id: entityId,
-    timestamp: new Date().toISOString(),
-    metadata: meta,
+  await supabase.rpc('log_audit_event', {
+    p_user_id:     userId,
+    p_action:      action,
+    p_entity_type: 'listing',
+    p_entity_id:   entityId,
+    p_metadata:    meta,
   });
 }
 
@@ -275,8 +276,40 @@ export function useListings(filters = {}) {
 
   /**
    * Mark a listing as Sold (active or under_contract → sold).
+   * Also triggers GHL pipeline update and commission record creation.
    */
-  const markSold = (id) => _updateStatus(id, 'sold');
+  const markSold = async (id) => {
+    const result = await _updateStatus(id, 'sold');
+    if (!result.error) {
+      // Fetch the full listing row needed by GHL triggers
+      const { data: listing } = await supabase
+        .from('listings')
+        .select('id, title, sale_price, realtor_id, assigned_director_id, ghl_contact_id, ghl_opportunity_id, status')
+        .eq('id', id)
+        .single();
+
+      if (listing) {
+        // Fire-and-forget — do not block the UI response
+        onListingSold(listing).catch(err =>
+          console.error('[useListings] Commission trigger failed:', err)
+        );
+        syncPipelineStage(listing, 'sold').then(res => {
+          if (res.ghl_opportunity_id && res.ghl_opportunity_id !== listing.ghl_opportunity_id) {
+            // Persist new opportunity ID if it was just created
+            supabase
+              .from('listings')
+              .update({ ghl_opportunity_id: res.ghl_opportunity_id })
+              .eq('id', id)
+              .then(() => {})
+              .catch(() => {});
+          }
+        }).catch(err =>
+          console.error('[useListings] Pipeline stage sync failed:', err)
+        );
+      }
+    }
+    return result;
+  };
 
   /**
    * Mark a listing as Expired (active → expired).

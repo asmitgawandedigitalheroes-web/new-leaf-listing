@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { notificationService } from '../../services/notification.service';
 
 /**
  * @typedef {Object} UserProfile
@@ -138,7 +139,7 @@ export function AuthProvider({ children }) {
           .from('profiles')
           .select('*')
           .eq('email', authUser.email)
-          .single();
+          .maybeSingle();
 
         if (!emailError && emailData) {
           console.info('[AuthContext] Profile successfully recovered via email match.');
@@ -440,6 +441,18 @@ export function AuthProvider({ children }) {
         // RLS blocks the INSERT. The profile will be created on first login
         // via the pending_profile metadata recovery in loadUserData().
         console.warn('[AuthContext] Profile INSERT failed at signup (likely no session yet):', profileError.message);
+      }
+
+      // Notify all admins that a new realtor is waiting for approval
+      if (!profileError && initialStatus === 'pending') {
+        notificationService.notifyAdminsNewSignup({
+          id: authData.user.id,
+          full_name,
+          email,
+          company,
+          city,
+          state,
+        }).catch(err => console.error('[AuthContext] Admin signup notification failed:', err));
       }
 
       // Mark invitation as accepted (non-fatal — profile already created above)

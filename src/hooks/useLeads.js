@@ -5,15 +5,14 @@ import { routingService } from '../../services/routing.service';
 import { crmService } from '../../services/crm.service';
 import { notificationService } from '../../services/notification.service';
 
-/** Fire-and-forget audit log writer. */
+/** Fire-and-forget audit log writer — uses SECURITY DEFINER RPC to bypass RLS. */
 async function audit(userId, action, entityId, meta = {}) {
-  await supabase.from('audit_logs').insert({
-    user_id: userId,
-    action,
-    entity_type: 'lead',
-    entity_id: entityId,
-    timestamp: new Date().toISOString(),
-    metadata: meta,
+  await supabase.rpc('log_audit_event', {
+    p_user_id:     userId,
+    p_action:      action,
+    p_entity_type: 'lead',
+    p_entity_id:   entityId,
+    p_metadata:    meta,
   });
 }
 
@@ -135,7 +134,8 @@ export function useLeads() {
 
     // BUG-001: inner try replaced with outer try — all code paths are now covered
     {
-      let { data, error: insertError } = await supabase
+      // Insert without joins first — anon users have no SELECT policy with joins
+      let { data: insertedRow, error: insertError } = await supabase
         .from('leads')
         .insert({
           contact_name: inquiryData.name,
@@ -151,10 +151,21 @@ export function useLeads() {
           source: inquiryData.source || 'website',
           lead_type: inquiryData.lead_type || 'buyer',
         })
-        .select('*, listing:listings(title, address, city, state), assigned_realtor:profiles!leads_assigned_realtor_id_fkey(full_name, email)')
+        .select('id, status, assigned_realtor_id, territory_id, source, lead_type')
         .single();
-      
+
       if (insertError) throw insertError;
+
+      // Fetch full row with joins only for authenticated users
+      let data = insertedRow;
+      if (user) {
+        const { data: fullRow } = await supabase
+          .from('leads')
+          .select('*, listing:listings(title, address, city, state), assigned_realtor:profiles!leads_assigned_realtor_id_fkey(full_name, email)')
+          .eq('id', insertedRow.id)
+          .single();
+        if (fullRow) data = fullRow;
+      }
 
       // 2. If not assigned via listing owner, trigger the routing engine
       if (!assignedRealtorId) {
@@ -249,13 +260,12 @@ export function useLeads() {
    */
   const addLeadNote = async (id, note) => {
     try {
-      const { error: auditError } = await supabase.from('audit_logs').insert({
-        user_id: user.id,
-        action: 'lead.note_added',
-        entity_type: 'lead',
-        entity_id: id,
-        timestamp: new Date().toISOString(),
-        metadata: { note }
+      const { error: auditError } = await supabase.rpc('log_audit_event', {
+        p_user_id:     user.id,
+        p_action:      'lead.note_added',
+        p_entity_type: 'lead',
+        p_entity_id:   id,
+        p_metadata:    { note },
       });
 
       if (auditError) throw auditError;

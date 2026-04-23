@@ -191,13 +191,6 @@ function ProtectedRoute({ children, allowedRoles }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // 3. Email verification gate — show friendly screen instead of blank/spinner
-  //    Supabase sets email_confirmed_at once the user clicks the confirmation link.
-  const emailConfirmed = !!(user.email_confirmed_at || user.confirmed_at);
-  if (!emailConfirmed) {
-    return <EmailVerificationRequired email={user.email} />;
-  }
-
   // 4. Check role access if allowedRoles is specified
   if (allowedRoles && allowedRoles.length > 0) {
     // If user is authenticated but role hasn't resolved yet, wait for it

@@ -131,7 +131,7 @@ export default function SettingsPage() {
         requireApproval: settings.require_listing_approval === true,
         autoExpireDays: settings.auto_expire_days || '90'
       });
-      setCrm(settings.crm_config || { ghl: { enabled: false }, salespro: { enabled: false } });
+      setCrm(settings.crm_config || { ghl: { enabled: false } });
       setNotif(settings.notif_config || { provider: 'resend', newLead: true });
     }
   }, [settings, isLoading]);
@@ -241,20 +241,34 @@ export default function SettingsPage() {
           </div>
         </SectionCard>
 
-        {/* Section 4: CRM */}
-        <SectionCard title="CRM Integrations" icon={HiLink} onSave={() => save('CRM', crm)} isLoading={isLoading} isSaving={isSaving['CRM']}>
-          {['ghl', 'salespro'].map(key => (
-            <div key={key} className="mb-4 p-4 border border-gray-100 rounded-lg bg-gray-50/50">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-gray-800 uppercase">{key}</h3>
-                <Toggle label="" value={crm[key]?.enabled} onChange={v => setCrm(p => ({...p, [key]: {...(p[key]||{}), enabled: v}}))} />
+        {/* Section 4: CRM — GoHighLevel only */}
+        <SectionCard title="CRM Integration" icon={HiLink} onSave={() => save('CRM', crm)} isLoading={isLoading} isSaving={isSaving['CRM']}>
+          <div className="mb-4 p-4 border border-gray-100 rounded-lg bg-gray-50/50">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-sm font-bold text-gray-800">GoHighLevel (GHL)</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Primary CRM — receives lead syncs and status updates via webhook</p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Field label="Webhook URL"><TextInput placeholder="https://..." value={crm[key]?.webhookUrl} onChange={e => setCrm(p => ({...p, [key]: {...(p[key]||{}), webhookUrl: e.target.value}}))} /></Field>
-                <Field label="API Key"><TextInput type="password" value={crm[key]?.apiKey} onChange={e => setCrm(p => ({...p, [key]: {...(p[key]||{}), apiKey: e.target.value}}))} /></Field>
-              </div>
+              <Toggle label="" value={crm.ghl?.enabled} onChange={v => setCrm(p => ({ ...p, ghl: { ...(p.ghl || {}), enabled: v } }))} />
             </div>
-          ))}
+            <div className="grid grid-cols-1 gap-3">
+              <Field label="GHL API Key (Private Integration Key)" hint="GHL → Settings → Integrations → API Keys → Create Key. Used to create contacts directly via GHL REST API — no workflow trigger required.">
+                <TextInput
+                  type="password"
+                  placeholder="••••••••••••••••••••••••••••••••"
+                  value={crm.ghl?.apiKey}
+                  onChange={e => setCrm(p => ({ ...p, ghl: { ...(p.ghl || {}), apiKey: e.target.value } }))}
+                />
+              </Field>
+              <Field label="Inbound Webhook URL (optional)" hint="Only needed if you want GHL to push status changes back to NLV. Leave blank if unused.">
+                <TextInput
+                  placeholder="https://services.leadconnectorhq.com/hooks/..."
+                  value={crm.ghl?.webhookUrl}
+                  onChange={e => setCrm(p => ({ ...p, ghl: { ...(p.ghl || {}), webhookUrl: e.target.value } }))}
+                />
+              </Field>
+            </div>
+          </div>
         </SectionCard>
 
       </div>

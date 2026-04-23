@@ -60,4 +60,31 @@ ALTER TABLE payout_requests
 --    The column stays and still works as a soft reference; it is kept in sync
 --    by application logic (Stripe webhook, admin plan change), not DB cascades.
 --    No functionality is lost — only the circular cascade chain is broken.
+--
+--    NOTE: PostgreSQL auto-names unnamed FK constraints as <table>_<col>_fkey.
+--    We try both the explicit name and the auto-generated name to be safe.
 ALTER TABLE profiles DROP CONSTRAINT IF EXISTS fk_profiles_subscription;
+ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_subscription_id_fkey;
+
+-- Belt-and-suspenders: dynamically drop whatever FK on profiles.subscription_id
+-- actually exists, regardless of its name.
+DO $$
+DECLARE
+  v_constraint text;
+BEGIN
+  SELECT tc.constraint_name INTO v_constraint
+  FROM information_schema.table_constraints tc
+  JOIN information_schema.key_column_usage kcu
+    ON tc.constraint_name = kcu.constraint_name
+   AND tc.table_name      = kcu.table_name
+  WHERE tc.table_name       = 'profiles'
+    AND tc.constraint_type  = 'FOREIGN KEY'
+    AND kcu.column_name     = 'subscription_id';
+
+  IF v_constraint IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE profiles DROP CONSTRAINT %I', v_constraint);
+    RAISE NOTICE 'Dropped FK constraint: %', v_constraint;
+  ELSE
+    RAISE NOTICE 'No FK on profiles.subscription_id found — already dropped or never existed.';
+  END IF;
+END $$;

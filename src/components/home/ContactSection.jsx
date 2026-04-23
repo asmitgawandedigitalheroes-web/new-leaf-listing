@@ -13,7 +13,7 @@ const INFO = [
   {
     icon: HiMapPin,
     label: 'Headquarters',
-    lines: ['3250 S Durango Dr, Suite 200', 'Las Vegas, NV 89117'],
+    lines: ['8 The Green St', 'Dover, DE, 19901'],
     color: DEEP,
     bg: '#E8F3EE',
   },
@@ -27,7 +27,7 @@ const INFO = [
   {
     icon: HiPhone,
     label: 'Call Us',
-    lines: ['+1 (702) 555-0192', 'Mon–Fri, 9am – 6pm PST'],
+    lines: ['1-866-886-3040', 'Mon–Fri, 9am – 6pm PST'],
     color: DEEP,
     bg: '#E8F3EE',
   },
