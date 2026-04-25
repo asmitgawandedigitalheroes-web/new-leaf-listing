@@ -214,6 +214,17 @@ function ProtectedRoute({ children, allowedRoles }) {
     }
   }
 
+  // 6. Contract gate — directors must sign the Territory Partner Agreement
+  //    before accessing any part of the app.
+  if (
+    role === 'director' &&
+    profile &&
+    !profile.territory_contract_signed_at &&
+    !location.pathname.startsWith('/onboarding')
+  ) {
+    return <Navigate to="/onboarding/sign-contract" replace />;
+  }
+
   // 6. Render the protected content
   return children;
 }

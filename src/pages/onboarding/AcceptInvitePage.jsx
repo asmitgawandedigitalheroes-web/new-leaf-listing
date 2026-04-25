@@ -121,7 +121,8 @@ export default function AcceptInvitePage() {
 
     addToast({ type: 'success', title: 'Account activated!', desc: 'Welcome to NLV Listings.' });
     setTimeout(() => {
-      navigate(invitation.role === 'director' ? '/director/dashboard' : '/realtor/dashboard');
+      // Directors must sign the Territory Partner Agreement before the dashboard
+      navigate(invitation.role === 'director' ? '/onboarding/sign-contract' : '/realtor/dashboard');
     }, 500);
   };
 

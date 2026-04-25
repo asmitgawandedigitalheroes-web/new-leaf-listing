@@ -386,12 +386,14 @@ export default function SignupPage() {
     }
     addToast({ type: 'success', title: 'Account created!', desc: 'Welcome to New Leaf Listings.' });
     setTimeout(() => {
-      // Admin-invited users (inviteToken) and directors go straight to their dashboard
-      const goToDirectorDash = isDirector || inviteData?.role === 'director';
-      if (inviteToken) {
-        navigate(goToDirectorDash ? '/director/dashboard' : '/realtor/dashboard');
+      const goAsDirector = isDirector || inviteData?.role === 'director';
+      if (goAsDirector) {
+        // Directors must sign the Territory Partner Agreement before the dashboard
+        navigate('/onboarding/sign-contract');
+      } else if (inviteToken) {
+        navigate('/realtor/dashboard');
       } else {
-        navigate(isDirector ? '/director/dashboard' : '/onboarding/pending');
+        navigate('/onboarding/pending');
       }
     }, 500);
   };

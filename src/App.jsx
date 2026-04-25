@@ -48,11 +48,14 @@ import UsersPage            from './pages/app/admin/UsersPage';
 import ApprovalsPage        from './pages/app/admin/ApprovalsPage';
 import AddUserPage          from './pages/app/admin/AddUserPage';
 import AcceptInvitePage     from './pages/onboarding/AcceptInvitePage';
+import SignContractPage     from './pages/onboarding/SignContractPage';
 import SettingsPage         from './pages/app/admin/SettingsPage';
 import AdminPricingPage     from './pages/app/admin/PricingPage';
 import EnquiriesPage        from './pages/app/admin/EnquiriesPage';
 import DisputesPage         from './pages/app/admin/DisputesPage';
 import PayoutsPage          from './pages/app/admin/PayoutsPage';
+import ContractEditorPage      from './pages/app/admin/ContractEditorPage';
+import ContractSignaturesPage  from './pages/app/admin/ContractSignaturesPage';
 
 // ── Director pages ────────────────────────────────────────────────
 import DirectorListingsPage       from './pages/app/director/DirectorListingsPage';
@@ -119,6 +122,7 @@ export default function App() {
             <Route path="/accept-invite"  element={<AcceptInvitePage />} />
 
             {/* ── Onboarding (post-signup status pages) ───────── */}
+            <Route path="/onboarding/sign-contract" element={<SignContractPage />} />
             <Route path="/onboarding/pending"   element={<PendingApprovalPage />} />
             <Route path="/onboarding/suspended" element={
               <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -186,6 +190,16 @@ export default function App() {
             <Route path="/admin/payouts" element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <PayoutsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/contract" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <ContractEditorPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/contract-signatures" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <ContractSignaturesPage />
               </ProtectedRoute>
             } />
             <Route path="/admin/settings" element={

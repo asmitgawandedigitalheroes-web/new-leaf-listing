@@ -48,6 +48,8 @@ const NAV = {
     { key: 'payouts',      label: 'Payouts',       icon: HiArrowDownTray,         to: '/admin/payouts' },
     { key: 'disputes',     label: 'Disputes',      icon: HiExclamationTriangle,   to: '/admin/disputes' },
     { key: 'audit',        label: 'Audit Log',     icon: HiClipboardDocumentList, to: '/admin/audit' },
+    { key: 'contract',            label: 'Contract Editor',   icon: HiDocumentText,  to: '/admin/contract' },
+    { key: 'contract-signatures', label: 'Signatures',        icon: HiShieldCheck,   to: '/admin/contract-signatures' },
     { key: 'settings',     label: 'Settings',      icon: HiCog6Tooth,             to: '/admin/settings' },
   ],
   director: [

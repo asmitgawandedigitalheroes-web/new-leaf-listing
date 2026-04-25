@@ -19,6 +19,8 @@ import {
   HiCheckBadge,
   HiXMark,
   HiPaperAirplane,
+  HiShieldCheck,
+  HiExclamationTriangle,
 } from 'react-icons/hi2';
 
 const P      = '#D4AF37';
@@ -682,6 +684,206 @@ function QuickLinkTab({ territories, currentUserId, onNewInvite }) {
   );
 }
 
+// ── Create Admin Tab (Flow 3) ───────────────────────────────────────────────
+function CreateAdminTab() {
+  const { addToast } = useToast();
+  const [form, setForm]         = useState({ full_name: '', email: '' });
+  const [errors, setErrors]     = useState({});
+  const [loading, setLoading]   = useState(false);
+  const [recentAdmins, setRecentAdmins] = useState([]);
+
+  useEffect(() => {
+    supabase
+      .from('profiles')
+      .select('id, full_name, email, created_at, status')
+      .eq('role', 'admin')
+      .order('created_at', { ascending: false })
+      .limit(10)
+      .then(({ data }) => setRecentAdmins(data || []));
+  }, []);
+
+  const set = (key, val) => {
+    setForm(prev => ({ ...prev, [key]: val }));
+    setErrors(prev => ({ ...prev, [key]: '' }));
+  };
+
+  const validate = () => {
+    const errs = {};
+    if (!form.full_name.trim())                                                errs.full_name = 'Full name is required.';
+    if (!form.email.trim())                                                    errs.email     = 'Email is required.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))           errs.email     = 'Enter a valid email address.';
+    return errs;
+  };
+
+  const handleCreate = async () => {
+    const errs = validate();
+    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    setErrors({});
+    setLoading(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error('No active session. Please log in again.');
+
+      const supabaseUrl    = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/admin-create-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'apikey': supabaseAnonKey,
+        },
+        body: JSON.stringify({
+          email:        form.email.trim().toLowerCase(),
+          full_name:    form.full_name.trim(),
+          role:         'admin',
+          territory_id: null,
+          caller_token: token,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok || result?.error) throw new Error(result?.error || `Request failed (${response.status})`);
+
+      addToast({ type: 'success', title: 'Admin account created', desc: `An invite email has been sent to ${form.email.trim()}.` });
+      setForm({ full_name: '', email: '' });
+
+      // Refresh list
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, created_at, status')
+        .eq('role', 'admin')
+        .order('created_at', { ascending: false })
+        .limit(10);
+      setRecentAdmins(data || []);
+    } catch (err) {
+      addToast({ type: 'error', title: 'Failed to create admin', desc: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const inputStyle = (err) => ({
+    width: '100%', paddingLeft: 36, paddingRight: 12, paddingTop: 10, paddingBottom: 10,
+    border: `1.5px solid ${err ? '#EF4444' : BORDER}`, borderRadius: 8,
+    fontSize: 14, color: OS, outline: 'none', background: '#fff', boxSizing: 'border-box',
+  });
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" style={{ maxWidth: 900 }}>
+
+      {/* Form card */}
+      <div style={{ background: '#fff', borderRadius: 16, padding: 28, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: '#FEF3C718', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #FDE68A' }}>
+            <HiShieldCheck size={20} color="#D97706" />
+          </div>
+          <div>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: OS, margin: 0 }}>Create Admin Account</h2>
+            <p style={{ fontSize: 12, color: LGRAY, margin: 0 }}>Full platform access — use with care</p>
+          </div>
+        </div>
+
+        {/* Warning banner */}
+        <div style={{
+          display: 'flex', gap: 10, alignItems: 'flex-start',
+          background: '#FFFBEB', border: '1px solid #FDE68A',
+          borderRadius: 10, padding: '12px 14px', marginBottom: 24,
+        }}>
+          <HiExclamationTriangle size={16} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
+          <p style={{ fontSize: 12, color: '#92400E', margin: 0, lineHeight: 1.55 }}>
+            Admin accounts have <strong>full access</strong> to all platform features including billing, users, and settings. Only create accounts for trusted team members.
+          </p>
+        </div>
+
+        {/* Full Name */}
+        <div style={{ marginBottom: 16 }}>
+          <FieldLabel>Full Name</FieldLabel>
+          <div style={{ position: 'relative' }}>
+            <HiIdentification size={15} color={errors.full_name ? '#EF4444' : LGRAY} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+            <input
+              type="text"
+              placeholder="Jane Smith"
+              value={form.full_name}
+              onChange={e => set('full_name', e.target.value)}
+              style={inputStyle(errors.full_name)}
+            />
+          </div>
+          <FieldError msg={errors.full_name} />
+        </div>
+
+        {/* Email */}
+        <div style={{ marginBottom: 28 }}>
+          <FieldLabel>Email Address</FieldLabel>
+          <div style={{ position: 'relative' }}>
+            <HiEnvelope size={15} color={errors.email ? '#EF4444' : LGRAY} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+            <input
+              type="email"
+              placeholder="jane@example.com"
+              value={form.email}
+              onChange={e => set('email', e.target.value)}
+              style={inputStyle(errors.email)}
+            />
+          </div>
+          <FieldError msg={errors.email} />
+        </div>
+
+        <Button fullWidth onClick={handleCreate} isLoading={loading}>
+          <HiShieldCheck size={15} />
+          Create Admin Account
+        </Button>
+
+        <p style={{ fontSize: 11, color: LGRAY, marginTop: 10, textAlign: 'center', lineHeight: 1.5 }}>
+          An invite email with a password-setup link will be sent to this address.
+        </p>
+      </div>
+
+      {/* Right column: how it works + recent admins */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <HowItWorks
+          steps={[
+            { step: '1', title: 'Enter Name & Email', desc: "Provide the new admin's full name and email address. No territory required." },
+            { step: '2', title: 'Account Created', desc: 'The account is provisioned immediately with full admin privileges.' },
+            { step: '3', title: 'Invite Email Sent', desc: 'Supabase sends a password-setup link to the provided email address.' },
+            { step: '4', title: 'Admin Sets Password', desc: 'They click the link, set a password, and immediately access the full admin panel.' },
+          ]}
+          footer={<><strong>No approval queue:</strong> Admin accounts are active immediately upon creation.</>}
+        />
+
+        {/* Recent admin accounts */}
+        {recentAdmins.length > 0 && (
+          <div style={{ background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+            <h3 style={{ fontSize: 13, fontWeight: 700, color: OS, marginBottom: 14 }}>Admin Accounts</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {recentAdmins.map(a => (
+                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: '50%',
+                    background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    <HiShieldCheck size={16} color="#D97706" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: OS, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.full_name || '—'}</div>
+                    <div style={{ fontSize: 11, color: LGRAY, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.email}</div>
+                  </div>
+                  <div style={{ fontSize: 10, color: LGRAY, flexShrink: 0 }}>
+                    {new Date(a.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+    </div>
+  );
+}
+
 // ── Recent Invitations table ────────────────────────────────────────────────
 function RecentInvitations({ invitations, onRevoke }) {
   if (invitations.length === 0) return null;
@@ -796,6 +998,7 @@ export default function AddUserPage() {
   const tabs = [
     { key: 'detailed', label: 'Detailed Invite',   icon: HiUserPlus },
     { key: 'quick',    label: 'Quick Link Invite',  icon: HiLink },
+    { key: 'admin',    label: 'Create Admin',       icon: HiShieldCheck },
   ];
 
   return (
@@ -807,7 +1010,7 @@ export default function AddUserPage() {
         <div style={{ marginBottom: 28 }}>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: OS, marginBottom: 4 }}>Add User</h1>
           <p style={{ fontSize: 13, color: LGRAY }}>
-            Invite realtors and directors with pre-filled details or a shareable link. Admin-invited users are auto-approved.
+            Invite realtors and directors, or create new admin accounts. Admin-invited users are auto-approved.
           </p>
         </div>
 
@@ -835,19 +1038,21 @@ export default function AddUserPage() {
         </div>
 
         {/* Tab content */}
-        {activeTab === 'detailed' ? (
+        {activeTab === 'detailed' && (
           <DetailedInviteTab
             territories={territories}
             currentUserId={user?.id}
             onNewInvite={fetchInvitations}
           />
-        ) : (
+        )}
+        {activeTab === 'quick' && (
           <QuickLinkTab
             territories={territories}
             currentUserId={user?.id}
             onNewInvite={fetchInvitations}
           />
         )}
+        {activeTab === 'admin' && <CreateAdminTab />}
 
         {/* Recent invitations (shared across tabs) */}
         <RecentInvitations invitations={invitations} onRevoke={handleRevoke} />

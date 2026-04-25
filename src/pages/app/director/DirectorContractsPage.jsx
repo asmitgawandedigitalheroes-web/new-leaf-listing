@@ -3,7 +3,12 @@ import AppLayout from '../../../components/layout/AppLayout';
 import { SectionCard } from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import { useAuth } from '../../../context/AuthContext';
+import { useToast } from '../../../context/ToastContext';
 import { supabase } from '../../../lib/supabase';
+import { usePlatformSettings } from '../../../hooks/usePlatformSettings';
+import { auditService } from '../../../../services/audit.service';
+import { notificationService } from '../../../../services/notification.service';
+import { sendContractSignedEmail } from '../../../utils/email';
 import { Link } from 'react-router-dom';
 import {
   HiDocumentText,
@@ -90,7 +95,7 @@ const AGREEMENT_SECTIONS = [
 
 // ── Contract modal ────────────────────────────────────────────────────────────
 
-function ContractModal({ profile, onClose, onSigned }) {
+function ContractModal({ profile, onClose, onSigned, sections = AGREEMENT_SECTIONS, adminEmail }) {
   const [entityName, setEntityName] = useState(profile?.full_name || '');
   const [accepted, setAccepted]     = useState(false);
   const [saving, setSaving]         = useState(false);
@@ -103,16 +108,38 @@ function ContractModal({ profile, onClose, onSigned }) {
     if (!accepted) { setError('You must read and accept the agreement to proceed.'); return; }
     setError('');
     setSaving(true);
+    const signedAt = new Date().toISOString();
     const { error: dbErr } = await supabase
       .from('profiles')
       .update({
-        territory_contract_signed_at:   new Date().toISOString(),
+        territory_contract_signed_at:   signedAt,
         territory_contract_entity_name: entityName.trim(),
       })
       .eq('id', profile.id);
     setSaving(false);
     if (dbErr) { setError('Failed to save. Please try again.'); return; }
-    onSigned({ signedAt: new Date().toISOString(), entityName: entityName.trim() });
+
+    // Fire-and-forget: audit log + emails (don't block the UI)
+    auditService.log(profile.id, 'contract.signed', 'contract', profile.id, {
+      entity_name: entityName.trim(),
+      signed_at: signedAt,
+    }).catch(() => {});
+
+    sendContractSignedEmail({
+      directorEmail: profile.email,
+      directorName:  profile.full_name || entityName.trim(),
+      entityName:    entityName.trim(),
+      adminEmail,
+    }).catch(() => {});
+
+    notificationService.notifyAdminsContractSigned({
+      id:         profile.id,
+      full_name:  profile.full_name,
+      email:      profile.email,
+      entityName: entityName.trim(),
+    }).catch(() => {});
+
+    onSigned({ signedAt, entityName: entityName.trim() });
   };
 
   return (
@@ -159,7 +186,7 @@ function ContractModal({ profile, onClose, onSigned }) {
           </div>
 
           {/* Sections */}
-          {AGREEMENT_SECTIONS.map(sec => (
+          {sections.map(sec => (
             <div key={sec.num} className="mb-5">
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0"
@@ -267,6 +294,10 @@ function ContractModal({ profile, onClose, onSigned }) {
 
 export default function DirectorContractsPage() {
   const { profile } = useAuth();
+  const { addToast } = useToast();
+  const { settings } = usePlatformSettings();
+  const agreementSections = settings.contract_template || AGREEMENT_SECTIONS;
+  const adminEmail = settings.support_email || 'support@nlvlistings.com';
   const [contractData, setContractData] = useState(null);
   const [loadingContract, setLoadingContract] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -295,6 +326,11 @@ export default function DirectorContractsPage() {
   const handleSigned = ({ signedAt, entityName }) => {
     setContractData({ territory_contract_signed_at: signedAt, territory_contract_entity_name: entityName });
     setShowModal(false);
+    addToast({
+      type: 'success',
+      title: 'Agreement signed',
+      desc: `Your Territory Partner Agreement is on record. A confirmation has been sent to ${profile?.email}.`,
+    });
   };
 
   const DOCS = [
@@ -557,6 +593,8 @@ export default function DirectorContractsPage() {
           profile={profile}
           onClose={() => setShowModal(false)}
           onSigned={handleSigned}
+          sections={agreementSections}
+          adminEmail={adminEmail}
         />
       )}
     </AppLayout>

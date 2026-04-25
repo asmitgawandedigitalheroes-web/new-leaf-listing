@@ -35,6 +35,7 @@ export function useAuditLogs() {
         if (a.includes('delet') || a.includes('remov')) return 'delete';
         if (a.includes('pay') || a.includes('subscri') || a.includes('billing') || a.includes('invoice') || a.includes('charge')) return 'payment';
         if (a.includes('login') || a.includes('logout') || a.includes('auth') || a.includes('password') || a.includes('token')) return 'auth';
+        if (a.includes('contract')) return 'contract';
         return 'update';
       };
 

@@ -407,6 +407,37 @@ export const notificationService = {
   },
 
   /**
+   * Notify all active admins (in-app) that a director has signed their contract.
+   * Email is handled separately by sendContractSignedEmail in email.js.
+   */
+  notifyAdminsContractSigned: async (director: {
+    id: string;
+    full_name?: string;
+    email?: string;
+    entityName: string;
+  }): Promise<void> => {
+    const { data: admins } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'admin')
+      .eq('status', 'active');
+
+    if (!admins || admins.length === 0) return;
+
+    await Promise.all(
+      admins.map((admin) =>
+        notificationService.createInAppNotification(
+          admin.id,
+          'Director Signed Contract',
+          `${director.full_name ?? 'A director'} (${director.email ?? ''}) signed as "${director.entityName}".`,
+          'system',
+          director.id
+        )
+      )
+    );
+  },
+
+  /**
    * Fetch all in-app notifications for a user, newest first.
    */
   getNotifications: async (userId: string) => {

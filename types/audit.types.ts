@@ -6,7 +6,8 @@ export type AuditAction =
   | 'subscription.created' | 'subscription.upgraded' | 'subscription.cancelled'
   | 'payment.succeeded' | 'payment.failed'
   | 'territory.assigned' | 'territory.updated'
-  | 'auth.login' | 'auth.logout';
+  | 'auth.login' | 'auth.logout'
+  | 'contract.signed';
 
 export interface AuditLog {
   id: string;

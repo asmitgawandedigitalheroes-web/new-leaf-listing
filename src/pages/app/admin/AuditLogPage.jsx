@@ -7,11 +7,12 @@ import { useAuditLogs } from '../../../hooks/useAuditLogs';
 import { HiClipboardDocumentList, HiArrowPath } from 'react-icons/hi2';
 
 const ACTION_STYLES = {
-  create:  { bg: '#E8F3EE', text: '#1F4D3A',  label: 'Create' },
-  update:  { bg: '#DBEAFE', text: '#1E40AF',  label: 'Update' },
-  delete:  { bg: '#FEE2E2', text: '#991B1B',  label: 'Delete' },
-  auth:    { bg: '#F3F4F6', text: '#4B5563',  label: 'Auth' },
-  payment: { bg: 'rgba(212,175,55,0.12)', text: '#B8962E', label: 'Payment' },
+  create:   { bg: '#E8F3EE', text: '#1F4D3A',  label: 'Create' },
+  update:   { bg: '#DBEAFE', text: '#1E40AF',  label: 'Update' },
+  delete:   { bg: '#FEE2E2', text: '#991B1B',  label: 'Delete' },
+  auth:     { bg: '#F3F4F6', text: '#4B5563',  label: 'Auth' },
+  payment:  { bg: 'rgba(212,175,55,0.12)', text: '#B8962E', label: 'Payment' },
+  contract: { bg: '#EDE9FE', text: '#5B21B6',  label: 'Contract' },
 };
 
 function ActionBadge({ action, actionCategory }) {

@@ -11,6 +11,9 @@ import {
   HiBell,
   HiArrowPath,
   HiCheckCircle,
+  HiPhone,
+  HiMapPin,
+  HiGlobeAlt,
 } from 'react-icons/hi2';
 import Button from '../../../components/ui/Button';
 import Skeleton from '../../../components/ui/Skeleton';
@@ -109,6 +112,8 @@ export default function SettingsPage() {
   const [listing, setListing]       = useState({});
   const [crm, setCrm]               = useState({});
   const [notif, setNotif]           = useState({});
+  const [contact, setContact]       = useState({});
+  const [social, setSocial]         = useState({});
 
   useEffect(() => {
     if (!isLoading) {
@@ -133,6 +138,12 @@ export default function SettingsPage() {
       });
       setCrm(settings.crm_config || { ghl: { enabled: false } });
       setNotif(settings.notif_config || { provider: 'resend', newLead: true });
+      setContact(settings.contact_config || {
+        phone: '', secondaryPhone: '', address: '', city: '', state: '', zip: '', businessHours: ''
+      });
+      setSocial(settings.social_config || {
+        facebook: '', instagram: '', twitter: '', linkedin: '', youtube: '', tiktok: ''
+      });
     }
   }, [settings, isLoading]);
 
@@ -241,7 +252,118 @@ export default function SettingsPage() {
           </div>
         </SectionCard>
 
-        {/* Section 4: CRM — GoHighLevel only */}
+        {/* Section 4: Contact Information */}
+        <SectionCard
+          title="Contact Information" icon={HiPhone}
+          onSave={() => save('contact', contact)}
+          isLoading={isLoading} isSaving={isSaving['contact']}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Primary Phone">
+              <TextInput
+                placeholder="+1 (555) 000-0000"
+                value={contact.phone}
+                onChange={e => setContact(p => ({ ...p, phone: e.target.value }))}
+              />
+            </Field>
+            <Field label="Secondary Phone">
+              <TextInput
+                placeholder="+1 (555) 000-0000"
+                value={contact.secondaryPhone}
+                onChange={e => setContact(p => ({ ...p, secondaryPhone: e.target.value }))}
+              />
+            </Field>
+            <Field label="Street Address" hint="Displayed on the contact page and footer.">
+              <TextInput
+                placeholder="123 Main Street, Suite 100"
+                value={contact.address}
+                onChange={e => setContact(p => ({ ...p, address: e.target.value }))}
+              />
+            </Field>
+            <Field label="Business Hours">
+              <TextInput
+                placeholder="Mon–Fri 9am–6pm CT"
+                value={contact.businessHours}
+                onChange={e => setContact(p => ({ ...p, businessHours: e.target.value }))}
+              />
+            </Field>
+            <Field label="City">
+              <TextInput
+                placeholder="Las Vegas"
+                value={contact.city}
+                onChange={e => setContact(p => ({ ...p, city: e.target.value }))}
+              />
+            </Field>
+            <Field label="State">
+              <TextInput
+                placeholder="NV"
+                value={contact.state}
+                onChange={e => setContact(p => ({ ...p, state: e.target.value }))}
+              />
+            </Field>
+            <Field label="ZIP Code">
+              <TextInput
+                placeholder="89101"
+                value={contact.zip}
+                onChange={e => setContact(p => ({ ...p, zip: e.target.value }))}
+              />
+            </Field>
+          </div>
+        </SectionCard>
+
+        {/* Section 5: Social Media Links */}
+        <SectionCard
+          title="Social Media Links" icon={HiGlobeAlt}
+          onSave={() => save('social', social)}
+          isLoading={isLoading} isSaving={isSaving['social']}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Facebook">
+              <TextInput
+                placeholder="https://facebook.com/yourpage"
+                value={social.facebook}
+                onChange={e => setSocial(p => ({ ...p, facebook: e.target.value }))}
+              />
+            </Field>
+            <Field label="Instagram">
+              <TextInput
+                placeholder="https://instagram.com/yourhandle"
+                value={social.instagram}
+                onChange={e => setSocial(p => ({ ...p, instagram: e.target.value }))}
+              />
+            </Field>
+            <Field label="Twitter / X">
+              <TextInput
+                placeholder="https://x.com/yourhandle"
+                value={social.twitter}
+                onChange={e => setSocial(p => ({ ...p, twitter: e.target.value }))}
+              />
+            </Field>
+            <Field label="LinkedIn">
+              <TextInput
+                placeholder="https://linkedin.com/company/yourcompany"
+                value={social.linkedin}
+                onChange={e => setSocial(p => ({ ...p, linkedin: e.target.value }))}
+              />
+            </Field>
+            <Field label="YouTube">
+              <TextInput
+                placeholder="https://youtube.com/@yourchannel"
+                value={social.youtube}
+                onChange={e => setSocial(p => ({ ...p, youtube: e.target.value }))}
+              />
+            </Field>
+            <Field label="TikTok">
+              <TextInput
+                placeholder="https://tiktok.com/@yourhandle"
+                value={social.tiktok}
+                onChange={e => setSocial(p => ({ ...p, tiktok: e.target.value }))}
+              />
+            </Field>
+          </div>
+        </SectionCard>
+
+        {/* Section 6: CRM — GoHighLevel only */}
         <SectionCard title="CRM Integration" icon={HiLink} onSave={() => save('CRM', crm)} isLoading={isLoading} isSaving={isSaving['CRM']}>
           <div className="mb-4 p-4 border border-gray-100 rounded-lg bg-gray-50/50">
             <div className="flex items-center justify-between mb-3">
