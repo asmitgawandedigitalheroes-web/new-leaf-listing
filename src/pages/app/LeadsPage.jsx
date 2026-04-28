@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import AppLayout from '../../components/layout/AppLayout';
 import Tabs from '../../components/ui/Tabs';
 import Badge from '../../components/ui/Badge';
@@ -12,6 +12,9 @@ import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import SearchableSelect from '../../components/ui/SearchableSelect';
 import { supabase } from '../../lib/supabase';
+import Pagination from '../../components/ui/Pagination';
+
+const PAGE_SIZE = 10;
 
 export default function LeadsPage() {
   const { profile } = useAuth();
@@ -34,6 +37,8 @@ export default function LeadsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { leads, isLoading, reassignLead: doReassign, assignLeadToDirector, fetchAvailableRealtors, createInquiry, updateLeadStatus } = useLeads();
+
+  const [page, setPage] = useState(1);
 
   const handleAddLead = async () => {
     // FIX: CRIT-005 — collect all field errors and display them inline instead of silently failing
@@ -170,6 +175,14 @@ export default function LeadsPage() {
     return list;
   }, [activeTab, leadTypeFilter, search, leads]);
 
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, leadTypeFilter, search]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const scoreColor = (s) => {
     if (s >= 80) return '#1F4D3A';
     if (s >= 50) return '#D4AF37';
@@ -266,7 +279,7 @@ export default function LeadsPage() {
                     <tr key={i}>
                       <td>
                         <div className="flex items-center gap-3">
-                          <Skeleton variant="circle" width="32px" height="32px" />
+                          <Avatar initials="??" size="sm" color="green" />
                           <div className="flex-1">
                             <Skeleton width="100px" height="12px" className="mb-1" />
                             <Skeleton width="140px" height="10px" />
@@ -282,7 +295,7 @@ export default function LeadsPage() {
                       <td><Skeleton width="50px" height="32px" /></td>
                     </tr>
                   ))
-                ) : filtered.map(lead => (
+                ) : paginated.map(lead => (
                   <tr
                     key={lead.id}
                     className="cursor-pointer"
@@ -359,6 +372,14 @@ export default function LeadsPage() {
               </tbody>
             </table>
           </div>
+
+          <Pagination 
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            totalItems={filtered.length}
+            pageSize={PAGE_SIZE}
+          />
 
           {filtered.length === 0 && (
             <div className="py-16 text-center text-gray-400">

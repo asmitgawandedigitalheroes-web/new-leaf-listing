@@ -1,38 +1,41 @@
 import React from 'react';
 import Label from '../shared/Label';
 
-const OS   = '#111111';
-const OSV  = '#4B5563';
+const OS = '#111111';
+const OSV = '#4B5563';
 const GOLD = '#D4AF37';
 const DEEP = '#1F4D3A';
 
 const PARTNERS = [
   {
-    id:   'nuevo-vizion',
+    id: 'nuevo-vizion',
     name: 'Nuevo Vizion Ingenieria Y Arquitectura',
-    sub:  'Engineering & Architecture',
-    logo: '/partners/nuevo-vizion.svg',
+    sub: 'Engineering & Architecture',
+    logo: '/partners/nuevo-vizion.png',
     desc: 'A Mexico-based design and engineering firm representing New Leaf Vision, delivering modern architectural and technical expertise.',
     href: 'https://www.nuevovizion.com',
     accent: '#6BBF3E',
+    logoBg: '#F8FAFC',
   },
   {
-    id:   'new-leaf',
+    id: 'new-leaf',
     name: 'New Leaf Vision Inc',
-    sub:  'Panelized Construction & Franchise Network',
-    logo: '/partners/new-leaf.svg',
+    sub: 'Panelized Construction & Franchise Network',
+    logo: '/partners/new-leaf.png',
     desc: 'An integrated panelized construction platform combined with a franchise network, enabling efficient, scalable, high-performance development.',
     href: 'https://www.newleafvision.com',
     accent: '#6BBF3E',
+    logoBg: '#111827', // Dark background for white text in logo
   },
   {
-    id:   'bold-group-dev',
+    id: 'bold-group-dev',
     name: 'Bold Group Development',
-    sub:  'Real Estate Development',
-    logo: '/partners/bold-group-dev.svg',
+    sub: 'Real Estate Development',
+    logo: '/partners/bold-group-dev.jpg',
     desc: 'A real estate development company focused on delivering high-value projects and investment opportunities.',
     href: 'https://www.boldgroup.dev',
     accent: GOLD,
+    logoBg: '#FFFFFF',
   },
 ];
 
@@ -82,7 +85,7 @@ export default function Partners() {
               {/* Logo area */}
               <div
                 className="flex items-center justify-center p-8"
-                style={{ background: '#FAFAFA', borderBottom: '1px solid #F3F4F6', minHeight: 140 }}
+                style={{ background: p.logoBg || '#FAFAFA', borderBottom: '1px solid #F3F4F6', minHeight: 140 }}
               >
                 <img
                   src={p.logo}
@@ -118,7 +121,7 @@ export default function Partners() {
                 >
                   Learn More
                   <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd"/>
+                    <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
                   </svg>
                 </div>
               </div>

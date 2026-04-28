@@ -252,7 +252,7 @@ export default function PricingPage() {
             <h2 className="font-headline text-2xl font-black text-center mb-8" style={{ color: DARK }}>
               Full Plan Comparison
             </h2>
-            <div className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${BORDER}` }}>
+            <div className="data-table rounded-2xl overflow-hidden" style={{ border: `1px solid ${BORDER}` }}>
               <table className="w-full">
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${BORDER}`, background: '#F9FAFB' }}>

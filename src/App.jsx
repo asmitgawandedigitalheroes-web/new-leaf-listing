@@ -5,6 +5,7 @@ import { AuthProvider } from './context/AuthContext';
 import { SiteSettingsProvider } from './context/SiteSettingsContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import ErrorBoundary from './components/ui/ErrorBoundary';
+import ChatWidget from './components/ui/ChatWidget';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -366,6 +367,7 @@ export default function App() {
             <Route path="*" element={<NotFoundPage />} />
 
             </Routes>
+            <ChatWidget />
           </BrowserRouter>
           </SiteSettingsProvider>
         </AuthProvider>

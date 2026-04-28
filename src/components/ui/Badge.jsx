@@ -23,7 +23,11 @@ const STYLES = {
 
 export default function Badge({ status, label, className = '' }) {
   const s = STYLES[status?.toLowerCase()] || STYLES.draft;
-  const text = label || (status ? status.charAt(0).toUpperCase() + status.slice(1) : '');
+  const text = label || (status ? (
+    status.toLowerCase() === 'showing' ? 'In Progress' :
+    status.toLowerCase() === 'lost' ? 'Closed' :
+    status.charAt(0).toUpperCase() + status.slice(1)
+  ) : '');
   return (
     <span
       className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide ${className}`}

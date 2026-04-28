@@ -39,7 +39,7 @@ export default function ContractSignaturesPage() {
     setIsLoading(true);
     const { data } = await supabase
       .from('profiles')
-      .select('id, full_name, email, status, territory_contract_signed_at, territory_contract_entity_name, territory:territories(name)')
+      .select('id, full_name, email, status, territory_contract_signed_at, territory_contract_entity_name, territory:territories!profiles_territory_id_fkey(city, state)')
       .eq('role', 'director')
       .order('full_name');
     setDirectors(data || []);
@@ -178,7 +178,7 @@ export default function ContractSignaturesPage() {
                         >
                           <td className="px-4 py-3 font-semibold text-gray-900">{d.full_name || '—'}</td>
                           <td className="px-4 py-3 text-gray-500">{d.email || '—'}</td>
-                          <td className="px-4 py-3 text-gray-500">{d.territory?.name || '—'}</td>
+                          <td className="px-4 py-3 text-gray-500">{d.territory ? `${d.territory.city}, ${d.territory.state}` : '—'}</td>
                           <td className="px-4 py-3">
                             {signed ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold"
@@ -255,7 +255,7 @@ export default function ContractSignaturesPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 { label: 'Email',        value: selected.email },
-                { label: 'Territory',    value: selected.territory?.name || '—' },
+                { label: 'Territory',    value: selected.territory ? `${selected.territory.city}, ${selected.territory.state}` : '—' },
                 { label: 'Account Status', value: selected.status },
                 { label: 'Contract Status', value: selected.territory_contract_signed_at ? 'Signed' : 'Not Signed' },
                 { label: 'Entity Name',  value: selected.territory_contract_entity_name || '—' },

@@ -87,14 +87,14 @@ export default function Hero() {
         </div>
 
         {/* Metrics row */}
-        <div className="hidden sm:flex sm:flex-row items-center gap-0 pt-7" style={{ borderTop: `1px solid rgba(201, 164, 92, 0.2)` }}>
+        <div className="grid grid-cols-2 sm:flex sm:flex-row items-center gap-y-6 gap-x-0 pt-7" style={{ borderTop: `1px solid rgba(201, 164, 92, 0.2)` }}>
           {[
             { val: '2,400+', label: 'Listings' },
             { val: '340+', label: 'Realtors' },
             { val: '$1.2B', label: 'Transacted' },
           ].map((m, i) => (
-            <div key={m.label} className="flex items-center w-full sm:w-auto">
-              <div className={`flex-1 sm:flex-none ${i > 0 ? 'sm:pl-7' : 'sm:pr-7'}`} style={i === 1 ? { paddingLeft: 28, paddingRight: 28 } : {}}>
+            <div key={m.label} className={`flex items-center w-full sm:w-auto ${i === 2 ? 'col-span-2 sm:col-span-1' : ''}`}>
+              <div className={`flex-1 sm:flex-none ${i > 0 ? 'sm:pl-7' : 'sm:pr-7'} ${i === 1 ? 'lg:px-10' : ''}`}>
                 <p className="font-headline font-black text-xl leading-none mb-0.5" style={{ color: 'var(--color-gold)' }}>{m.val}</p>
                 <p style={{ fontSize: 10, color: 'rgba(247, 246, 242, 0.5)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>{m.label}</p>
               </div>

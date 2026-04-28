@@ -216,6 +216,7 @@ export function useLeads() {
     new:         'new',
     contacted:   'contacted',
     in_progress: 'showing',
+    lost:        'lost',
     closed:      'converted',
   };
 
@@ -358,6 +359,11 @@ export function useLeads() {
 
       audit(user.id, 'lead.assigned_to_director', id, { director_id: directorId }).catch(() => {});
       notificationService.notifyDirectorLead(id, directorId).catch(console.error);
+
+      // Sync updated director assignment to GHL so nlv_assigned_director is updated
+      crmService.syncLead(id).catch(err => {
+        console.error('[useLeads] CRM sync after director assign failed:', err);
+      });
 
       setLeads(prev => prev.map(l => l.id === id
         ? { ...l, assigned_director_id: directorId, assigned_realtor_id: null, assigned_realtor: null, status: 'assigned' }

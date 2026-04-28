@@ -136,30 +136,35 @@ export default function PublicFooter() {
           <p className="text-xs font-bold uppercase tracking-[0.15em] mb-5 text-center" style={{ color: G }}>Our Partners</p>
           <div className="flex flex-wrap items-center justify-center gap-8">
             {[
-              { src: '/partners/nuevo-vizion.svg', alt: 'Nuevo Vizion', href: 'https://www.nuevovizion.com' },
-              { src: '/partners/new-leaf.svg',     alt: 'New Leaf Vision', href: 'https://www.newleafvision.com' },
-              { src: '/partners/bold-group-dev.svg', alt: 'Bold Group Development', href: 'https://www.boldgroup.dev' },
+              { src: '/partners/nuevo-vizion.png', alt: 'Nuevo Vizion', href: 'https://www.nuevovizion.com', bg: '#fff' },
+              { src: '/partners/new-leaf.png',     alt: 'New Leaf Vision', href: 'https://www.newleafvision.com', bg: '#111827' },
+              { src: '/partners/bold-group-dev.jpg', alt: 'Bold Group Development', href: 'https://www.boldgroup.dev', bg: '#fff' },
             ].map(p => (
               <a
                 key={p.alt}
                 href={p.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="opacity-60 transition-opacity no-underline"
-                onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-                onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
+                className="group transition-all no-underline rounded-xl p-2.5 flex items-center justify-center shadow-sm hover:shadow-md"
+                style={{ 
+                  width: 140, 
+                  height: 60, 
+                  background: p.bg,
+                  border: p.bg === '#fff' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.05)'
+                }}
                 title={p.alt}
               >
                 <img
                   src={p.src}
                   alt={p.alt}
-                  style={{ height: 36, width: 'auto', maxWidth: 140, objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
+                  className="opacity-90 group-hover:opacity-100 transition-opacity"
+                  style={{ height: '100%', width: '100%', objectFit: 'contain' }}
                   onError={e => {
                     e.currentTarget.style.display = 'none';
                     e.currentTarget.nextSibling.style.display = 'inline';
                   }}
                 />
-                <span className="text-xs font-semibold hidden" style={{ color: 'rgba(255,255,255,0.55)' }}>{p.alt}</span>
+                <span className="text-[10px] font-bold text-gray-900 hidden">{p.alt}</span>
               </a>
             ))}
           </div>

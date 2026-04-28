@@ -7,6 +7,39 @@ export type CrmProvider = 'ghl';
 // Must match the DB CHECK constraint on leads.status exactly.
 const VALID_LEAD_STATUSES = new Set(['new', 'assigned', 'contacted', 'showing', 'offer', 'converted', 'lost']);
 
+// GHL requires the actual field UUID (not fieldKey) when updating contact custom fields.
+// These IDs are stable for the configured location (sro8sN54qUKbEO5UGkrx).
+// If fields are re-created the IDs change — resolve dynamically via resolveGhlFieldIds().
+const GHL_FIELD_IDS: Record<string, string> = {
+  'contact.nlv_lead_id':            'SA5py9BigGxs4RbdZzP2',
+  'contact.nlv_listing_id':         '5dzsbV4Q6f5ypcu2HZ8B',
+  'contact.nlv_territory':          'Wi6chtF8RZlqYxi98koY',
+  'contact.nlv_lead_status':        'mGJqomQu7KGt3JZL17TE',
+  'contact.nlv_assigned_to':        'VjJqABUFcXC8wO9roseE',
+  'contact.nlv_assigned_director':  '7bjrTdWOQ8EOsbh9qrUE',
+  'contact.nlv_attribution_flag':   'rDNbfeK4ZrMlxldKnr5k',
+  'contact.nlv_attribution_expiry': 'Jip6TLJRCiiBblASSa90',
+  'contact.nlv_commission_type':    'E3viSJo9LybOXpAIaPD4',
+  'contact.nlv_platform_lead':      'uLc132D1i3gB0W3U58PZ',
+};
+
+/** Resolve fieldKey → UUID, falling back to a live GHL lookup if key is missing. */
+async function resolveFieldId(fieldKey: string, apiKey: string, locationId: string): Promise<string> {
+  if (GHL_FIELD_IDS[fieldKey]) return GHL_FIELD_IDS[fieldKey];
+  try {
+    const res = await fetch(
+      `https://services.leadconnectorhq.com/locations/${locationId}/customFields`,
+      { headers: { Authorization: `Bearer ${apiKey}`, Version: '2021-07-28' } }
+    );
+    const body = await res.json().catch(() => null);
+    const field = (body?.customFields ?? []).find((f: any) => f.fieldKey === fieldKey);
+    if (field?.id) GHL_FIELD_IDS[fieldKey] = field.id;
+    return field?.id ?? fieldKey;
+  } catch {
+    return fieldKey;
+  }
+}
+
 export interface WebhookConfig {
   url: string;
   auth_header: string;
@@ -156,28 +189,28 @@ const syncToGhlApi = async (
     ...(isPit
       ? {
           customFields: [
-            { id: 'contact.nlv_lead_id',            field_value: lead.id },
-            { id: 'contact.nlv_listing_id',         field_value: lead.listing_id ?? '' },
-            { id: 'contact.nlv_territory',          field_value: lead.territory_id ?? '' },
-            { id: 'contact.nlv_lead_status',        field_value: lead.status ?? 'new' },
-            { id: 'contact.nlv_assigned_to',        field_value: lead.assigned_realtor_id ?? '' },
-            { id: 'contact.nlv_assigned_director',  field_value: lead.assigned_director_id ?? '' },
-            { id: 'contact.nlv_attribution_flag',   field_value: 'platform' },
-            { id: 'contact.nlv_attribution_expiry', field_value: attributionExpiry },
-            { id: 'contact.nlv_commission_type',    field_value: lead.lead_type ?? 'deal' },
-            { id: 'contact.nlv_platform_lead',      field_value: 'true' },
+            { id: GHL_FIELD_IDS['contact.nlv_lead_id'],            field_value: lead.id },
+            { id: GHL_FIELD_IDS['contact.nlv_listing_id'],         field_value: lead.listing_id ?? '' },
+            { id: GHL_FIELD_IDS['contact.nlv_territory'],          field_value: lead.territory_id ?? '' },
+            { id: GHL_FIELD_IDS['contact.nlv_lead_status'],        field_value: lead.status ?? 'new' },
+            { id: GHL_FIELD_IDS['contact.nlv_assigned_to'],        field_value: (lead as any).assigned_realtor?.full_name ?? lead.assigned_realtor_id ?? '' },
+            { id: GHL_FIELD_IDS['contact.nlv_assigned_director'],  field_value: (lead as any).assigned_director?.full_name ?? lead.assigned_director_id ?? '' },
+            { id: GHL_FIELD_IDS['contact.nlv_attribution_flag'],   field_value: 'platform' },
+            { id: GHL_FIELD_IDS['contact.nlv_attribution_expiry'], field_value: attributionExpiry },
+            { id: GHL_FIELD_IDS['contact.nlv_commission_type'],    field_value: lead.lead_type ?? 'deal' },
+            { id: GHL_FIELD_IDS['contact.nlv_platform_lead'],      field_value: 'true' },
           ],
         }
       : {
           customField: [
-            { id: 'contact.nlv_lead_id',            fieldValue: lead.id },
-            { id: 'contact.nlv_territory',          fieldValue: lead.territory_id ?? '' },
-            { id: 'contact.nlv_lead_status',        fieldValue: lead.status ?? 'new' },
-            { id: 'contact.nlv_assigned_to',        fieldValue: lead.assigned_realtor_id ?? '' },
-            { id: 'contact.nlv_assigned_director',  fieldValue: lead.assigned_director_id ?? '' },
-            { id: 'contact.nlv_attribution_flag',   fieldValue: 'platform' },
-            { id: 'contact.nlv_attribution_expiry', fieldValue: attributionExpiry },
-            { id: 'contact.nlv_platform_lead',      fieldValue: 'true' },
+            { id: GHL_FIELD_IDS['contact.nlv_lead_id'],            fieldValue: lead.id },
+            { id: GHL_FIELD_IDS['contact.nlv_territory'],          fieldValue: lead.territory_id ?? '' },
+            { id: GHL_FIELD_IDS['contact.nlv_lead_status'],        fieldValue: lead.status ?? 'new' },
+            { id: GHL_FIELD_IDS['contact.nlv_assigned_to'],        fieldValue: (lead as any).assigned_realtor?.full_name ?? lead.assigned_realtor_id ?? '' },
+            { id: GHL_FIELD_IDS['contact.nlv_assigned_director'],  fieldValue: (lead as any).assigned_director?.full_name ?? lead.assigned_director_id ?? '' },
+            { id: GHL_FIELD_IDS['contact.nlv_attribution_flag'],   fieldValue: 'platform' },
+            { id: GHL_FIELD_IDS['contact.nlv_attribution_expiry'], fieldValue: attributionExpiry },
+            { id: GHL_FIELD_IDS['contact.nlv_platform_lead'],      fieldValue: 'true' },
           ],
         }),
   };
@@ -218,13 +251,14 @@ const syncToGhlApi = async (
         const existingId = searchBody?.contact?.id;
 
         if (existingId) {
-          // PUT update — locationId in body (same as POST)
+          // PUT /contacts/{id} rejects locationId in the body — strip it before sending
+          const { locationId: _omit, ...putPayload } = contactPayload;
           response = await fetch(
             `https://services.leadconnectorhq.com/contacts/${existingId}`,
             {
               method: 'PUT',
               headers,
-              body: JSON.stringify(contactPayload), // locationId already in contactPayload
+              body: JSON.stringify(putPayload),
             }
           );
           responseBody = await response.json().catch(() => null);
@@ -357,10 +391,16 @@ export const crmService = {
    * Defaults to 'ghl' if no provider override given.
    */
   syncLead: async (leadId: string, provider: CrmProvider = 'ghl'): Promise<CrmSyncResult> => {
-    // Fetch the full lead row so the payload contains real data
+    // Fetch the full lead row including realtor/director names for GHL display
     const { data: lead, error: fetchError } = await supabase
       .from('leads')
-      .select('id, source, territory_id, status, assigned_realtor_id, assigned_director_id, listing_id, lead_type, contact_name, contact_email, contact_phone, contact_masked_email, created_at')
+      .select(`
+        id, source, territory_id, status, assigned_realtor_id, assigned_director_id,
+        listing_id, lead_type, contact_name, contact_email, contact_phone,
+        contact_masked_email, created_at,
+        assigned_realtor:profiles!leads_assigned_realtor_id_fkey(full_name),
+        assigned_director:profiles!leads_assigned_director_id_fkey(full_name)
+      `)
       .eq('id', leadId)
       .single();
 
@@ -445,6 +485,8 @@ export const crmService = {
 
   /**
    * Send a lead status update to the CRM.
+   * For GHL: also PUTs the nlv_lead_status custom field directly on the contact
+   * so all status transitions (contacted, showing, converted, lost, etc.) are reflected.
    */
   syncLeadStatus: async (leadId: string, status: string, provider: CrmProvider = 'ghl'): Promise<CrmSyncResult> => {
     const config = await getWebhookConfig(provider);
@@ -461,16 +503,77 @@ export const crmService = {
       status,
     };
 
-    const result = await postWebhook(config, payload, provider);
+    // Only POST to webhook URL when one is actually configured — an empty URL causes
+    // fetch('') to hit the current page and return 404.
+    let result: CrmSyncResult & { provider: CrmProvider } = config.url
+      ? await postWebhook(config, payload, provider)
+      : { success: false, provider, error: 'No webhook URL configured' };
+
+    // For GHL with a direct API key: update the contact's nlv_lead_status custom field
+    // directly via the Contacts API so every status change is reflected in GHL.
+    if (provider === 'ghl' && !config.is_mock && config.auth_value) {
+      try {
+        const { data: leadRow } = await supabase
+          .from('leads')
+          .select('ghl_contact_id')
+          .eq('id', leadId)
+          .single();
+
+        const ghlContactId = leadRow?.ghl_contact_id;
+
+        if (ghlContactId) {
+          const apiKey = config.auth_value.replace(/^Bearer\s+/i, '');
+          const isPit = apiKey.startsWith('pit-');
+
+          let locationId: string | null = import.meta?.env?.VITE_GHL_LOCATION_ID ?? null;
+          try {
+            const { data: settingsRow } = await supabase
+              .from('platform_settings')
+              .select('value')
+              .eq('key', 'crm_config')
+              .maybeSingle();
+            const dbLocationId = settingsRow?.value?.ghl?.locationId;
+            if (dbLocationId) locationId = dbLocationId;
+          } catch { /* fall through */ }
+
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          };
+          if (isPit) headers['Version'] = '2021-07-28';
+
+          // PUT /contacts/{id} does NOT accept locationId in the body (422 otherwise).
+          // GHL requires the actual field UUID, not the fieldKey string.
+          const statusFieldId = await resolveFieldId('contact.nlv_lead_status', apiKey, locationId ?? '');
+          const body: Record<string, any> = isPit
+            ? { customFields: [{ id: statusFieldId, field_value: status }] }
+            : { customField: [{ id: statusFieldId, fieldValue: status }] };
+
+          const res = await fetch(
+            `https://services.leadconnectorhq.com/contacts/${ghlContactId}`,
+            { method: 'PUT', headers, body: JSON.stringify(body) }
+          );
+
+          if (res.ok) {
+            result = { success: true, provider, status_code: res.status };
+          } else {
+            const errBody = await res.json().catch(() => null);
+            console.error('[CrmService] GHL contact status update failed:', errBody);
+          }
+        }
+      } catch (err: any) {
+        console.error('[CrmService] syncLeadStatus GHL direct update error:', err.message);
+      }
+    }
 
     await auditService.log(
       null,
       'lead.status_changed',
       'crm_sync',
       leadId,
-      { 
-        provider, 
-        status, 
+      {
+        provider,
+        status,
         success: result.success,
         is_mock: config.is_mock
       }

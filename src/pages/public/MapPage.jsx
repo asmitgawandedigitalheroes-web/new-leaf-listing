@@ -202,7 +202,7 @@ export default function MapPage() {
 
       {/* Page title bar */}
       <div
-        className="flex items-center justify-between px-6 py-3 gap-4 flex-wrap"
+        className="flex flex-col md:flex-row md:items-center justify-between px-6 py-4 md:py-3 gap-4"
         style={{ background: DEEP, marginTop: 80 }}
       >
         <div className="flex items-center gap-2">
@@ -217,18 +217,20 @@ export default function MapPage() {
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full" style={{ background: GOLD }} />
-            <span className="text-[11px] font-semibold" style={{ color: 'rgba(255,255,255,0.7)' }}>
-              Market Owner ({topCount})
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full" style={{ background: DEEP, border: '1px solid rgba(255,255,255,0.3)' }} />
-            <span className="text-[11px] font-semibold" style={{ color: 'rgba(255,255,255,0.7)' }}>
-              Dominator ({featuredCount})
-            </span>
+        <div className="flex items-center gap-4 flex-wrap justify-between md:justify-end w-full md:w-auto">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full" style={{ background: GOLD }} />
+              <span className="text-[11px] font-semibold" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                Market Owner ({topCount})
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full" style={{ background: DEEP, border: '1px solid rgba(255,255,255,0.3)' }} />
+              <span className="text-[11px] font-semibold" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                Dominator ({featuredCount})
+              </span>
+            </div>
           </div>
           {/* Sidebar toggle */}
           <button

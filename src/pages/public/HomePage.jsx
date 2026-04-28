@@ -14,6 +14,7 @@ import ProfessionalSection from '../../components/home/ProfessionalSection';
 import CollectorSection from '../../components/home/CollectorSection';
 import NetworkCTA from '../../components/home/NetworkCTA';
 import TrustBadges from '../../components/home/TrustBadges';
+import Testimonials from '../../components/home/Testimonials';
 
 const BG = '#F7F6F2';   // Soft Ivory background
 const OS = '#0B0B0B';   // Midnight Black
@@ -59,10 +60,13 @@ export default function HomePage() {
         {/* Section 10: Social Proof & Trust */}
         <TrustBadges />
 
-        {/* Section 11: Contact */}
+        {/* Section 11: Testimonials */}
+        <Testimonials />
+
+        {/* Section 12: Contact */}
         <ContactSection />
 
-        {/* Section 12: Final CTA */}
+        {/* Section 13: Final CTA */}
         <NetworkCTA />
       </main>
 

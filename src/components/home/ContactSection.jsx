@@ -64,10 +64,10 @@ export default function ContactSection() {
 
             {/* Mascot Image */}
             <div className="mt-4 flex justify-center lg:justify-start">
-              <img 
-                src="/images/mascot.png" 
-                alt="NLV Mascot" 
-                className="w-full max-w-[380px] h-auto object-contain drop-shadow-2xl transition-transform duration-500 hover:scale-105" 
+              <img
+                src="/images/mascot.png"
+                alt="NLV Mascot"
+                className="w-full max-w-[280px] h-auto object-contain drop-shadow-2xl transition-transform duration-500 hover:scale-105"
               />
             </div>
           </div>
@@ -114,38 +114,38 @@ export default function ContactSection() {
                 borderLeft: `3px solid ${GOLD}`,
               }}
             >
-            <div className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ color: GOLD }}>
-              Ready to join?
-            </div>
-            <h3 className="font-headline font-black text-white text-2xl mb-3">
-              Start Your Journey with NLV Listings
-            </h3>
-            <p className="text-sm mb-8" style={{ color: '#9CA3AF', lineHeight: 1.8 }}>
-              Join hundreds of elite realtors already growing their business on the platform. Limited early-access spots are available.
-            </p>
+              <div className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ color: GOLD }}>
+                Ready to join?
+              </div>
+              <h3 className="font-headline font-black text-white text-2xl mb-3">
+                Start Your Journey with NLV Listings
+              </h3>
+              <p className="text-sm mb-8" style={{ color: '#9CA3AF', lineHeight: 1.8 }}>
+                Join hundreds of elite realtors already growing their business on the platform. Limited early-access spots are available.
+              </p>
 
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Link
-                to="/signup"
-                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-sm no-underline transition-all"
-                style={{ background: GOLD, color: OS }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#B8962E'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = GOLD; }}
-              >
-                Get Early Access
-                <HiArrowRight size={16} />
-              </Link>
-              <Link
-                to="/contact"
-                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-sm no-underline transition-all"
-                style={{ background: 'rgba(255,255,255,0.07)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)' }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; }}
-              >
-                Contact Sales
-              </Link>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Link
+                  to="/signup"
+                  className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-sm no-underline transition-all"
+                  style={{ background: GOLD, color: OS }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#B8962E'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = GOLD; }}
+                >
+                  Get Early Access
+                  <HiArrowRight size={16} />
+                </Link>
+                <Link
+                  to="/contact"
+                  className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-sm no-underline transition-all"
+                  style={{ background: 'rgba(255,255,255,0.07)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; }}
+                >
+                  Contact Sales
+                </Link>
+              </div>
             </div>
-          </div>
           </div>
         </div>
       </div>

@@ -23,7 +23,7 @@ export const LEADS = [
   { id: 5, name: 'Chris Wong', email: 'c***@gmail.com', phone: '(713) 892-5544', status: 'new', budget: '$300K–$450K', interest: 'House', source: 'partner', assignedTo: 'Mark Davis', score: 42, createdAt: 'Mar 26, 2026', notes: null },
   { id: 6, name: 'Priya Sharma', email: 'p***@gmail.com', phone: '(512) 774-9021', status: 'offer', budget: '$600K–$800K', interest: 'House', source: 'website', assignedTo: 'Sarah Kim', score: 95, createdAt: 'Mar 25, 2026', notes: 'Submitted offer on 742 Oak Lane. Counter pending.' },
   { id: 7, name: 'James Liu', email: 'j***@yahoo.com', phone: '(305) 881-2233', status: 'converted', budget: '$1.5M–$2M', interest: 'House', source: 'referral', assignedTo: 'Lisa Chen', score: 98, createdAt: 'Mar 24, 2026', notes: 'Closed on 4400 Biscayne Drive.' },
-  { id: 8, name: 'Ana Reeves', email: 'a***@gmail.com', phone: '(615) 552-6699', status: 'lost', budget: '$200K–$300K', interest: 'Condo', source: 'website', assignedTo: 'Mark Davis', score: 22, createdAt: 'Mar 23, 2026', notes: 'Went with a competitor. Budget too low for inventory.' },
+  { id: 8, name: 'Ana Reeves', email: 'a***@gmail.com', phone: '(615) 552-6699', status: 'lost', budget: '$200K–$300K', interest: 'Condo', source: 'website', assignedTo: 'Mark Davis', score: 22, createdAt: 'Mar 23, 2026', notes: 'Closed competitor deal. Budget too low for inventory.' },
 ];
 
 export const COMMISSIONS = [

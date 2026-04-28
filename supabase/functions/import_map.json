@@ -3,7 +3,8 @@
      "std/": "https://deno.land/std@0.190.0/",
      "http/": "https://deno.land/std@0.190.0/http/",
       "stripe": "https://esm.sh/stripe@12.9.0?target=deno",
-      "supabase": "https://esm.sh/@supabase/supabase-js@2.21.0"
+      "supabase": "https://esm.sh/@supabase/supabase-js@2.21.0",
+      "@google/generative-ai": "https://esm.sh/@google/generative-ai@0.24.0?target=deno"
    }
  }
 

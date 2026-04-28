@@ -35,12 +35,14 @@ interface RegisterResult {
 
 /**
  * Register all NLV custom fields in the GHL location.
+ * Accepts optional apiKey/locationId overrides so the admin UI can pass
+ * values from the DB settings form instead of relying on env vars.
  *
  * @returns Array of results per field — useful for logging in the admin UI
  */
-export async function registerCustomFields(): Promise<RegisterResult[]> {
-  const apiKey     = import.meta?.env?.VITE_GHL_API_KEY ?? '';
-  const locationId = import.meta?.env?.VITE_GHL_LOCATION_ID ?? '';
+export async function registerCustomFields(opts?: { apiKey?: string; locationId?: string }): Promise<RegisterResult[]> {
+  const apiKey     = opts?.apiKey     ?? import.meta?.env?.VITE_GHL_API_KEY     ?? '';
+  const locationId = opts?.locationId ?? import.meta?.env?.VITE_GHL_LOCATION_ID ?? '';
 
   if (!apiKey || !locationId) {
     throw new Error('VITE_GHL_API_KEY and VITE_GHL_LOCATION_ID must be set');
@@ -52,20 +54,32 @@ export async function registerCustomFields(): Promise<RegisterResult[]> {
     Version:        '2021-07-28',
   };
 
-  // Fetch existing fields to avoid duplicates
+  // Fetch existing fields to avoid duplicates.
+  // GHL stores display names in title-case ("NLV Lead Status") but generates
+  // field keys in snake_case ("contact.nlv_lead_status"). We match by key suffix
+  // so "NLV Lead Status" correctly deduplicates against our field name "nlv_lead_status".
   const existingRes = await fetch(
     `${GHL_API_BASE}/locations/${locationId}/customFields`,
     { headers }
   );
   const existingBody = await existingRes.json().catch(() => ({ customFields: [] }));
+
+  // Build a set of existing field key suffixes: "contact.nlv_lead_status" → "nlv_lead_status"
+  const existingKeys = new Set<string>(
+    (existingBody.customFields ?? []).map((f: any) => {
+      const key: string = f.fieldKey ?? f.id ?? '';
+      return key.replace(/^contact\./, '');
+    })
+  );
+  // Also keep display-name set as fallback
   const existingNames = new Set<string>(
-    (existingBody.customFields ?? []).map((f: any) => f.name as string)
+    (existingBody.customFields ?? []).map((f: any) => (f.name as string).toLowerCase().replace(/\s+/g, '_'))
   );
 
   const results: RegisterResult[] = [];
 
   for (const field of FIELDS_TO_REGISTER) {
-    if (existingNames.has(field.name)) {
+    if (existingKeys.has(field.name) || existingNames.has(field.name)) {
       results.push({ field: field.name, status: 'skipped' });
       continue;
     }
@@ -92,8 +106,8 @@ export async function registerCustomFields(): Promise<RegisterResult[]> {
         results.push({ field: field.name, status: 'created', id: fieldId });
         console.info(`[registerCustomFields] Created: ${field.name} (${fieldId})`);
       } else {
-        // GHL returns 422 for duplicate names in some API versions — treat as skip
-        if (res.status === 422 || body?.message?.toLowerCase().includes('duplicate')) {
+        // GHL returns 400 or 422 when the field key already exists — treat both as skip
+        if (res.status === 422 || res.status === 400 || body?.message?.toLowerCase().includes('duplicate')) {
           results.push({ field: field.name, status: 'skipped' });
         } else {
           results.push({ field: field.name, status: 'error', error: body?.message ?? `HTTP ${res.status}` });

@@ -7,8 +7,12 @@ import { useAuth } from '../../../context/AuthContext';
 import { useLeads } from '../../../hooks/useLeads';
 import { useToast } from '../../../context/ToastContext';
 import { supabase } from '../../../lib/supabase';
-import { HiCheckCircle, HiUserGroup, HiXMark } from 'react-icons/hi2';
+import { HiCheckCircle, HiUserGroup, HiXMark, HiViewColumns, HiListBullet, HiEnvelope } from 'react-icons/hi2';
 import LeadDrawer from '../../../components/shared/LeadDrawer';
+import Pagination from '../../../components/ui/Pagination';
+import { maskEmail, maskName } from '../../../utils/masking';
+
+const PAGE_SIZE = 10;
 
 const SCORE_COLOR = (s) => s >= 80 ? '#1F4D3A' : s >= 50 ? '#D4AF37' : '#DC2626';
 
@@ -43,8 +47,10 @@ export default function DirectorLeadsPage() {
   const [bulkAssignTo, setBulkAssignTo]   = useState('');
   const [bulkAssigning, setBulkAssigning] = useState(false);
 
-  // Lead type filter
+  // Lead type & view state
   const [leadTypeFilter, setLeadTypeFilter] = useState('all'); // 'all' | 'buyer' | 'realtor'
+  const [viewMode, setViewMode] = useState('table'); // 'kanban' | 'table'
+  const [page, setPage] = useState(1);
 
   // Director queue state
   const [directorQueue, setDirectorQueue] = useState([]);
@@ -104,6 +110,14 @@ export default function DirectorLeadsPage() {
     return leads.filter(l => (l.lead_type || 'buyer') === leadTypeFilter);
   }, [leads, leadTypeFilter]);
 
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [leadTypeFilter, viewMode]);
+
+  const totalPages = Math.ceil(filteredLeads.length / PAGE_SIZE);
+  const paginated = filteredLeads.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const byStatus = useMemo(() => {
     const map = {};
     COLUMNS.forEach(c => { map[c] = []; });
@@ -139,7 +153,6 @@ export default function DirectorLeadsPage() {
     }
   };
 
-  // Bulk assign handler
   const handleBulkAssign = async () => {
     if (!bulkAssignTo || selectedLeads.size === 0) return;
     setBulkAssigning(true);
@@ -191,31 +204,47 @@ export default function DirectorLeadsPage() {
           </div>
         </div>
 
-        {/* Lead Type Filter */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Funnel:</span>
-          {[
-            { key: 'all', label: 'All Leads' },
-            { key: 'buyer', label: 'Buyer Leads', color: '#1F4D3A' },
-            { key: 'realtor', label: 'Realtor Leads', color: '#7C3AED' },
-          ].map(opt => (
-            <button
-              key={opt.key}
-              onClick={() => setLeadTypeFilter(opt.key)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-              style={{
-                background: leadTypeFilter === opt.key ? (opt.color || '#111827') : '#F3F4F6',
-                color: leadTypeFilter === opt.key ? '#fff' : '#6B7280',
-              }}
-            >
-              {opt.label}
-              {opt.key !== 'all' && (
-                <span className="ml-1.5 opacity-75">
-                  ({leads.filter(l => (l.lead_type || 'buyer') === opt.key).length})
-                </span>
-              )}
-            </button>
-          ))}
+        {/* Filter & View Bar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Funnel:</span>
+            {[
+              { key: 'all', label: 'All Leads' },
+              { key: 'buyer', label: 'Buyer Leads', color: '#1F4D3A' },
+              { key: 'realtor', label: 'Realtor Leads', color: '#7C3AED' },
+            ].map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => setLeadTypeFilter(opt.key)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                style={{
+                  background: leadTypeFilter === opt.key ? (opt.color || '#111827') : '#F3F4F6',
+                  color: leadTypeFilter === opt.key ? '#fff' : '#6B7280',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="flex bg-gray-100 p-1 rounded-xl w-fit">
+              <button
+                onClick={() => setViewMode('kanban')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'kanban' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                <HiViewColumns size={16} />
+                Kanban
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'table' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                <HiListBullet size={16} />
+                Table
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Bulk Selection Bar */}
@@ -299,7 +328,7 @@ export default function DirectorLeadsPage() {
           </div>
         )}
 
-        {/* Kanban Pipeline */}
+        {/* Main Content */}
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             {COLUMNS.map(col => (
@@ -309,7 +338,7 @@ export default function DirectorLeadsPage() {
               </div>
             ))}
           </div>
-        ) : (
+        ) : viewMode === 'kanban' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             {COLUMNS.map(col => (
               <div key={col} className="flex flex-col gap-3">
@@ -348,14 +377,14 @@ export default function DirectorLeadsPage() {
                             >
                               {isSelected && <span className="text-white text-[9px] font-black">✓</span>}
                             </div>
-                            <div className="font-semibold text-gray-900 text-sm">{lead.contact_name || 'Unknown'}</div>
+                            <div className="font-semibold text-gray-900 text-sm">{maskName(lead.contact_name) || 'Unknown'}</div>
                           </div>
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
                             style={{ background: SCORE_COLOR(lead.score || 50) + '22', color: SCORE_COLOR(lead.score || 50) }}>
                             {lead.score || 50}
                           </span>
                         </div>
-                        <div className="text-xs text-gray-400 mb-1">{lead.contact_masked_email || lead.contact_email}</div>
+                        <div className="text-xs text-gray-400 mb-1">{maskEmail(lead.contact_masked_email || lead.contact_email)}</div>
                         <div className="text-xs text-gray-500 mb-2">
                           {lead.budget_max ? `$${lead.budget_max.toLocaleString()}` : '—'}
                         </div>
@@ -403,8 +432,79 @@ export default function DirectorLeadsPage() {
               </div>
             ))}
           </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/50">
+                      <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Lead</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Type</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Score</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Source</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Assigned</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {paginated.map(lead => (
+                      <tr key={lead.id} className="hover:bg-gray-50/80 transition-colors cursor-pointer" onClick={() => openDrawer(lead)}>
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-gray-900">{maskName(lead.contact_name)}</div>
+                          <div className="text-xs text-gray-400 font-mono tracking-tighter">{maskEmail(lead.contact_email)}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                           <span
+                            className="text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider"
+                            style={
+                              (lead.lead_type || 'buyer') === 'realtor'
+                                ? { background: '#EDE9FE', color: '#5B21B6' }
+                                  : { background: '#E8F3EE', color: '#1F4D3A' }
+                            }
+                          >
+                            {(lead.lead_type || 'buyer') === 'realtor' ? 'Realtor' : 'Buyer'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 capitalize text-xs font-semibold" style={{ color: COL_COLORS[toColumn(lead.status)] }}>
+                          {COL_LABELS[toColumn(lead.status)]}
+                        </td>
+                        <td className="px-4 py-3 font-black" style={{ color: SCORE_COLOR(lead.score || 50) }}>
+                          {lead.score || 50}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500 capitalize">{lead.source || 'web'}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500">
+                          {lead.assigned_realtor ? (
+                             <div className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                              {lead.assigned_realtor.full_name}
+                            </div>
+                          ) : (
+                            <span className="text-gray-300 italic">Pending Assignment</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex gap-1 justify-end">
+                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openDrawer(lead); }}>View</Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              <Pagination 
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                totalItems={filteredLeads.length}
+                pageSize={PAGE_SIZE}
+              />
+            </div>
+          </div>
         )}
-
       </div>
 
       {/* Single Assign Modal */}

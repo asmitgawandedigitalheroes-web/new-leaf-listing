@@ -7,13 +7,16 @@ import Modal from '../../../components/ui/Modal';
 import { useAuth } from '../../../context/AuthContext';
 import { useLeads } from '../../../hooks/useLeads';
 import { useToast } from '../../../context/ToastContext';
-import { HiLockClosed, HiUsers, HiExclamationTriangle } from 'react-icons/hi2';
+import { HiLockClosed, HiUsers, HiExclamationTriangle, HiEnvelope } from 'react-icons/hi2';
 import LeadDrawer from '../../../components/shared/LeadDrawer';
 import { maskEmail, maskName } from '../../../utils/masking';
 import { supabase } from '../../../lib/supabase';
 import { ActionPill } from '../../../components/shared/TableActions';
 import MobileCard, { MobileCardRow, MobileCardActions } from '../../../components/shared/MobileCard';
 import { usePlanAccess } from '../../../hooks/usePlanAccess';
+import Pagination from '../../../components/ui/Pagination';
+
+const PAGE_SIZE = 10;
 
 const STATUS_TABS = ['all', 'new', 'contacted', 'in_progress', 'closed'];
 
@@ -58,6 +61,8 @@ export default function RealtorLeadsPage() {
   const [monthlyLeadCount, setMonthlyLeadCount] = useState(0);
   const { leads, updateLeadStatus, isLoading, createInquiry, addLeadNote } = useLeads();
 
+  const [page, setPage] = useState(1);
+
   // Count leads assigned this month to enforce Starter plan cap
   useEffect(() => {
     if (!user?.id || planLimits.leads === -1) return;
@@ -101,6 +106,14 @@ export default function RealtorLeadsPage() {
     leads.filter(l => activeTab === 'all' || normalizeStatus(l.status) === activeTab),
     [leads, activeTab]
   );
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const stats = [
     { label: 'Total',       value: leads.length },
@@ -230,9 +243,9 @@ export default function RealtorLeadsPage() {
                 <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filtered.map(lead => (
-                <tr key={lead.id} className="hover:bg-gray-50/80 transition-colors">
+              <tbody className="divide-y divide-gray-50">
+                {paginated.map(lead => (
+                  <tr key={lead.id} className="hover:bg-gray-50/80 transition-colors">
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900">{maskName(lead.contact_name)}</div>
                     <div className="text-xs text-gray-400">{maskEmail(lead.contact_email)}</div>
@@ -253,28 +266,50 @@ export default function RealtorLeadsPage() {
         </div>
 
         <div className="md:hidden flex flex-col gap-3">
-          {filtered.map(lead => (
-            <MobileCard key={lead.id} onClick={() => openDrawer(lead)}>
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <Avatar initials={lead.contact_name?.slice(0, 2).toUpperCase() || 'L'} size="md" color="gold" />
-                  <div>
-                    <div className="font-semibold text-gray-900 text-sm">{maskName(lead.contact_name)}</div>
-                    <div className="text-xs text-gray-400 font-mono tracking-tight">{maskEmail(lead.contact_email)}</div>
+          {paginated.map(lead => (
+            <div 
+              key={lead.id} 
+              className="bg-white rounded-2xl overflow-hidden mb-3"
+              style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.05)' }}
+              onClick={() => openDrawer(lead)}
+            >
+              <div className="p-4 flex gap-4 relative">
+                {/* Status Badge in top right */}
+                <div className="absolute top-4 right-4">
+                  <Badge status={normalizeStatus(lead.status)} label={STATUS_LABELS[normalizeStatus(lead.status)]} />
+                </div>
+
+                {/* Left: Avatar */}
+                <div className="w-20 h-20 flex-shrink-0">
+                  <Avatar 
+                    initials={lead.contact_name?.slice(0, 2).toUpperCase() || 'L'} 
+                    size={80} 
+                    color="gold" 
+                    className="rounded-xl shadow-sm"
+                  />
+                </div>
+
+                {/* Right: Details */}
+                <div className="flex-1 min-w-0 pr-12">
+                  <div className="font-bold text-gray-900 text-base truncate mb-0.5">{maskName(lead.contact_name)}</div>
+                  <div className="text-xs text-gray-400 flex items-center gap-1 mb-2 font-mono">
+                    <HiEnvelope size={10} className="text-gray-300" />
+                    <span className="truncate">{maskEmail(lead.contact_email)}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-lg font-black text-gray-900">{lead.score ?? 0}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Score</span>
+                  </div>
+
+                  <div className="text-[11px] text-gray-400">
+                    Budget: <span className="font-semibold text-gray-600">${lead.budget_max?.toLocaleString() || 'N/A'}</span>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded"
-                  style={{ background: SCORE_COLOR(lead.score || 0) + '22', color: SCORE_COLOR(lead.score || 0) }}>
-                  {lead.score ?? 0}
-                </span>
               </div>
-              <MobileCardRow label="Budget">${lead.budget_max?.toLocaleString() || 'N/A'}</MobileCardRow>
-              <MobileCardRow label="Source"><span className="capitalize">{lead.source?.replace('_', ' ') || 'Website'}</span></MobileCardRow>
-              <MobileCardRow label="Received">{new Date(lead.created_at).toLocaleDateString()}</MobileCardRow>
-              <MobileCardRow label="Status">
-                <Badge status={normalizeStatus(lead.status)} label={STATUS_LABELS[normalizeStatus(lead.status)]} />
-              </MobileCardRow>
-              <MobileCardActions>
+
+              {/* Bottom: Actions Row */}
+              <div className="px-4 py-3 bg-gray-50/50 border-t border-gray-100 flex items-center gap-3">
                 <ActionPill
                   label="View Details"
                   color="#B8962E"
@@ -285,12 +320,21 @@ export default function RealtorLeadsPage() {
                   label="Raise Dispute"
                   color="#DC2626"
                   bg="#FEE2E2"
-                  onClick={(e) => openDisputeModal(lead, e)}
+                  onClick={(e) => { e.stopPropagation(); openDisputeModal(lead, e); }}
                 />
-              </MobileCardActions>
-            </MobileCard>
+              </div>
+            </div>
           ))}
         </div>
+
+        <Pagination 
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+          className="bg-white rounded-xl shadow-sm border border-gray-100"
+        />
 
         {filtered.length === 0 && (
           <div className="py-20 text-center text-gray-400 flex flex-col items-center">

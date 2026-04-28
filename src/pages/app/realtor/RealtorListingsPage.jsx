@@ -735,57 +735,79 @@ export default function RealtorListingsPage() {
                   boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.05)',
                   border: isRejected ? '1.5px solid #FCA5A5' : '1.5px solid transparent',
                 }}>
-                <div className="relative h-44 overflow-hidden">
-                  <img
-                    src={listing.images?.[0] || FALLBACK_IMAGE}
-                    alt={listing.title}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute top-2 left-2 flex gap-1.5">
+                <div className="p-4 flex gap-4 relative">
+                  {/* Status Badge in top right */}
+                  <div className="absolute top-4 right-4">
                     <Badge status={listing.status} />
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                      style={{ background: tierMeta.bg, color: tierMeta.color }}>
-                      {tierMeta.label}
-                    </span>
+                  </div>
+
+                  {/* Left: Square Image */}
+                  <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 shadow-sm">
+                    <img
+                      src={listing.images?.[0] || FALLBACK_IMAGE}
+                      alt={listing.title}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+
+                  {/* Right: Details */}
+                  <div className="flex-1 min-w-0 pr-12">
+                    <div className="font-bold text-gray-900 text-base truncate mb-0.5">{listing.title}</div>
+                    <div className="text-xs text-gray-400 flex items-center gap-1 mb-2">
+                      <HiMapPin size={10} className="text-gray-300" />
+                      <span className="truncate">{[listing.address, listing.city].filter(Boolean).join(', ') || 'No location'}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg font-black text-gray-900">${listing.price?.toLocaleString() || 0}</span>
+                      {listing.upgrade_type !== 'standard' && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                          style={{ 
+                            background: listing.upgrade_type === 'top' ? 'linear-gradient(135deg,#7C3AED,#5B21B6)' : 'linear-gradient(135deg,#D4AF37,#B8962E)', 
+                            color: '#fff' 
+                          }}>
+                          {listing.upgrade_type}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="text-[11px] text-gray-400">
+                      Agent: <span className="font-semibold text-gray-600">{profile?.full_name || 'Khushi'}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="p-4">
-                  <div className="font-semibold text-gray-900 mb-1 text-sm">{listing.title}</div>
-                  <div className="text-xs text-gray-400 flex items-center gap-1 mb-1">
-                    <HiMapPin size={10} />
-                    {[listing.city, listing.state].filter(Boolean).join(', ') || 'No location'}
+
+                {isRejected && listing.rejection_reason && (
+                  <div className="mx-4 mb-3 text-xs text-red-600 p-2 bg-red-50 rounded-lg border border-red-100">
+                    <strong>Reason:</strong> {listing.rejection_reason}
                   </div>
-                  {isRejected && listing.rejection_reason && (
-                    <div className="text-xs text-red-600 mb-2 p-2 bg-red-50 rounded-lg">
-                      <strong>Rejected:</strong> {listing.rejection_reason}
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-lg font-black text-gray-900">${listing.price?.toLocaleString() || 0}</span>
-                    {listing.views_count > 0 && <span className="text-xs text-gray-400">{listing.views_count} views</span>}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <ActionPill
-                      icon={HiEye} label="View"
-                      color="#1D4ED8" bg="rgba(219,234,254,0.8)"
-                      onClick={() => navigate(`/listings/${listing.id}`)}
-                    />
-                    <ActionPill
-                      icon={HiPencilSquare} label="Edit"
-                      color="#374151" bg="#F3F4F6"
-                      disabled={isUnderContract}
-                      onClick={() => openEdit(listing)}
-                    />
+                )}
+
+                {/* Bottom: Actions Row */}
+                <div className="px-4 py-3 bg-gray-50/50 border-t border-gray-100 flex items-center gap-3">
+                  <ActionPill
+                    icon={HiEye} label="View"
+                    color="#1D4ED8" bg="rgba(219,234,254,0.8)"
+                    onClick={() => navigate(`/listings/${listing.id}`)}
+                  />
+                  <ActionPill
+                    icon={HiPencilSquare} label="Edit"
+                    color="#374151" bg="#F3F4F6"
+                    disabled={isUnderContract}
+                    onClick={() => openEdit(listing)}
+                  />
+                  <ActionPill
+                    icon={HiXMark} label="Delete"
+                    color="#DC2626" bg="rgba(254,226,226,0.8)"
+                    disabled={isUnderContract}
+                    onClick={() => setDeleteTarget(listing)}
+                  />
+                  
+                  <div className="ml-auto">
                     <ActionMenu
                       items={menuItems}
                       open={openMenuId === listing.id}
                       onToggle={v => setOpenMenuId(v ? listing.id : null)}
-                    />
-                    <ActionPill
-                      icon={HiXMark} label="Delete"
-                      color="#DC2626" bg="rgba(254,226,226,0.8)"
-                      disabled={isUnderContract}
-                      onClick={() => setDeleteTarget(listing)}
                     />
                   </div>
                 </div>

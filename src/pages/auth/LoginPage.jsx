@@ -20,14 +20,6 @@ import { supabase } from '../../lib/supabase';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { APP_URL } from '../../utils/appUrl';
 
-// Demo credentials — available in all builds for easy testing.
-// Set VITE_DEMO_ADMIN_EMAIL etc. in .env.local to override defaults.
-const DEMO_CREDS = {
-  admin:    { email: import.meta.env.VITE_DEMO_ADMIN_EMAIL    ?? 'admin@nlvlistings.com',    password: import.meta.env.VITE_DEMO_ADMIN_PASS    ?? 'admin123' },
-  director: { email: import.meta.env.VITE_DEMO_DIRECTOR_EMAIL ?? 'director@nlvlistings.com', password: import.meta.env.VITE_DEMO_DIRECTOR_PASS ?? 'director123' },
-  realtor:  { email: import.meta.env.VITE_DEMO_REALTOR_EMAIL  ?? 'realtor@nlvlistings.com',  password: import.meta.env.VITE_DEMO_REALTOR_PASS  ?? 'realtor123' },
-};
-
 // NLV Brand Colors
 const P   = '#D4AF37';
 const PH  = '#B8962E';
@@ -70,29 +62,6 @@ export default function LoginPage() {
   const [showPw, setShowPw]       = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
-
-  // BUG-002: Auto-submit with the supplied credentials — state updates are async,
-  // so we pass the values directly into auth.login instead of reading from state.
-  const fillDemoCredentials = async (email, password) => {
-    setForm({ email, password });
-    setLoading(true);
-    const { error, profile: loggedInProfile } = await auth.login(email, password);
-    setLoading(false);
-    if (error) {
-      addToast({ type: 'error', title: 'Demo login failed', desc: error.message });
-      return;
-    }
-    addToast({ type: 'success', title: 'Welcome back!', desc: 'Signed in successfully.' });
-    const userRole   = loggedInProfile?.role;
-    const userStatus = loggedInProfile?.status;
-    if (userRole === 'admin') {
-      navigate('/admin/dashboard');
-    } else if (userRole === 'director') {
-      navigate(userStatus === 'pending' ? '/onboarding/pending' : '/director/dashboard');
-    } else {
-      navigate(userStatus === 'pending' ? '/onboarding/pending' : '/realtor/dashboard');
-    }
-  };
 
   const handleForgotPassword = async (e) => {
     e.preventDefault();
@@ -308,32 +277,6 @@ export default function LoginPage() {
               Sign In
             </Button>
           </form>
-
-          {/* Demo credentials — only rendered in development */}
-          {DEMO_CREDS && (
-            <div className="mt-8 p-4 bg-gray-50 border border-gray-200 rounded-xl shadow-sm">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 text-center">
-                Quick Demo Access
-              </p>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { label: 'Admin',    key: 'admin' },
-                  { label: 'Director', key: 'director' },
-                  { label: 'Realtor',  key: 'realtor' },
-                ].map(({ label, key }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => fillDemoCredentials(DEMO_CREDS[key].email, DEMO_CREDS[key].password)}
-                    className="py-2.5 px-1 text-[10px] font-bold rounded-lg border border-gray-200 bg-white hover:border-[#D4AF37] hover:text-[#D4AF37] transition-all uppercase tracking-tighter shadow-sm active:scale-95"
-                    style={{ color: '#4B5563' }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Divider */}
           <div className="flex items-center gap-3 my-6">

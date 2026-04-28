@@ -9,13 +9,14 @@ import { useState, useEffect } from 'react';
 
 import { HiPhone, HiEnvelope, HiCalendar, HiTag, HiCurrencyDollar, HiIdentification, HiChatBubbleLeftEllipsis, HiLockClosed, HiLockOpen, HiPaperAirplane, HiXCircle } from 'react-icons/hi2';
 
-/** Maps raw DB status values to the 4 UI status values used in the dropdown. */
+/** Maps raw DB status values to the UI status values used in the dropdown. */
 function normalizeStatus(status) {
   const map = {
     new: 'new', assigned: 'new',
     contacted: 'contacted',
     showing: 'in_progress', offer: 'in_progress', in_progress: 'in_progress',
-    converted: 'closed', lost: 'closed', closed: 'closed',
+    lost: 'lost',
+    converted: 'closed', closed: 'closed',
   };
   return map[status] || 'new';
 }
@@ -452,7 +453,7 @@ export default function LeadDrawer({ lead, open, onClose, onAssign, updateStatus
         </div>
 
         {/* Close Lead button — Bug 11 */}
-        {normalizeStatus(displayLead.status) !== 'closed' && (
+        {normalizeStatus(displayLead.status) !== 'closed' && normalizeStatus(displayLead.status) !== 'lost' && (
           <div className="mb-6">
             {!closeConfirmOpen ? (
               <button
@@ -522,6 +523,7 @@ export default function LeadDrawer({ lead, open, onClose, onAssign, updateStatus
                 { value: 'new',         label: 'New' },
                 { value: 'contacted',   label: 'Contacted' },
                 { value: 'in_progress', label: 'In Progress' },
+                { value: 'lost',        label: 'Closed' },
                 { value: 'closed',      label: 'Closed' },
               ].map(s => (
                 <option key={s.value} value={s.value}>{s.label}</option>

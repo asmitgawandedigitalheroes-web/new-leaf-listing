@@ -17,6 +17,7 @@ import {
 } from 'react-icons/hi2';
 import Button from '../../../components/ui/Button';
 import Skeleton from '../../../components/ui/Skeleton';
+import { registerCustomFields } from '../../../../lib/ghl/registerCustomFields';
 
 // ── Color constants ───────────────────────────────────────────────────────────
 const P      = '#D4AF37';
@@ -114,6 +115,8 @@ export default function SettingsPage() {
   const [notif, setNotif]           = useState({});
   const [contact, setContact]       = useState({});
   const [social, setSocial]         = useState({});
+  const [registeringFields, setRegisteringFields] = useState(false);
+  const [registerResults, setRegisterResults]     = useState(null);
 
   useEffect(() => {
     if (!isLoading) {
@@ -396,6 +399,60 @@ export default function SettingsPage() {
                   onChange={e => setCrm(p => ({ ...p, ghl: { ...(p.ghl || {}), webhookUrl: e.target.value } }))}
                 />
               </Field>
+
+              {/* Register custom fields — must be run once so nlv_lead_status etc. appear on GHL contacts */}
+              <div className="mt-2 pt-4 border-t border-gray-100">
+                <p className="text-xs text-gray-500 mb-2">
+                  Run this once after saving your API Key + Location ID to register the <code>nlv_lead_status</code>, <code>nlv_assigned_to</code>, and other NLV custom fields in your GHL location. Safe to re-run.
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  isLoading={registeringFields}
+                  onClick={async () => {
+                    if (!crm.ghl?.apiKey || !crm.ghl?.locationId) {
+                      addToast({ type: 'error', title: 'Missing GHL config', desc: 'Save your API Key and Location ID first.' });
+                      return;
+                    }
+                    setRegisteringFields(true);
+                    setRegisterResults(null);
+                    try {
+                      const results = await registerCustomFields({ apiKey: crm.ghl.apiKey, locationId: crm.ghl.locationId });
+                      setRegisterResults(results);
+                      const created = results.filter(r => r.status === 'created').length;
+                      const skipped = results.filter(r => r.status === 'skipped').length;
+                      const errors  = results.filter(r => r.status === 'error').length;
+                      if (errors === 0) {
+                        addToast({ type: 'success', title: 'GHL Custom Fields Ready', desc: `${created} created, ${skipped} already existed.` });
+                      } else {
+                        addToast({ type: 'error', title: `${errors} field(s) failed`, desc: 'Check console for details.' });
+                      }
+                    } catch (err) {
+                      addToast({ type: 'error', title: 'Registration failed', desc: err.message });
+                    } finally {
+                      setRegisteringFields(false);
+                    }
+                  }}
+                >
+                  {registeringFields ? 'Registering…' : 'Register GHL Custom Fields'}
+                </Button>
+                {registerResults && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {registerResults.map(r => (
+                      <span
+                        key={r.field}
+                        className="text-[10px] font-mono px-1.5 py-0.5 rounded"
+                        style={{
+                          background: r.status === 'created' ? '#DCFCE7' : r.status === 'error' ? '#FEE2E2' : '#F3F4F6',
+                          color:      r.status === 'created' ? '#166534' : r.status === 'error' ? '#991B1B' : '#6B7280',
+                        }}
+                      >
+                        {r.field} {r.status === 'created' ? '✓' : r.status === 'error' ? '✗' : '–'}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </SectionCard>

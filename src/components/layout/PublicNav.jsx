@@ -44,11 +44,16 @@ export default function PublicNav() {
         backdropFilter: scrolled ? 'blur(16px)' : 'none',
       }}
     >
-      <div className="max-w-7xl mx-auto px-6 md:px-8 h-[80px] flex items-center gap-8">
+      <div className="max-w-7xl mx-auto px-6 md:px-8 h-16 md:h-[80px] flex items-center gap-8">
 
         {/* Logo */}
         <Link to="/" className="no-underline flex-shrink-0 flex items-center">
-          <NLVLogo mode="light" size="sm" />
+          <div className="hidden md:block">
+            <NLVLogo mode="light" size="sm" />
+          </div>
+          <div className="md:hidden">
+            <NLVLogo mode="light" size="xs" />
+          </div>
         </Link>
 
         {/* Center nav — desktop */}

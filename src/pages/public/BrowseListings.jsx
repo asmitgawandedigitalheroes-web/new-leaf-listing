@@ -433,12 +433,12 @@ export default function BrowseListings() {
                     : (
                       <div
                         key={listing.id}
-                        className="flex rounded-xl overflow-hidden transition-all"
+                        className="flex flex-col sm:flex-row rounded-xl overflow-hidden transition-all"
                         style={{ background: '#fff', boxShadow: '0 2px 8px rgba(26,32,44,0.05)', border: `1px solid ${BORDER}` }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(212,175,55,0.35)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(26,32,44,0.08)'; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.boxShadow = '0 2px 8px rgba(26,32,44,0.05)'; }}
                       >
-                        <div className="w-48 flex-shrink-0 overflow-hidden relative">
+                        <div className="w-full sm:w-48 h-48 sm:h-auto flex-shrink-0 overflow-hidden relative">
                           <img src={listing.images?.[0] || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=600&q=80'} alt={listing.title} className="w-full h-full object-cover" />
                           <div
                             className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize"
