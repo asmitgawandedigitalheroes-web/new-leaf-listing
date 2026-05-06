@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 export function useTerritories() {
   const [territories, setTerritories] = useState([]);
   const [directors, setDirectors] = useState([]);
+  const [realtors, setRealtors] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -67,13 +68,14 @@ export function useTerritories() {
 
       setTerritories(transformed);
 
-      // 4. Fetch potential directors
-      const { data: dirData } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .eq('role', 'director');
-      
-      setDirectors(dirData || []);
+      // 4. Fetch potential directors and realtors for assignment UI
+      const [dirRes, realtorRes] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, email').eq('role', 'director'),
+        supabase.from('profiles').select('id, full_name, email, territory_id').eq('role', 'realtor'),
+      ]);
+
+      setDirectors(dirRes.data || []);
+      setRealtors(realtorRes.data || []);
     } catch (err) {
       console.error('[useTerritories] Fetch error:', err);
       setError(err.message);
@@ -132,15 +134,36 @@ export function useTerritories() {
     }
   };
 
-  return { 
-    territories, 
-    directors, 
-    isLoading, 
-    error, 
-    refresh: fetchTerritories, 
-    addTerritory, 
-    updateTerritory, 
-    deleteTerritory 
+  /** Assign a realtor to a territory by updating their profile.territory_id */
+  const assignRealtor = async (userId, territoryId) => {
+    try {
+      const { error: err } = await supabase
+        .from('profiles')
+        .update({ territory_id: territoryId || null, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+      if (err) throw err;
+      await fetchTerritories();
+      return { error: null };
+    } catch (err) {
+      return { error: err };
+    }
+  };
+
+  /** Remove a realtor from their current territory */
+  const removeRealtor = async (userId) => assignRealtor(userId, null);
+
+  return {
+    territories,
+    directors,
+    realtors,
+    isLoading,
+    error,
+    refresh: fetchTerritories,
+    addTerritory,
+    updateTerritory,
+    deleteTerritory,
+    assignRealtor,
+    removeRealtor,
   };
 }
 

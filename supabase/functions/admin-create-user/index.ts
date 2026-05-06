@@ -134,10 +134,12 @@ serve(async (req: Request) => {
       });
     }
 
-    // Profile starts as "pending" — the user must complete payment (14-day trial)
-    // before their account is activated. The stripe-webhook flips status → "active"
-    // and stamps verified_at once checkout.session.completed fires.
     const now = new Date().toISOString();
+
+    // Directors are invite-only, pre-approved by an admin — activate immediately so
+    // they can access /director/contracts to sign their territory agreement.
+    // Realtors remain pending until they complete a paid subscription checkout.
+    const initialStatus = role === "director" ? "active" : "pending";
 
     // Insert profile row — use only columns that exist in the profiles table schema
     const profileInsert: Record<string, unknown> = {
@@ -145,7 +147,7 @@ serve(async (req: Request) => {
       email,
       full_name,
       role,
-      status: "pending",        // Activated by Stripe webhook after subscription start
+      status: initialStatus,
       phone: phone ?? null,
       // verified_at intentionally omitted — set by webhook after first subscription
     };
@@ -174,7 +176,7 @@ serve(async (req: Request) => {
       action: "admin.create_user",
       entity_type: "profile",
       entity_id: newUser.user.id,
-      metadata: { email, role, full_name, status: "pending", requires_subscription: true, territory_id: territory_id ?? null },
+      metadata: { email, role, full_name, status: initialStatus, requires_subscription: role !== "director", territory_id: territory_id ?? null },
       timestamp: now,
     });
 

@@ -51,6 +51,7 @@ const NAV = {
     { key: 'contract',            label: 'Documents',         icon: HiDocumentText,  to: '/admin/contract' },
     { key: 'contract-signatures', label: 'Signatures',        icon: HiShieldCheck,   to: '/admin/contract-signatures' },
     { key: 'settings',     label: 'Settings',      icon: HiCog6Tooth,             to: '/admin/settings' },
+    { key: 'profile',      label: 'My Profile',    icon: HiUserCircle,            to: '/admin/profile' },
   ],
   director: [
     { key: 'dashboard',       label: 'Dashboard',          icon: HiViewColumns,          to: '/director/dashboard' },
@@ -109,7 +110,12 @@ export default function Sidebar({ role: roleProp = 'realtor', onClose }) {
   const { role: authRole, profile, logout } = useAuth();
 
   const effectiveRole = authRole || roleProp || 'realtor';
-  const items = NAV[effectiveRole] || NAV.realtor;
+  let items = NAV[effectiveRole] || NAV.realtor;
+
+  // HIDE 'My Profile' for Super Admin if requested (it's for regular admins)
+  if (effectiveRole === 'admin' && profile?.is_super_admin) {
+    items = items.filter(i => i.key !== 'profile');
+  }
 
   const displayName = profile?.full_name || DEMO_NAMES[effectiveRole] || 'User';
   const roleColors  = ROLE_COLOR[effectiveRole] || ROLE_COLOR.realtor;

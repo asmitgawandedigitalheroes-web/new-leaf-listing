@@ -119,10 +119,13 @@ export function useUsers() {
 
   const deleteUser = async (id) => {
     try {
-      // Guard: never allow deletion of an admin account
+      // Guard: never allow deletion of an admin account or super admin
       const target = users.find(u => u.id === id);
       if (target?.role === 'admin') {
         return { error: new Error('Admin accounts cannot be deleted. Suspend the account instead.') };
+      }
+      if (target?.is_super_admin) {
+        return { error: new Error('Super admin accounts are protected and cannot be deleted.') };
       }
       // Guard: cannot delete yourself
       if (id === currentUser?.id) {

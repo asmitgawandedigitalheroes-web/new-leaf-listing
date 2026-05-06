@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase';
 
 const WELCOME_MESSAGE = {
   role: 'assistant',
-  content: "Hi! I'm the NLV Assistant. I can help you with subscription plans, signing up as a realtor or director, adding listings, earning commissions, and more. What would you like to know?",
+  content: "Hi! I'm Cl0s3r, your NLV assistant. I can help you with subscription plans, signing up as a realtor or director, adding listings, earning commissions, and more. What would you like to know?",
 };
 
 // ── FAQ knowledge base ────────────────────────────────────────────────────────
@@ -330,16 +330,16 @@ export default function ChatWidget() {
             onClick={() => setIsOpen(true)}
           >
             {/* Alien character "standing" */}
-            <div className="relative mb-[-16px] z-10 transition-transform duration-500 group-hover:-translate-y-2 animate-float">
+            <div className="relative mb-[-12px] z-10 transition-transform duration-500 group-hover:-translate-y-2 animate-float">
               <img 
                 src="/images/Cl0s3r.png" 
                 alt="Assistant" 
-                className="w-24 h-24 object-contain drop-shadow-2xl" 
+                className="w-16 h-16 object-contain drop-shadow-2xl" 
               />
             </div>
             {/* Bubble */}
-            <div className="bg-white px-6 py-3 rounded-[1.25rem] shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-gray-50 flex items-center gap-2">
-              <span className="text-[15px] font-bold text-gray-800 whitespace-nowrap tracking-tight">Chat with us 👋</span>
+            <div className="bg-white px-4 py-2 rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-gray-50 flex items-center gap-2">
+              <span className="text-[13px] font-bold text-gray-800 whitespace-nowrap tracking-tight">Chat with us 👋</span>
             </div>
           </div>
         ) : (

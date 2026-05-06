@@ -95,7 +95,7 @@ serve(async (req: Request) => {
 
     const { data: targetProfile } = await supabaseAdmin
       .from("profiles")
-      .select("role, email")
+      .select("role, email, is_super_admin")
       .eq("id", userId)
       .single();
 
@@ -103,6 +103,13 @@ serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ success: false, error: "Admin accounts cannot be deleted. Suspend instead." }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
+
+    if (targetProfile?.is_super_admin) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Super admin accounts are protected and cannot be deleted." }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 403 }
       );
     }
 

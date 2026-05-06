@@ -103,6 +103,17 @@ export default function DirectorCommissionsPage() {
     { label: 'Payable', value: `$${payable.toLocaleString()}`, color: '#7C3AED', icon: <HiCurrencyDollar className="w-3.5 h-3.5" /> },
   ];
 
+  // Override earnings = commissions where recipient_role is 'director'
+  // (generated when realtors under this director's territory subscribe)
+  const overrideCommissions = commissions.filter(c => c.recipient_role === 'director');
+  const totalOverride     = overrideCommissions.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const overrideThisMonth = overrideCommissions
+    .filter(c => (c.created_at || '').startsWith(thisMonthKey))
+    .reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const overridePending   = overrideCommissions
+    .filter(c => c.status === 'pending')
+    .reduce((s, c) => s + (Number(c.amount) || 0), 0);
+
   const handlePayoutRequest = async () => {
     const amount = Number(payoutAmount);
     if (!amount || amount <= 0) {
@@ -161,6 +172,72 @@ export default function DirectorCommissionsPage() {
             </div>
           ))}
         </div>
+
+        {/* Override Earnings — commissions from realtors in director's territory */}
+        <SectionCard title="Override Earnings">
+          <div className="px-4 md:px-6 py-5 flex flex-col gap-4">
+            <p className="text-xs text-gray-400">
+              Override commissions are generated automatically when realtors under your territory make a subscription payment. Your per-subscription cut is credited here.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { label: 'Total Override', value: `$${totalOverride.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: '#D4AF37' },
+                { label: 'This Month', value: `$${overrideThisMonth.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: '#1F4D3A' },
+                { label: 'Pending Approval', value: `$${overridePending.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: '#B8962E' },
+              ].map(item => (
+                <div key={item.label} className="p-4 rounded-xl border border-gray-100 bg-gray-50">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">{item.label}</div>
+                  <div className="text-xl font-black" style={{ color: item.color }}>{item.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {overrideCommissions.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-[10px] font-bold uppercase tracking-widest text-gray-400 border-b border-gray-100">
+                      <th className="text-left py-2 pr-4">Date</th>
+                      <th className="text-left py-2 pr-4">Type</th>
+                      <th className="text-right py-2 pr-4">Amount</th>
+                      <th className="text-left py-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overrideCommissions.slice(0, 10).map(c => (
+                      <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                        <td className="py-2.5 pr-4 text-gray-500 text-xs">
+                          {c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                        </td>
+                        <td className="py-2.5 pr-4 capitalize text-gray-700">{c.type}</td>
+                        <td className="py-2.5 pr-4 text-right font-semibold text-gray-800">
+                          ${Number(c.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2.5">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold capitalize"
+                            style={{
+                              background: (STATUS_STYLES[c.status] || STATUS_STYLES.pending).bg,
+                              color:      (STATUS_STYLES[c.status] || STATUS_STYLES.pending).text,
+                            }}
+                          >
+                            {c.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {overrideCommissions.length > 10 && (
+                  <p className="text-xs text-gray-400 mt-2 text-center">{overrideCommissions.length - 10} more records — see full table below</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 italic text-center py-4">
+                No override commissions yet. They appear here when realtors in your territory subscribe.
+              </p>
+            )}
+          </div>
+        </SectionCard>
 
         {/* Chart + Source breakdown */}
         <div className="grid lg:grid-cols-3 gap-6">

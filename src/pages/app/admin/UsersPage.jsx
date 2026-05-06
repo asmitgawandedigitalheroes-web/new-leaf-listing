@@ -170,6 +170,7 @@ function ManageUserModal({
   open,
   user,
   territories,
+  currentUserProfile,
   onClose,
   onUpdateRole,
   onUpdateTerritory,
@@ -177,10 +178,16 @@ function ManageUserModal({
   onStatusChange,
   onVerify,
   onDelete,
+  onSaveCommission,
 }) {
   const [activeTab, setActiveTab] = useState('profile');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [verifyLoading, setVerifyLoading] = useState(false);
+
+  // Commission edit state
+  const [commBasePct,     setCommBasePct]     = useState('');
+  const [commOverridePct, setCommOverridePct] = useState('');
+  const [commSaving,      setCommSaving]      = useState(false);
 
   if (!open || !user) return null;
 
@@ -224,9 +231,14 @@ function ManageUserModal({
             <div>
               <h2 style={{ fontSize: 22, fontWeight: 900, margin: 0 }}>{user.name}</h2>
               <p style={{ fontSize: 13, opacity: 0.9, marginTop: 2 }}>{user.email}</p>
-              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                 <StatusBadge status={user.status} />
                 <RoleBadge role={user.role} />
+                {user.is_super_admin && (
+                  <span style={{ background: '#FEF3C7', color: '#92400E', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <HiShieldCheck size={12} /> Super Admin
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -235,10 +247,11 @@ function ManageUserModal({
         {/* Action Tabs - Redesigned for professionalism */}
         <div style={{ display: 'flex', borderBottom: `1px solid ${BORDER}`, padding: '0 12px' }}>
           {[
-            { id: 'profile', label: 'Overview' },
+            { id: 'profile',      label: 'Overview' },
             { id: 'subscription', label: 'Subscription' },
-            { id: 'danger', label: 'Safety' },
-          ].map(tab => (
+            { id: 'commission',   label: 'Commission', show: user.role === 'director' || user.role === 'admin' },
+            { id: 'danger',       label: 'Safety' },
+          ].filter(t => t.show !== false).map(tab => (
             <button
               key={tab.id}
               onClick={() => { setActiveTab(tab.id); setConfirmDelete(false); }}
@@ -268,20 +281,30 @@ function ManageUserModal({
           {activeTab === 'profile' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               
+              {/* Super Admin protection notice */}
+              {user.is_super_admin && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 10, background: '#FFFBEB', border: '1px solid #FCD34D' }}>
+                  <HiShieldCheck size={18} color="#D97706" style={{ flexShrink: 0 }} />
+                  <p style={{ fontSize: 12, color: '#92400E', lineHeight: 1.4 }}>
+                    This account has super admin privileges. Status changes, role changes, and deletion are blocked.
+                  </p>
+                </div>
+              )}
               {/* Account Status Toggle */}
               <div>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: LGRAY, textTransform: 'uppercase', marginBottom: 12, letterSpacing: '0.05em' }}>Account Status</label>
                 {user.status === 'pending' ? (
-                  <button onClick={handleApprove} style={{ width: '100%', padding: '12px', borderRadius: 12, background: '#22C55E12', color: '#065F46', border: '1px solid #22C55E33', fontWeight: 800, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                  <button onClick={handleApprove} disabled={user.is_super_admin} style={{ width: '100%', padding: '12px', borderRadius: 12, background: '#22C55E12', color: '#065F46', border: '1px solid #22C55E33', fontWeight: 800, cursor: user.is_super_admin ? 'not-allowed' : 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, opacity: user.is_super_admin ? 0.5 : 1 }}>
                     <HiCheckBadge size={20} /> Activate & Verify Account
                   </button>
                 ) : (
-                  <button onClick={handleStatusToggle} style={{ 
-                    width: '100%', padding: '12px', borderRadius: 12, 
-                    background: user.status === 'active' ? '#EF444408' : '#22C55E08', 
-                    color: user.status === 'active' ? '#991B1B' : '#065F46', 
-                    border: `1px solid ${user.status === 'active' ? '#EF444433' : '#22C55E33'}`, 
-                    fontWeight: 800, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 
+                  <button onClick={handleStatusToggle} disabled={user.is_super_admin} style={{
+                    width: '100%', padding: '12px', borderRadius: 12,
+                    background: user.status === 'active' ? '#EF444408' : '#22C55E08',
+                    color: user.status === 'active' ? '#991B1B' : '#065F46',
+                    border: `1px solid ${user.status === 'active' ? '#EF444433' : '#22C55E33'}`,
+                    fontWeight: 800, cursor: user.is_super_admin ? 'not-allowed' : 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                    opacity: user.is_super_admin ? 0.5 : 1,
                   }}>
                     {user.status === 'active' ? <HiNoSymbol size={20} /> : <HiCheckBadge size={20} />}
                     {user.status === 'active' ? 'Suspend Access' : 'Restore Access'}
@@ -331,9 +354,10 @@ function ManageUserModal({
               {/* Role Management */}
               <div>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: LGRAY, textTransform: 'uppercase', marginBottom: 12, letterSpacing: '0.05em' }}>Assign Platform Role</label>
-                {user.role === 'admin' ? (
+                {(user.role === 'admin' || user.is_super_admin) ? (
                   <div style={{ padding: '10px 14px', borderRadius: 10, background: '#FEF3C7', border: '1px solid #FCD34D', fontSize: 12, color: '#92400E', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <HiExclamationTriangle size={14} /> Admin role is protected and cannot be changed.
+                    <HiExclamationTriangle size={14} />
+                    {user.is_super_admin ? 'Super admin role is protected and cannot be changed.' : 'Admin role is protected and cannot be changed.'}
                   </div>
                 ) : (
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -403,6 +427,64 @@ function ManageUserModal({
             </div>
           )}
 
+          {activeTab === 'commission' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div style={{ padding: '12px 14px', borderRadius: 10, background: '#FFFBEB', border: '1px solid #FCD34D', fontSize: 12, color: '#92400E' }}>
+                <strong>Commission rates</strong> override the platform-wide defaults for this user.
+                {user.role === 'admin' && !currentUserProfile?.is_super_admin && (
+                  <div style={{ marginTop: 6, color: '#DC2626' }}>Only a super admin can edit commission rates for other admins.</div>
+                )}
+              </div>
+              {/* Only super_admin can edit admin commissions; admin can edit director commissions */}
+              {(user.role === 'director' || (user.role === 'admin' && currentUserProfile?.is_super_admin)) ? (
+                <>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: LGRAY, textTransform: 'uppercase', marginBottom: 6, letterSpacing: '0.05em' }}>
+                      Base Commission %
+                    </label>
+                    <input
+                      type="number" min="0" max="100" step="0.01"
+                      placeholder="e.g. 25"
+                      value={commBasePct}
+                      onChange={e => setCommBasePct(e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 13, color: OS, outline: 'none', boxSizing: 'border-box' }}
+                    />
+                    <p style={{ fontSize: 11, color: LGRAY, marginTop: 3 }}>Leave blank to use platform default</p>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: LGRAY, textTransform: 'uppercase', marginBottom: 6, letterSpacing: '0.05em' }}>
+                      Override Commission %
+                    </label>
+                    <input
+                      type="number" min="0" max="100" step="0.01"
+                      placeholder="e.g. 25"
+                      value={commOverridePct}
+                      onChange={e => setCommOverridePct(e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 13, color: OS, outline: 'none', boxSizing: 'border-box' }}
+                    />
+                    <p style={{ fontSize: 11, color: LGRAY, marginTop: 3 }}>Override % applied to realtor subscription payments under this user's territory</p>
+                  </div>
+                  <button
+                    disabled={commSaving}
+                    onClick={async () => {
+                      setCommSaving(true);
+                      await onSaveCommission(user.id, {
+                        base_commission_pct:     commBasePct     !== '' ? parseFloat(commBasePct)     : null,
+                        override_commission_pct: commOverridePct !== '' ? parseFloat(commOverridePct) : null,
+                      });
+                      setCommSaving(false);
+                    }}
+                    style={{ width: '100%', padding: '12px', borderRadius: 12, background: commSaving ? '#F9FAFB' : P, color: commSaving ? LGRAY : '#fff', border: 'none', fontWeight: 800, cursor: commSaving ? 'wait' : 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                  >
+                    {commSaving ? <><HiArrowPath size={16} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</> : 'Save Commission Rates'}
+                  </button>
+                </>
+              ) : (
+                <p style={{ fontSize: 13, color: LGRAY, textAlign: 'center' }}>You don't have permission to edit commission rates for this user.</p>
+              )}
+            </div>
+          )}
+
           {activeTab === 'danger' && (
             <div style={{ textAlign: 'center', padding: '20px 0' }}>
               {!confirmDelete ? (
@@ -412,13 +494,14 @@ function ManageUserModal({
                   </div>
                   <h3 style={{ fontSize: 16, fontWeight: 700, color: OS, marginBottom: 8 }}>Permanent Deletion</h3>
                   <p style={{ fontSize: 13, color: LGRAY, marginBottom: 24, lineHeight: 1.5 }}>Deleting this user will permanently remove their profile and all associated platform data.</p>
-                  <button 
-                    disabled={user.role === 'admin'}
-                    onClick={() => setConfirmDelete(true)} 
-                    style={{ width: '100%', padding: '12px', borderRadius: 10, background: user.role === 'admin' ? '#F3F4F6' : '#991B1B', color: user.role === 'admin' ? '#9CA3AF' : '#fff', border: 'none', fontWeight: 700, cursor: user.role === 'admin' ? 'not-allowed' : 'pointer' }}>
-                    {user.role === 'admin' ? 'Admin Accounts Locked' : 'Delete Account'}
+                  <button
+                    disabled={user.role === 'admin' || user.is_super_admin}
+                    onClick={() => setConfirmDelete(true)}
+                    style={{ width: '100%', padding: '12px', borderRadius: 10, background: (user.role === 'admin' || user.is_super_admin) ? '#F3F4F6' : '#991B1B', color: (user.role === 'admin' || user.is_super_admin) ? '#9CA3AF' : '#fff', border: 'none', fontWeight: 700, cursor: (user.role === 'admin' || user.is_super_admin) ? 'not-allowed' : 'pointer' }}>
+                    {user.is_super_admin ? 'Super Admin Protected' : user.role === 'admin' ? 'Admin Accounts Locked' : 'Delete Account'}
                   </button>
-                  {user.role === 'admin' && <p style={{ fontSize: 11, color: LGRAY, marginTop: 10 }}>Admin accounts cannot be deleted for security reasons.</p>}
+                  {user.is_super_admin && <p style={{ fontSize: 11, color: LGRAY, marginTop: 10 }}>Super admin accounts are protected and cannot be deleted or demoted.</p>}
+                  {!user.is_super_admin && user.role === 'admin' && <p style={{ fontSize: 11, color: LGRAY, marginTop: 10 }}>Admin accounts cannot be deleted for security reasons.</p>}
                 </>
               ) : (
                 <>
@@ -529,13 +612,13 @@ function AddUserModal({ open, territories, onConfirm, onCancel, isSubmitting }) 
           />
         </div>
 
-        {/* Trial notice — user selects plan themselves after accepting invite */}
+        {/* Subscription notice — user selects plan themselves after accepting invite */}
         <div style={{ marginBottom: 24, padding: '12px 14px', borderRadius: 10, background: '#FFFBEB', border: '1px solid #FCD34D', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           <HiSparkles size={16} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
           <div>
             <p style={{ fontSize: 12, fontWeight: 700, color: '#92400E', margin: 0 }}>User selects their own plan</p>
             <p style={{ fontSize: 11, color: '#B45309', margin: '2px 0 0' }}>
-              After setting their password, the invited user will be directed to choose a subscription plan. All plans include a <strong>14-day free trial</strong>.
+              After setting their password, the invited user will be directed to choose a subscription plan. An active paid subscription is required for platform access.
             </p>
           </div>
         </div>
@@ -557,7 +640,7 @@ function AddUserModal({ open, territories, onConfirm, onCancel, isSubmitting }) 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function UsersPage() {
   const { addToast } = useToast();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, profile: currentUserProfile } = useAuth();
   const { users, territories, isLoading, updateUser, deleteUser: apiDeleteUser, createUser, changeUserPlan, refresh } = useUsers();
 
   const [search, setSearch] = useState('');
@@ -741,6 +824,29 @@ export default function UsersPage() {
     await refresh();
   };
 
+  // ── Commission config ─────────────────────────────────────────────
+  const saveCommission = async (userId, { base_commission_pct, override_commission_pct }) => {
+    const { supabase: sb } = await import('../../../lib/supabase');
+    // Upsert into user_commission_config
+    const { error } = await sb
+      .from('user_commission_config')
+      .upsert({
+        user_id:              userId,
+        base_commission_pct:     base_commission_pct     ?? 25,
+        override_commission_pct: override_commission_pct ?? 25,
+        updated_by:           currentUser?.id,
+        updated_at:           new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+
+    // Also update override_commission_pct on the profile for commission RPC
+    if (!error && override_commission_pct !== null) {
+      await sb.from('profiles').update({ override_commission_pct }).eq('id', userId);
+    }
+    addToast(error
+      ? { type: 'error', title: 'Save failed', desc: error.message }
+      : { type: 'success', title: 'Commission updated', desc: 'Commission rates saved successfully.' });
+  };
+
   // ── Add User ──────────────────────────────────────────────────────
   const handleAddUser = useCallback(async (formData) => {
     setIsSubmitting(true);
@@ -759,7 +865,7 @@ export default function UsersPage() {
       addToast({
         type: 'success',
         title: 'Invitation Sent',
-        desc: `${formData.email} will receive an email to set their password and choose a subscription plan (14-day free trial included).`
+        desc: `${formData.email} will receive an email to set their password and choose a subscription plan.`
       });
     }
   }, [createUser, addToast]);
@@ -968,6 +1074,7 @@ export default function UsersPage() {
         open={manageModal.open}
         user={manageModal.user}
         territories={territories}
+        currentUserProfile={currentUserProfile}
         onClose={() => setManageModal({ open: false, user: null })}
         onUpdateRole={changeRole}
         onUpdateTerritory={assignTerritory}
@@ -975,6 +1082,7 @@ export default function UsersPage() {
         onStatusChange={handleStatusChange}
         onVerify={verifyUser}
         onDelete={deleteUser}
+        onSaveCommission={saveCommission}
       />
       <AddUserModal open={addUserOpen} territories={territories} isSubmitting={isSubmitting}
         onConfirm={handleAddUser} onCancel={() => setAddUserOpen(false)} />

@@ -12,26 +12,40 @@ import { useToast } from '../../../context/ToastContext';
 import { useTerritories } from '../../../hooks/useTerritories';
 import { ActionPill } from '../../../components/shared/TableActions';
 import MobileCard, { MobileCardRow, MobileCardActions } from '../../../components/shared/MobileCard';
-import { 
-  HiGlobeAlt, 
-  HiMapPin, 
-  HiBriefcase, 
+import {
+  HiGlobeAlt,
+  HiMapPin,
+  HiBriefcase,
   HiExclamationTriangle,
-  HiArrowPath 
+  HiArrowPath,
+  HiUsers,
+  HiUserCircle,
 } from 'react-icons/hi2';
 
 export default function TerritoriesPage() {
   const { addToast } = useToast();
-  const { territories, directors, isLoading, refresh, addTerritory, updateTerritory, deleteTerritory } = useTerritories();
+  const {
+    territories, directors, realtors, isLoading, refresh,
+    addTerritory, updateTerritory, deleteTerritory,
+    assignRealtor, removeRealtor,
+  } = useTerritories();
 
   const [filterCountry, setFilterCountry] = useState('All');
   const [filterState, setFilterState] = useState('All');
   const [addOpen, setAddOpen] = useState(false);
+
+  // Director assignment modal state
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState(null);
   const [assignDirectorId, setAssignDirectorId] = useState('');
+
+  // Realtor assignment modal state
+  const [realtorAssignOpen, setRealtorAssignOpen] = useState(false);
+  const [realtorAssignTarget, setRealtorAssignTarget] = useState(null);
+  const [selectedRealtorId, setSelectedRealtorId] = useState('');
+
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const [form, setForm] = useState({ country: 'USA', state: '', city: '', director_id: '' });
 
   const countries = useMemo(() => ['All', ...new Set(territories.map(t => t.country))], [territories]);
@@ -93,6 +107,35 @@ export default function TerritoriesPage() {
       setAssignTarget(null);
       setAssignDirectorId('');
       addToast({ type: 'success', title: 'Director assigned', desc: 'Territory director updated successfully.' });
+    }
+  };
+
+  /** Assign the selected realtor to the target territory */
+  const handleAssignRealtor = async () => {
+    if (!selectedRealtorId) {
+      addToast({ type: 'error', title: 'Select a realtor', desc: 'Please choose a realtor to assign.' });
+      return;
+    }
+    setIsSubmitting(true);
+    const { error } = await assignRealtor(selectedRealtorId, realtorAssignTarget.id);
+    setIsSubmitting(false);
+    if (error) {
+      addToast({ type: 'error', title: 'Error', desc: error.message });
+    } else {
+      setRealtorAssignOpen(false);
+      setRealtorAssignTarget(null);
+      setSelectedRealtorId('');
+      addToast({ type: 'success', title: 'Realtor assigned', desc: 'Realtor has been assigned to this territory.' });
+    }
+  };
+
+  /** Remove a realtor from the target territory */
+  const handleRemoveRealtor = async (userId) => {
+    const { error } = await removeRealtor(userId);
+    if (error) {
+      addToast({ type: 'error', title: 'Error', desc: error.message });
+    } else {
+      addToast({ type: 'success', title: 'Realtor removed', desc: 'Realtor unassigned from territory.' });
     }
   };
 
@@ -200,9 +243,14 @@ export default function TerritoriesPage() {
                           <Badge status={t.status === 'unassigned' ? 'draft' : 'active'} label={t.status === 'unassigned' ? 'Unassigned' : 'Active'} />
                         </td>
                         <td>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 flex-wrap">
                             <Button variant="outline" size="sm" onClick={() => { setAssignTarget(t); setAssignDirectorId(t.director_id || ''); setAssignOpen(true); }}>
-                              {t.director_id ? 'Reassign' : 'Assign Director'}
+                              <HiUserCircle size={13} className="mr-1" />
+                              {t.director_id ? 'Director ✓' : 'Assign Director'}
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => { setRealtorAssignTarget(t); setSelectedRealtorId(''); setRealtorAssignOpen(true); }}>
+                              <HiUsers size={13} className="mr-1" />
+                              Manage Realtors ({t.realtorsCount})
                             </Button>
                             <Button variant="ghost" size="sm" onClick={() => {
                               if (window.confirm(`Delete territory ${t.city}?`)) {
@@ -241,10 +289,16 @@ export default function TerritoriesPage() {
               </MobileCardRow>
               <MobileCardActions>
                 <ActionPill
-                  label={t.director_id ? 'Reassign' : 'Assign Director'}
+                  label={t.director_id ? 'Director ✓' : 'Assign Director'}
                   color="#fff"
                   bg="#D4AF37"
                   onClick={() => { setAssignTarget(t); setAssignDirectorId(t.director_id || ''); setAssignOpen(true); }}
+                />
+                <ActionPill
+                  label={`Realtors (${t.realtorsCount})`}
+                  color="#fff"
+                  bg="#1F4D3A"
+                  onClick={() => { setRealtorAssignTarget(t); setSelectedRealtorId(''); setRealtorAssignOpen(true); }}
                 />
                 <ActionPill
                   label="Delete"
@@ -305,7 +359,7 @@ export default function TerritoriesPage() {
         </div>
       </Modal>
 
-      {/* Assign Modal */}
+      {/* Assign Director Modal */}
       <Modal
         open={assignOpen}
         onClose={() => { setAssignOpen(false); setAssignTarget(null); setAssignDirectorId(''); }}
@@ -318,6 +372,9 @@ export default function TerritoriesPage() {
         }
       >
         <div className="flex flex-col gap-4">
+          <div className="p-3 rounded-lg bg-blue-50 border border-blue-100 text-xs text-blue-800 font-medium">
+            Director assignment — a director oversees a broad territory (province / country level).
+          </div>
           <div className="p-3 rounded-lg bg-gray-50 text-sm text-gray-600">
             <strong>{assignTarget?.city}</strong>, {assignTarget?.state}
           </div>
@@ -331,8 +388,77 @@ export default function TerritoriesPage() {
                 label: d.full_name,
                 sublabel: d.email
               }))}
-              emptyLabel="— None —"
+              emptyLabel="— None (remove director) —"
               placeholder="Search directors..."
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* Manage Realtors Modal */}
+      <Modal
+        open={realtorAssignOpen}
+        onClose={() => { setRealtorAssignOpen(false); setRealtorAssignTarget(null); setSelectedRealtorId(''); }}
+        title={realtorAssignTarget ? `Manage Realtors — ${realtorAssignTarget.city}` : 'Manage Realtors'}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setRealtorAssignOpen(false)}>Close</Button>
+            <Button variant="primary" onClick={handleAssignRealtor} isLoading={isSubmitting}>Assign Realtor</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <div className="p-3 rounded-lg bg-green-50 border border-green-100 text-xs text-green-800 font-medium">
+            Realtor assignment — realtors receive leads within their assigned city/zone territory.
+          </div>
+
+          {/* Currently assigned realtors */}
+          {(() => {
+            const assigned = realtors.filter(r => r.territory_id === realtorAssignTarget?.id);
+            return assigned.length > 0 ? (
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Currently Assigned ({assigned.length})
+                </label>
+                <div className="flex flex-col gap-2">
+                  {assigned.map(r => (
+                    <div key={r.id} className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-100 bg-gray-50">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-800">{r.full_name}</div>
+                        <div className="text-xs text-gray-400">{r.email}</div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveRealtor(r.id)}
+                        className="text-xs text-red-500 hover:text-red-700 font-semibold transition-colors px-2 py-1 rounded hover:bg-red-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 italic">No realtors currently assigned to this territory.</p>
+            );
+          })()}
+
+          {/* Add new realtor */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+              Add Realtor to Territory
+            </label>
+            <SearchableSelect
+              value={selectedRealtorId}
+              onChange={val => setSelectedRealtorId(val)}
+              options={realtors
+                .filter(r => r.territory_id !== realtorAssignTarget?.id)
+                .map(r => ({
+                  value: r.id,
+                  label: r.full_name,
+                  sublabel: r.email + (r.territory_id ? ' · has territory' : ' · unassigned'),
+                }))}
+              emptyLabel="— Select Realtor —"
+              placeholder="Search realtors..."
             />
           </div>
         </div>

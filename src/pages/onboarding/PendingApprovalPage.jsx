@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { HiClock, HiEnvelope, HiArrowRightOnRectangle, HiCheckCircle } from 'react-icons/hi2';
+import { HiClock, HiEnvelope, HiArrowRightOnRectangle, HiCheckCircle, HiCreditCard, HiArrowPath } from 'react-icons/hi2';
 import NLVLogo from '../../components/ui/NLVLogo';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -15,7 +15,33 @@ const BORDER = '#E5E7EB';
 
 export default function PendingApprovalPage() {
   const navigate = useNavigate();
-  const { profile, role, logout } = useAuth();
+  const { profile, role, user, logout } = useAuth();
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError]     = useState('');
+
+  const pendingPlan = localStorage.getItem('nlv_pending_plan') || 'pro';
+  const isRealtorPending = role === 'realtor' && profile?.status === 'pending';
+
+  const handleSubscribe = async () => {
+    setCheckoutLoading(true);
+    setCheckoutError('');
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: {
+          planKey: pendingPlan,
+          userId: user?.id,
+          userEmail: user?.email || profile?.email,
+          invitedFlow: true,
+        },
+      });
+      if (error || !data?.url) throw new Error(error?.message || 'No checkout URL returned');
+      localStorage.removeItem('nlv_pending_plan');
+      window.location.href = data.url;
+    } catch (err) {
+      setCheckoutError(err.message);
+      setCheckoutLoading(false);
+    }
+  };
 
   // Realtime listener: redirect to dashboard when admin approves
   useEffect(() => {
@@ -77,17 +103,19 @@ export default function PendingApprovalPage() {
           {/* Icon */}
           <div
             className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5"
-            style={{ background: `${P}18` }}
+            style={{ background: isRealtorPending ? `${P}18` : `${P}18` }}
           >
-            <HiClock size={32} color={P} />
+            {isRealtorPending ? <HiCreditCard size={32} color={P} /> : <HiClock size={32} color={P} />}
           </div>
 
           <h1 className="text-2xl font-black mb-2" style={{ color: OS }}>
-            Application Under Review
+            {isRealtorPending ? 'One Last Step' : 'Application Under Review'}
           </h1>
           <p className="text-sm leading-relaxed mb-6" style={{ color: OSV }}>
-            Your account has been created and is pending approval from our team.
-            You'll be notified and automatically redirected once approved.
+            {isRealtorPending
+              ? 'Your account is ready. Subscribe to a plan to activate full platform access.'
+              : 'Your account has been created and is pending approval from our team. You\'ll be notified and automatically redirected once approved.'
+            }
           </p>
 
           {/* Profile summary */}
@@ -120,13 +148,19 @@ export default function PendingApprovalPage() {
             className="rounded-xl p-4 mb-6 text-left"
             style={{ background: SCL, border: `1px solid rgba(31,77,58,0.15)` }}
           >
-            <p className="text-[11px] font-black uppercase tracking-wider mb-3" style={{ color: S }}>What happens next</p>
+            <p className="text-[11px] font-black uppercase tracking-wider mb-3" style={{ color: S }}>
+              {isRealtorPending ? 'How it works' : 'What happens next'}
+            </p>
             <div className="flex flex-col gap-2">
-              {[
+              {(isRealtorPending ? [
+                'Click "Subscribe & Activate" to complete payment via Stripe',
+                'Your account activates immediately after payment',
+                'Access your full dashboard, listings, and leads',
+              ] : [
                 'Our team reviews your application (typically within 1 business day)',
                 'You receive an email notification when approved',
                 'This page will automatically redirect you to your dashboard',
-              ].map((item, i) => (
+              ]).map((item, i) => (
                 <div key={i} className="flex items-start gap-2">
                   <HiCheckCircle size={14} color={S} style={{ marginTop: 2, flexShrink: 0 }} />
                   <p className="text-[12px] leading-relaxed" style={{ color: '#2D5A4A' }}>{item}</p>
@@ -134,6 +168,27 @@ export default function PendingApprovalPage() {
               ))}
             </div>
           </div>
+
+          {/* Subscribe CTA for pending realtors */}
+          {isRealtorPending && (
+            <div className="mb-4">
+              <button
+                onClick={handleSubscribe}
+                disabled={checkoutLoading}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition-all"
+                style={{ background: checkoutLoading ? '#F9FAFB' : P, color: checkoutLoading ? LGRAY : '#fff', border: 'none', cursor: checkoutLoading ? 'wait' : 'pointer' }}
+              >
+                {checkoutLoading
+                  ? <><HiArrowPath size={16} style={{ animation: 'spin 1s linear infinite' }} /> Redirecting to payment…</>
+                  : <><HiCreditCard size={16} /> Subscribe & Activate</>
+                }
+              </button>
+              {checkoutError && (
+                <p className="text-[11px] text-red-500 mt-2 text-center">{checkoutError}</p>
+              )}
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex flex-col gap-3">

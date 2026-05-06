@@ -195,12 +195,8 @@ serve(async (req: Request) => {
         const planKey = meta.planKey;
 
         if (userId) {
-          // When subscription has a trial, Stripe fires checkout.session.completed
-          // with amount_total = 0 and subscription status = "trialing".
-          // We store "trialing" now; the invoice.paid event flips it to "active"
-          // when the trial ends and the first real charge succeeds.
-          const hasTrialPeriod = session.amount_total === 0 && !!session.subscription;
-          const subStatus = hasTrialPeriod ? "trialing" : "active";
+          // Free trials removed — all subscriptions activate immediately on checkout.
+          const subStatus = "active";
 
           // BUG-001: Use upsert with onConflict='user_id' so that concurrent
           // webhook retries produce exactly one active subscription row.

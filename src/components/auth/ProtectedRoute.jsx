@@ -203,11 +203,17 @@ function ProtectedRoute({ children, allowedRoles }) {
   }
 
   // 5. Status gating — admins bypass; only affects realtors/directors
-  //    pending  → hold on the approval waiting page
+  //    pending  → hold on the approval waiting page (directors can still reach
+  //               /director/contracts so they can sign the territory agreement
+  //               before their account is fully activated)
   //    suspended → blocked page
   if (role !== 'admin' && !location.pathname.startsWith('/onboarding')) {
     if (profile?.status === 'pending') {
-      return <Navigate to="/onboarding/pending" replace />;
+      const isDirectorContractsPage =
+        role === 'director' && location.pathname === '/director/contracts';
+      if (!isDirectorContractsPage) {
+        return <Navigate to="/onboarding/pending" replace />;
+      }
     }
     if (profile?.status === 'suspended') {
       return <Navigate to="/onboarding/suspended" replace />;

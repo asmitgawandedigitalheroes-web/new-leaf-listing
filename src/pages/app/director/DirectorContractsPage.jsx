@@ -9,7 +9,7 @@ import { usePlatformSettings } from '../../../hooks/usePlatformSettings';
 import { auditService } from '../../../../services/audit.service';
 import { notificationService } from '../../../../services/notification.service';
 import { sendContractSignedEmail } from '../../../utils/email';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   HiDocumentText,
   HiShieldCheck,
@@ -96,10 +96,11 @@ const AGREEMENT_SECTIONS = [
 // ── Contract modal ────────────────────────────────────────────────────────────
 
 function ContractModal({ profile, onClose, onSigned, sections = AGREEMENT_SECTIONS, adminEmail }) {
+  const { updateProfile } = useAuth();
   const [entityName, setEntityName] = useState(profile?.full_name || '');
-  const [accepted, setAccepted]     = useState(false);
-  const [saving, setSaving]         = useState(false);
-  const [error, setError]           = useState('');
+  const [accepted, setAccepted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const handleSubmit = async (e) => {
@@ -112,10 +113,18 @@ function ContractModal({ profile, onClose, onSigned, sections = AGREEMENT_SECTIO
     const { error: dbErr } = await supabase
       .from('profiles')
       .update({
-        territory_contract_signed_at:   signedAt,
+        territory_contract_signed_at: signedAt,
         territory_contract_entity_name: entityName.trim(),
       })
       .eq('id', profile.id);
+    if (dbErr) { setSaving(false); setError('Failed to save. Please try again.'); return; }
+
+    // If director was pending (e.g., just created by admin), activate their
+    // account now that the territory agreement is signed.
+    if (profile?.status === 'pending') {
+      await updateProfile({ status: 'active' });
+    }
+
     setSaving(false);
     if (dbErr) { setError('Failed to save. Please try again.'); return; }
 
@@ -123,480 +132,498 @@ function ContractModal({ profile, onClose, onSigned, sections = AGREEMENT_SECTIO
     auditService.log(profile.id, 'contract.signed', 'contract', profile.id, {
       entity_name: entityName.trim(),
       signed_at: signedAt,
-    }).catch(() => {});
+    }).catch(() => { });
 
     sendContractSignedEmail({
       directorEmail: profile.email,
-      directorName:  profile.full_name || entityName.trim(),
-      entityName:    entityName.trim(),
+      directorName: profile.full_name || entityName.trim(),
+      entityName: entityName.trim(),
       adminEmail,
-    }).catch(() => {});
+    }).catch(() => { });
 
     notificationService.notifyAdminsContractSigned({
-      id:         profile.id,
-      full_name:  profile.full_name,
-      email:      profile.email,
+      id: profile.id,
+      full_name: profile.full_name,
+      email: profile.email,
       entityName: entityName.trim(),
-    }).catch(() => {});
+    }).catch(() => { });
 
     onSigned({ signedAt, entityName: entityName.trim() });
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }}>
-      <div className="w-full max-w-2xl flex flex-col rounded-2xl overflow-hidden"
-        style={{ background: '#fff', boxShadow: '0 24px 64px rgba(0,0,0,0.22)', maxHeight: '90vh' }}>
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }}>
+        <div className="w-full max-w-2xl flex flex-col rounded-2xl overflow-hidden"
+          style={{ background: '#fff', boxShadow: '0 24px 64px rgba(0,0,0,0.22)', maxHeight: '90vh' }}>
 
-        {/* Modal header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b"
-          style={{ borderColor: BORDER, flexShrink: 0 }}>
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ background: '#E8F3EE' }}>
-              <HiDocumentText className="w-5 h-5" style={{ color: DEEP }} />
+          {/* Modal header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b"
+            style={{ borderColor: BORDER, flexShrink: 0 }}>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                style={{ background: '#E8F3EE' }}>
+                <HiDocumentText className="w-5 h-5" style={{ color: DEEP }} />
+              </div>
+              <div>
+                <div className="font-bold text-gray-900 text-sm">Territory Partner Agreement</div>
+                <div className="text-[11px] text-gray-400">New Leaf Vision Inc. — Read carefully before signing</div>
+              </div>
             </div>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+              <HiXMark className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+
+          {/* Contract body — scrollable */}
+          <div className="overflow-y-auto flex-1 px-6 py-5">
+
+            {/* Title block */}
+            <div className="text-center mb-6 pb-6 border-b" style={{ borderColor: BORDER }}>
+              <div className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: GOLD }}>
+                New Leaf Vision Inc.
+              </div>
+              <h2 className="text-lg font-black text-gray-900 mb-3">
+                NLVLISTINGS TERRITORY PARTNER AGREEMENT
+              </h2>
+              <div className="text-xs text-gray-500 mb-4">Effective Date: {today}</div>
+              <div className="text-xs text-gray-600 leading-relaxed">
+                This Territory Partner Agreement ("Agreement") is entered into between{' '}
+                <strong>New Leaf Vision Inc.</strong>, a Delaware corporation ("Company") and{' '}
+                <strong>{entityName || '[Partner Name / Entity]'}</strong> ("Territory Partner").
+              </div>
+            </div>
+
+            {/* Sections */}
+            {sections.map(sec => (
+              <div key={sec.num} className="mb-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0"
+                    style={{ background: DEEP, color: '#fff' }}>{sec.num}</span>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-gray-800">{sec.title}</h3>
+                </div>
+                <div className="pl-8 text-xs text-gray-600 leading-relaxed whitespace-pre-line">
+                  {sec.body}
+                </div>
+              </div>
+            ))}
+
+            {/* Signatures block */}
+            <div className="mt-6 pt-6 border-t" style={{ borderColor: BORDER }}>
+              <h3 className="text-xs font-black uppercase tracking-widest text-gray-800 mb-4">16. SIGNATURES</h3>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="p-4 rounded-xl" style={{ background: '#F9FAFB', border: `1px solid ${BORDER}` }}>
+                  <div className="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1">Company</div>
+                  <div className="text-sm font-bold text-gray-800">New Leaf Vision Inc.</div>
+                  <div className="text-xs text-gray-500 mt-1">Authorized Representative</div>
+                </div>
+                <div className="p-4 rounded-xl" style={{ background: '#F9FAFB', border: `1px solid ${BORDER}` }}>
+                  <div className="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1">Territory Partner</div>
+                  <div className="text-sm font-bold text-gray-800">{entityName || '—'}</div>
+                  <div className="text-xs text-gray-500 mt-1">Electronic signature on {today}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Signature form — fixed at bottom */}
+          <form onSubmit={handleSubmit} className="px-6 py-5 border-t flex flex-col gap-4"
+            style={{ borderColor: BORDER, flexShrink: 0, background: '#F9FAFB' }}>
+
             <div>
-              <div className="font-bold text-gray-900 text-sm">Territory Partner Agreement</div>
-              <div className="text-[11px] text-gray-400">New Leaf Vision Inc. — Read carefully before signing</div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 block mb-1.5">
+                Your Legal Name or Entity Name *
+              </label>
+              <input
+                type="text"
+                value={entityName}
+                onChange={e => setEntityName(e.target.value)}
+                placeholder="e.g. John Smith or Smith Realty LLC"
+                className="w-full px-3 py-2.5 text-sm rounded-lg focus:outline-none"
+                style={{
+                  border: `1px solid ${BORDER}`,
+                  background: '#fff',
+                  color: '#111',
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(212,175,55,0.12)'; }}
+                onBlur={e => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.boxShadow = ''; }}
+              />
             </div>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-            <HiXMark className="w-5 h-5 text-gray-500" />
-          </button>
-        </div>
 
-        {/* Contract body — scrollable */}
-        <div className="overflow-y-auto flex-1 px-6 py-5">
-
-          {/* Title block */}
-          <div className="text-center mb-6 pb-6 border-b" style={{ borderColor: BORDER }}>
-            <div className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: GOLD }}>
-              New Leaf Vision Inc.
-            </div>
-            <h2 className="text-lg font-black text-gray-900 mb-3">
-              NLVLISTINGS TERRITORY PARTNER AGREEMENT
-            </h2>
-            <div className="text-xs text-gray-500 mb-4">Effective Date: {today}</div>
-            <div className="text-xs text-gray-600 leading-relaxed">
-              This Territory Partner Agreement ("Agreement") is entered into between{' '}
-              <strong>New Leaf Vision Inc.</strong>, a Delaware corporation ("Company") and{' '}
-              <strong>{entityName || '[Partner Name / Entity]'}</strong> ("Territory Partner").
-            </div>
-          </div>
-
-          {/* Sections */}
-          {sections.map(sec => (
-            <div key={sec.num} className="mb-5">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0"
-                  style={{ background: DEEP, color: '#fff' }}>{sec.num}</span>
-                <h3 className="text-xs font-black uppercase tracking-widest text-gray-800">{sec.title}</h3>
-              </div>
-              <div className="pl-8 text-xs text-gray-600 leading-relaxed whitespace-pre-line">
-                {sec.body}
-              </div>
-            </div>
-          ))}
-
-          {/* Signatures block */}
-          <div className="mt-6 pt-6 border-t" style={{ borderColor: BORDER }}>
-            <h3 className="text-xs font-black uppercase tracking-widest text-gray-800 mb-4">16. SIGNATURES</h3>
-            <div className="grid grid-cols-2 gap-6">
-              <div className="p-4 rounded-xl" style={{ background: '#F9FAFB', border: `1px solid ${BORDER}` }}>
-                <div className="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1">Company</div>
-                <div className="text-sm font-bold text-gray-800">New Leaf Vision Inc.</div>
-                <div className="text-xs text-gray-500 mt-1">Authorized Representative</div>
-              </div>
-              <div className="p-4 rounded-xl" style={{ background: '#F9FAFB', border: `1px solid ${BORDER}` }}>
-                <div className="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1">Territory Partner</div>
-                <div className="text-sm font-bold text-gray-800">{entityName || '—'}</div>
-                <div className="text-xs text-gray-500 mt-1">Electronic signature on {today}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Signature form — fixed at bottom */}
-        <form onSubmit={handleSubmit} className="px-6 py-5 border-t flex flex-col gap-4"
-          style={{ borderColor: BORDER, flexShrink: 0, background: '#F9FAFB' }}>
-
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 block mb-1.5">
-              Your Legal Name or Entity Name *
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={accepted}
+                onChange={e => setAccepted(e.target.checked)}
+                className="mt-0.5 w-4 h-4 flex-shrink-0 accent-[#1F4D3A]"
+              />
+              <span className="text-xs text-gray-600 leading-relaxed">
+                I have read and fully understand the NLVListings Territory Partner Agreement. I agree to be bound by its terms and conditions on behalf of myself and/or my entity.
+              </span>
             </label>
-            <input
-              type="text"
-              value={entityName}
-              onChange={e => setEntityName(e.target.value)}
-              placeholder="e.g. John Smith or Smith Realty LLC"
-              className="w-full px-3 py-2.5 text-sm rounded-lg focus:outline-none"
-              style={{
-                border: `1px solid ${BORDER}`,
-                background: '#fff',
-                color: '#111',
-              }}
-              onFocus={e => { e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(212,175,55,0.12)'; }}
-              onBlur={e => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.boxShadow = ''; }}
-            />
-          </div>
 
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={accepted}
-              onChange={e => setAccepted(e.target.checked)}
-              className="mt-0.5 w-4 h-4 flex-shrink-0 accent-[#1F4D3A]"
-            />
-            <span className="text-xs text-gray-600 leading-relaxed">
-              I have read and fully understand the NLVListings Territory Partner Agreement. I agree to be bound by its terms and conditions on behalf of myself and/or my entity.
-            </span>
-          </label>
+            {error && (
+              <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                <HiExclamationTriangle className="w-4 h-4 flex-shrink-0" />
+                {error}
+              </div>
+            )}
 
-          {error && (
-            <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">
-              <HiExclamationTriangle className="w-4 h-4 flex-shrink-0" />
-              {error}
+            <div className="flex items-center justify-end gap-3">
+              <button type="button" onClick={onClose}
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100 transition-colors">
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold text-white transition-all disabled:opacity-60"
+                style={{ background: DEEP }}
+              >
+                {saving ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Signing…
+                  </>
+                ) : (
+                  <>
+                    <HiPencilSquare className="w-4 h-4" />
+                    Sign &amp; Submit Agreement
+                  </>
+                )}
+              </button>
             </div>
-          )}
-
-          <div className="flex items-center justify-end gap-3">
-            <button type="button" onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100 transition-colors">
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold text-white transition-all disabled:opacity-60"
-              style={{ background: DEEP }}
-            >
-              {saving ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Signing…
-                </>
-              ) : (
-                <>
-                  <HiPencilSquare className="w-4 h-4" />
-                  Sign &amp; Submit Agreement
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+  // ── Main page ─────────────────────────────────────────────────────────────────
 
-export default function DirectorContractsPage() {
-  const { profile } = useAuth();
-  const { addToast } = useToast();
-  const { settings } = usePlatformSettings();
-  const agreementSections = settings.contract_template || AGREEMENT_SECTIONS;
-  const adminEmail = settings.support_email || 'support@nlvlistings.com';
-  const [contractData, setContractData] = useState(null);
-  const [loadingContract, setLoadingContract] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [downloadedIds, setDownloadedIds] = useState(new Set());
+  export default function DirectorContractsPage() {
+    const navigate = useNavigate();
+    const { profile } = useAuth();
+    const { addToast } = useToast();
+    const { settings } = usePlatformSettings();
+    const agreementSections = settings.contract_template || AGREEMENT_SECTIONS;
+    const adminEmail = settings.support_email || 'support@nlvlistings.com';
+    const [contractData, setContractData] = useState(null);
+    const [loadingContract, setLoadingContract] = useState(true);
+    const [showModal, setShowModal] = useState(false);
+    const [downloadedIds, setDownloadedIds] = useState(new Set());
+    const [justActivated, setJustActivated] = useState(false);
 
-  useEffect(() => {
-    if (!profile?.id) return;
-    supabase
-      .from('profiles')
-      .select('territory_contract_signed_at, territory_contract_entity_name')
-      .eq('id', profile.id)
-      .single()
-      .then(({ data }) => {
-        setContractData(data);
-        setLoadingContract(false);
-      });
-  }, [profile?.id]);
+    useEffect(() => {
+      if (!profile?.id) return;
+      supabase
+        .from('profiles')
+        .select('territory_contract_signed_at, territory_contract_entity_name')
+        .eq('id', profile.id)
+        .single()
+        .then(({ data }) => {
+          setContractData(data);
+          setLoadingContract(false);
+        });
+    }, [profile?.id]);
 
-  const isSigned = !!contractData?.territory_contract_signed_at;
-  const signedDate = isSigned
-    ? new Date(contractData.territory_contract_signed_at).toLocaleDateString('en-US', {
+    const isSigned = !!contractData?.territory_contract_signed_at;
+    const signedDate = isSigned
+      ? new Date(contractData.territory_contract_signed_at).toLocaleDateString('en-US', {
         year: 'numeric', month: 'long', day: 'numeric',
       })
-    : null;
+      : null;
 
-  const handleSigned = ({ signedAt, entityName }) => {
-    setContractData({ territory_contract_signed_at: signedAt, territory_contract_entity_name: entityName });
-    setShowModal(false);
-    addToast({
-      type: 'success',
-      title: 'Agreement signed',
-      desc: `Your Territory Partner Agreement is on record. A confirmation has been sent to ${profile?.email}.`,
-    });
-  };
+    const handleSigned = ({ signedAt, entityName }) => {
+      setContractData({ territory_contract_signed_at: signedAt, territory_contract_entity_name: entityName });
+      setShowModal(false);
+      // If the director was pending, their account is now active — show a redirect banner
+      if (profile?.status === 'pending') {
+        setJustActivated(true);
+        setTimeout(() => navigate('/director/dashboard'), 3000);
+      }
+    };
 
-  const DOCS = [
-    {
-      id: 'territory',
-      icon: HiDocumentText,
-      title: 'Territory Partner Agreement',
-      desc: 'Your agreement granting priority/exclusive rights over your assigned territory within the NLVListings platform.',
-      status: isSigned ? 'signed' : 'pending',
-      date: isSigned ? `Signed ${signedDate}` : 'Action required',
-      color: DEEP,
-      bg: '#E8F3EE',
-      action: isSigned ? null : 'sign',
-      downloadable: isSigned,
-    },
-    {
-      id: 'platform',
-      icon: HiShieldCheck,
-      title: 'Platform Rules',
-      desc: 'Operational guidelines, lead handling policies, and code of conduct for all participants.',
-      status: 'active',
-      date: 'Always current',
-      color: '#3B82F6',
-      bg: '#EFF6FF',
-      link: '/platform-rules',
-      downloadable: false,
-    },
-    {
-      id: 'commissions',
-      icon: HiScale,
-      title: 'Commission Structure',
-      desc: 'Your 25% recurring override commission terms and payout schedule agreement.',
-      status: 'active',
-      date: 'Always current',
-      color: GOLD,
-      bg: 'rgba(212,175,55,0.10)',
-      link: '/full-contracts',
-      downloadable: false,
-    },
-    {
-      id: 'privacy',
-      icon: HiLockClosed,
-      title: 'Data & Privacy Policy',
-      desc: 'How NLV Listings handles lead data, GDPR compliance, and your obligations.',
-      status: 'active',
-      date: 'Always current',
-      color: '#6B7280',
-      bg: '#F9FAFB',
-      link: '/privacy-policy',
-      downloadable: false,
-    },
-  ];
+    const DOCS = [
+      {
+        id: 'territory',
+        icon: HiDocumentText,
+        title: 'Territory Partner Agreement',
+        desc: 'Your agreement granting priority/exclusive rights over your assigned territory within the NLVListings platform.',
+        status: isSigned ? 'signed' : 'pending',
+        date: isSigned ? `Signed ${signedDate}` : 'Action required',
+        color: DEEP,
+        bg: '#E8F3EE',
+        action: isSigned ? null : 'sign',
+        downloadable: isSigned,
+      },
+      {
+        id: 'platform',
+        icon: HiShieldCheck,
+        title: 'Platform Rules',
+        desc: 'Operational guidelines, lead handling policies, and code of conduct for all participants.',
+        status: 'active',
+        date: 'Always current',
+        color: '#3B82F6',
+        bg: '#EFF6FF',
+        link: '/platform-rules',
+        downloadable: false,
+      },
+      {
+        id: 'commissions',
+        icon: HiScale,
+        title: 'Commission Structure',
+        desc: 'Your 25% recurring override commission terms and payout schedule agreement.',
+        status: 'active',
+        date: 'Always current',
+        color: GOLD,
+        bg: 'rgba(212,175,55,0.10)',
+        link: '/full-contracts',
+        downloadable: false,
+      },
+      {
+        id: 'privacy',
+        icon: HiLockClosed,
+        title: 'Data & Privacy Policy',
+        desc: 'How NLV Listings handles lead data, GDPR compliance, and your obligations.',
+        status: 'active',
+        date: 'Always current',
+        color: '#6B7280',
+        bg: '#F9FAFB',
+        link: '/privacy-policy',
+        downloadable: false,
+      },
+    ];
 
-  return (
-    <AppLayout role="director" title="Legal & Contracts">
-      <div className="p-4 md:p-6 flex flex-col gap-6">
+    return (
+      <AppLayout role="director" title="Legal & Contracts">
+        <div className="p-4 md:p-6 flex flex-col gap-6">
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="text-xs text-gray-400 uppercase tracking-widest font-semibold mb-0.5">Director Panel</div>
-            <h2 className="text-xl font-bold text-gray-900">Legal & Contracts</h2>
-            <p className="text-sm text-gray-400 mt-0.5">Your signed agreements and platform policies</p>
-          </div>
-          {!loadingContract && (
-            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl"
-              style={{ background: isSigned ? '#E8F3EE' : 'rgba(212,175,55,0.10)' }}>
-              {isSigned
-                ? <HiCheckCircle className="w-4 h-4" style={{ color: DEEP }} />
-                : <HiExclamationTriangle className="w-4 h-4" style={{ color: GOLD }} />}
-              <span className="text-sm font-semibold"
-                style={{ color: isSigned ? DEEP : '#92741A' }}>
-                {isSigned ? 'All agreements on file' : 'Territory agreement required'}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Unsigned banner */}
-        {!loadingContract && !isSigned && (
-          <div className="rounded-2xl p-5 md:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-            style={{
-              background: '#1A202C',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
-              borderLeft: `3px solid ${GOLD}`,
-            }}>
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Action Required</div>
-              <div className="text-white font-bold text-lg mb-1">Sign Your Territory Partner Agreement</div>
-              <div className="text-gray-400 text-sm">
-                To activate your territory and access all director features, please review and sign the Territory Partner Agreement.
-              </div>
+              <div className="text-xs text-gray-400 uppercase tracking-widest font-semibold mb-0.5">Director Panel</div>
+              <h2 className="text-xl font-bold text-gray-900">Legal & Contracts</h2>
+              <p className="text-sm text-gray-400 mt-0.5">Your signed agreements and platform policies</p>
             </div>
-            <button
-              onClick={() => setShowModal(true)}
-              className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold flex-shrink-0 transition-all hover:opacity-90"
-              style={{ background: GOLD, color: '#111' }}
-            >
-              <HiPencilSquare className="w-4 h-4" />
-              Review &amp; Sign
-            </button>
+            {!loadingContract && (
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl"
+                style={{ background: isSigned ? '#E8F3EE' : 'rgba(212,175,55,0.10)' }}>
+                {isSigned
+                  ? <HiCheckCircle className="w-4 h-4" style={{ color: DEEP }} />
+                  : <HiExclamationTriangle className="w-4 h-4" style={{ color: GOLD }} />}
+                <span className="text-sm font-semibold"
+                  style={{ color: isSigned ? DEEP : '#92741A' }}>
+                  {isSigned ? 'All agreements on file' : 'Territory agreement required'}
+                </span>
+              </div>
+            )}
           </div>
-        )}
 
-        {/* Signed summary card */}
-        {!loadingContract && isSigned && (
-          <div className="rounded-2xl p-5 md:p-6"
-            style={{
-              background: '#1A202C',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
-              borderLeft: `3px solid ${GOLD}`,
-            }}>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Account just activated banner */}
+          {justActivated && (
+            <div className="rounded-2xl p-5 md:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+              style={{ background: '#1A202C', boxShadow: '0 4px 20px rgba(0,0,0,0.18)', borderLeft: `3px solid #22C55E` }}>
               <div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Territory Director Agreement</div>
-                <div className="text-white font-bold text-lg mb-1">
-                  {contractData.territory_contract_entity_name || profile?.full_name || 'Regional Director'}
-                </div>
-                <div className="text-gray-400 text-sm">{profile?.territory || 'Territory'} · Signed {signedDate}</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Account Activated</div>
+                <div className="text-white font-bold text-lg mb-1">Welcome! Your director account is now active.</div>
+                <div className="text-gray-400 text-sm">Redirecting you to the dashboard in a moment…</div>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" />
-                <span className="text-green-400 text-sm font-semibold">Active Agreement</span>
+                <span className="text-green-400 text-sm font-semibold">Active</span>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4 mt-5 pt-5 border-t border-gray-700">
-              {[
-                { label: 'Commission', value: '25% Override' },
-                { label: 'Territory', value: profile?.territory || '—' },
-                { label: 'Status', value: 'Active Director' },
-              ].map((item, i) => (
-                <div key={i}>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5">{item.label}</div>
-                  <div className="text-white text-sm font-semibold">{item.value}</div>
+          )}
+
+          {/* Unsigned banner */}
+          {!loadingContract && !isSigned && (
+            <div className="rounded-2xl p-5 md:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+              style={{
+                background: '#1A202C',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
+                borderLeft: `3px solid ${GOLD}`,
+              }}>
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Action Required</div>
+                <div className="text-white font-bold text-lg mb-1">Sign Your Territory Partner Agreement</div>
+                <div className="text-gray-400 text-sm">
+                  To activate your territory and access all director features, please review and sign the Territory Partner Agreement.
                 </div>
-              ))}
+              </div>
+              <button
+                onClick={() => setShowModal(true)}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold flex-shrink-0 transition-all hover:opacity-90"
+                style={{ background: GOLD, color: '#111' }}
+              >
+                <HiPencilSquare className="w-4 h-4" />
+                Review &amp; Sign
+              </button>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Documents Grid */}
-        <SectionCard title="Your Documents">
-          <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {DOCS.map(doc => {
-              const Icon = doc.icon;
-              const downloaded = downloadedIds.has(doc.id);
-              const isPending = doc.status === 'pending';
-              return (
-                <div key={doc.id} className="rounded-xl border overflow-hidden"
-                  style={{
-                    borderColor: isPending ? GOLD : BORDER,
-                    boxShadow: isPending ? `0 0 0 1px ${GOLD}` : '0 1px 3px rgba(0,0,0,0.04)',
-                  }}>
-                  <div className="p-4">
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: doc.bg }}>
-                        <Icon className="w-5 h-5" style={{ color: doc.color }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-gray-900 text-sm mb-1">{doc.title}</div>
-                        <p className="text-xs text-gray-500 leading-relaxed">{doc.desc}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-50">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full"
-                          style={{ background: isPending ? GOLD : doc.status === 'signed' ? '#059669' : '#3B82F6' }} />
-                        <span className="text-[10px] font-semibold capitalize"
-                          style={{ color: isPending ? '#92741A' : doc.status === 'signed' ? '#059669' : '#3B82F6' }}>
-                          {isPending ? 'Pending signature' : doc.status === 'signed' ? 'Signed' : 'Active'}
-                        </span>
-                        <span className="text-[10px] text-gray-400 ml-1">{doc.date}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {doc.action === 'sign' && (
-                          <button
-                            onClick={() => setShowModal(true)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all"
-                            style={{ background: GOLD, color: '#111' }}
-                          >
-                            <HiPencilSquare className="w-3.5 h-3.5" />
-                            Sign Now
-                          </button>
-                        )}
-                        {doc.link && (
-                          <Link
-                            to={doc.link}
-                            target="_blank"
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
-                            style={{ background: doc.bg, color: doc.color }}
-                          >
-                            <HiArrowTopRightOnSquare className="w-3.5 h-3.5" />
-                            View
-                          </Link>
-                        )}
-                        {doc.downloadable && (
-                          <button
-                            onClick={() => setDownloadedIds(prev => new Set([...prev, doc.id]))}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
-                            style={{
-                              background: downloaded ? '#F0FDF4' : '#F9FAFB',
-                              color: downloaded ? '#059669' : '#6B7280',
-                              border: downloaded ? '1px solid #BBF7D0' : `1px solid ${BORDER}`,
-                            }}
-                          >
-                            {downloaded
-                              ? <><HiCheckCircle className="w-3.5 h-3.5" /> Saved</>
-                              : <><HiArrowDownTray className="w-3.5 h-3.5" /> Download</>}
-                          </button>
-                        )}
-                      </div>
-                    </div>
+          {/* Signed summary card */}
+          {!loadingContract && isSigned && (
+            <div className="rounded-2xl p-5 md:p-6"
+              style={{
+                background: '#1A202C',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
+                borderLeft: `3px solid ${GOLD}`,
+              }}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Territory Director Agreement</div>
+                  <div className="text-white font-bold text-lg mb-1">
+                    {contractData.territory_contract_entity_name || profile?.full_name || 'Regional Director'}
                   </div>
+                  <div className="text-gray-400 text-sm">{profile?.territory || 'Territory'} · Signed {signedDate}</div>
                 </div>
-              );
-            })}
-          </div>
-        </SectionCard>
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" />
+                  <span className="text-green-400 text-sm font-semibold">Active Agreement</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4 mt-5 pt-5 border-t border-gray-700">
+                {[
+                  { label: 'Commission', value: '25% Override' },
+                  { label: 'Territory', value: profile?.territory || '—' },
+                  { label: 'Status', value: 'Active Director' },
+                ].map((item, i) => (
+                  <div key={i}>
+                    <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5">{item.label}</div>
+                    <div className="text-white text-sm font-semibold">{item.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-        {/* Key terms */}
-        <SectionCard title="Key Agreement Terms">
-          <div className="p-4 md:p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                { icon: HiCalendar, label: 'Agreement Start', value: 'Upon territory activation', color: DEEP, bg: '#E8F3EE' },
-                { icon: HiScale, label: 'Commission Rate', value: '25% Monthly Override', color: GOLD, bg: 'rgba(212,175,55,0.1)' },
-                { icon: HiShieldCheck, label: 'Territory Exclusivity', value: 'Exclusive rights granted', color: '#3B82F6', bg: '#EFF6FF' },
-              ].map((item, i) => {
-                const Icon = item.icon;
+          {/* Documents Grid */}
+          <SectionCard title="Your Documents">
+            <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {DOCS.map(doc => {
+                const Icon = doc.icon;
+                const downloaded = downloadedIds.has(doc.id);
+                const isPending = doc.status === 'pending';
                 return (
-                  <div key={i} className="flex items-start gap-3 p-4 rounded-xl" style={{ background: item.bg }}>
-                    <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: item.color }} />
-                    <div>
-                      <div className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: item.color }}>{item.label}</div>
-                      <div className="text-sm font-semibold text-gray-800">{item.value}</div>
+                  <div key={doc.id} className="rounded-xl border overflow-hidden"
+                    style={{
+                      borderColor: isPending ? GOLD : BORDER,
+                      boxShadow: isPending ? `0 0 0 1px ${GOLD}` : '0 1px 3px rgba(0,0,0,0.04)',
+                    }}>
+                    <div className="p-4">
+                      <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                          style={{ background: doc.bg }}>
+                          <Icon className="w-5 h-5" style={{ color: doc.color }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-gray-900 text-sm mb-1">{doc.title}</div>
+                          <p className="text-xs text-gray-500 leading-relaxed">{doc.desc}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-50">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full"
+                            style={{ background: isPending ? GOLD : doc.status === 'signed' ? '#059669' : '#3B82F6' }} />
+                          <span className="text-[10px] font-semibold capitalize"
+                            style={{ color: isPending ? '#92741A' : doc.status === 'signed' ? '#059669' : '#3B82F6' }}>
+                            {isPending ? 'Pending signature' : doc.status === 'signed' ? 'Signed' : 'Active'}
+                          </span>
+                          <span className="text-[10px] text-gray-400 ml-1">{doc.date}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {doc.action === 'sign' && (
+                            <button
+                              onClick={() => setShowModal(true)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all"
+                              style={{ background: GOLD, color: '#111' }}
+                            >
+                              <HiPencilSquare className="w-3.5 h-3.5" />
+                              Sign Now
+                            </button>
+                          )}
+                          {doc.link && (
+                            <Link
+                              to={doc.link}
+                              target="_blank"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
+                              style={{ background: doc.bg, color: doc.color }}
+                            >
+                              <HiArrowTopRightOnSquare className="w-3.5 h-3.5" />
+                              View
+                            </Link>
+                          )}
+                          {doc.downloadable && (
+                            <button
+                              onClick={() => setDownloadedIds(prev => new Set([...prev, doc.id]))}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
+                              style={{
+                                background: downloaded ? '#F0FDF4' : '#F9FAFB',
+                                color: downloaded ? '#059669' : '#6B7280',
+                                border: downloaded ? '1px solid #BBF7D0' : `1px solid ${BORDER}`,
+                              }}
+                            >
+                              {downloaded
+                                ? <><HiCheckCircle className="w-3.5 h-3.5" /> Saved</>
+                                : <><HiArrowDownTray className="w-3.5 h-3.5" /> Download</>}
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
-            <div className="mt-5 pt-5 border-t border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <p className="text-xs text-gray-400 leading-relaxed max-w-lg">
-                All agreements are binding under NLV Listings Platform Terms. For disputes or modifications to your territory agreement, contact your platform administrator.
-              </p>
-              <button onClick={() => setShowModal(true)}>
-                <Button variant="outline" size="sm" className="flex items-center gap-2 flex-shrink-0">
-                  <HiDocumentText className="w-4 h-4" />
-                  {isSigned ? 'View Agreement' : 'Sign Agreement'}
-                </Button>
-              </button>
+          </SectionCard>
+
+          {/* Key terms */}
+          <SectionCard title="Key Agreement Terms">
+            <div className="p-4 md:p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {[
+                  { icon: HiCalendar, label: 'Agreement Start', value: 'Upon territory activation', color: DEEP, bg: '#E8F3EE' },
+                  { icon: HiScale, label: 'Commission Rate', value: '25% Monthly Override', color: GOLD, bg: 'rgba(212,175,55,0.1)' },
+                  { icon: HiShieldCheck, label: 'Territory Exclusivity', value: 'Exclusive rights granted', color: '#3B82F6', bg: '#EFF6FF' },
+                ].map((item, i) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={i} className="flex items-start gap-3 p-4 rounded-xl" style={{ background: item.bg }}>
+                      <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: item.color }} />
+                      <div>
+                        <div className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: item.color }}>{item.label}</div>
+                        <div className="text-sm font-semibold text-gray-800">{item.value}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-5 pt-5 border-t border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <p className="text-xs text-gray-400 leading-relaxed max-w-lg">
+                  All agreements are binding under NLV Listings Platform Terms. For disputes or modifications to your territory agreement, contact your platform administrator.
+                </p>
+                <button onClick={() => setShowModal(true)}>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2 flex-shrink-0">
+                    <HiDocumentText className="w-4 h-4" />
+                    {isSigned ? 'View Agreement' : 'Sign Agreement'}
+                  </Button>
+                </button>
+              </div>
             </div>
-          </div>
-        </SectionCard>
+          </SectionCard>
 
-      </div>
+        </div>
 
-      {showModal && (
-        <ContractModal
-          profile={profile}
-          onClose={() => setShowModal(false)}
-          onSigned={handleSigned}
-          sections={agreementSections}
-          adminEmail={adminEmail}
-        />
-      )}
-    </AppLayout>
-  );
-}
+        {showModal && (
+          <ContractModal
+            profile={profile}
+            onClose={() => setShowModal(false)}
+            onSigned={handleSigned}
+            sections={agreementSections}
+            adminEmail={adminEmail}
+          />
+        )}
+      </AppLayout>
+    );
+  }

@@ -29,12 +29,12 @@ import { supabase } from '../../lib/supabase';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 
 // NLV Brand Colors
-const P      = '#D4AF37';
-const S      = '#1F4D3A';
-const SCL    = '#E8F3EE';
-const OS     = '#111111';
-const OSV    = '#4B5563';
-const LGRAY  = '#6B7280';
+const P = '#D4AF37';
+const S = '#1F4D3A';
+const SCL = '#E8F3EE';
+const OS = '#111111';
+const OSV = '#4B5563';
+const LGRAY = '#6B7280';
 const BORDER = '#E5E7EB';
 const SURFBG = '#F9FAFB';
 
@@ -45,14 +45,14 @@ const SURFBG = '#F9FAFB';
 // step 3 = Confirm & submit
 
 const REALTOR_STEPS = [
-  { label: 'Role',        icon: HiUserGroup },
-  { label: 'Account',     icon: HiUser },
+  { label: 'Role', icon: HiUserGroup },
+  { label: 'Account', icon: HiUser },
   { label: 'Select Plan', icon: HiSparkles },
-  { label: 'Confirm',     icon: HiCheckCircle },
+  { label: 'Confirm', icon: HiCheckCircle },
 ];
 
 const DIRECTOR_STEPS = [
-  { label: 'Role',    icon: HiUserGroup },
+  { label: 'Role', icon: HiUserGroup },
   { label: 'Account', icon: HiUser },
   { label: 'Confirm', icon: HiCheckCircle },
 ];
@@ -109,16 +109,16 @@ function InputField({ label, type = 'text', placeholder, value, onChange, icon, 
 
 // Password rules
 const PW_RULES = [
-  { key: 'length',    label: '8–15 characters',         test: v => v.length >= 8 && v.length <= 15 },
-  { key: 'uppercase', label: 'One uppercase letter',     test: v => /[A-Z]/.test(v) },
-  { key: 'number',    label: 'One number',               test: v => /[0-9]/.test(v) },
-  { key: 'symbol',    label: 'One symbol (!@#$…)',       test: v => /[^A-Za-z0-9\s]/.test(v) },
-  { key: 'nospace',   label: 'No spaces',                test: v => !/\s/.test(v) },
+  { key: 'length', label: '8–15 characters', test: v => v.length >= 8 && v.length <= 15 },
+  { key: 'uppercase', label: 'One uppercase letter', test: v => /[A-Z]/.test(v) },
+  { key: 'number', label: 'One number', test: v => /[0-9]/.test(v) },
+  { key: 'symbol', label: 'One symbol (!@#$…)', test: v => /[^A-Za-z0-9\s]/.test(v) },
+  { key: 'nospace', label: 'No spaces', test: v => !/\s/.test(v) },
 ];
 
 function PasswordField({ value, onChange, error }) {
   const [focused, setFocused] = useState(false);
-  const [show, setShow]       = useState(false);
+  const [show, setShow] = useState(false);
   const [touched, setTouched] = useState(false);
 
   const showRules = touched && value.length > 0;
@@ -207,14 +207,14 @@ export default function SignupPage() {
 
   // Invite / role params from URL
   const inviteTerritoryId = searchParams.get('territory_id') || '';
-  const inviteDirectorId  = searchParams.get('director_id')  || '';
-  const roleParam         = searchParams.get('role')         || '';
-  const isDirectorInvite  = roleParam === 'director';
+  const inviteDirectorId = searchParams.get('director_id') || '';
+  const roleParam = searchParams.get('role') || '';
+  const isDirectorInvite = roleParam === 'director';
 
   // Admin invite token (Flow 2 — quick link)
   const inviteToken = searchParams.get('invite_token') || '';
-  const [inviteData,    setInviteData]    = useState(null);
-  const [inviteError,   setInviteError]   = useState('');
+  const [inviteData, setInviteData] = useState(null);
+  const [inviteError, setInviteError] = useState('');
   const [inviteLoading, setInviteLoading] = useState(!!inviteToken);
 
   // Referral tracking — resolve ?ref=CODE to referrer's UUID on mount
@@ -237,9 +237,9 @@ export default function SignupPage() {
     plan: 'pro',
     licenseNumber: '', licenseState: '', licenseExpiry: '',
   });
-  const [loading, setLoading]           = useState(false);
+  const [loading, setLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [pricingPlans, setPricingPlans]   = useState([]);
+  const [pricingPlans, setPricingPlans] = useState([]);
   // OBS-001/002: inline field-level errors for Step 1
   const [fieldErrors, setFieldErrors] = useState({});
 
@@ -306,7 +306,7 @@ export default function SignupPage() {
           ...prev,
           role: data.role,
           email: data.email || prev.email,
-          name:  data.full_name || prev.name,
+          name: data.full_name || prev.name,
         }));
       });
   }, [inviteToken]);
@@ -323,18 +323,18 @@ export default function SignupPage() {
       // OBS-001/002: Collect ALL errors in one pass and show them inline simultaneously
       const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       const errs = {};
-      if (!form.name.trim())                          errs.name     = 'Full name is required.';
-      if (!form.email.trim())                         errs.email    = 'Email address is required.';
-      else if (!EMAIL_RE.test(form.email.trim()))     errs.email    = 'Enter a valid email address.';
+      if (!form.name.trim()) errs.name = 'Full name is required.';
+      if (!form.email.trim()) errs.email = 'Email address is required.';
+      else if (!EMAIL_RE.test(form.email.trim())) errs.email = 'Enter a valid email address.';
       if (!form.password) {
         errs.password = 'Password is required.';
       } else if (PW_RULES.some(r => !r.test(form.password))) {
         errs.password = 'Password does not meet all requirements.';
       }
-      if (!form.company.trim())                       errs.company  = 'Company or brokerage name is required.';
-      if (!form.country.trim())                       errs.country  = 'Country is required.';
-      if (!form.state.trim())                         errs.state    = 'State / province is required.';
-      if (!form.city.trim())                          errs.city     = 'City is required.';
+      if (!form.company.trim()) errs.company = 'Company or brokerage name is required.';
+      if (!form.country.trim()) errs.country = 'Country is required.';
+      if (!form.state.trim()) errs.state = 'State / province is required.';
+      if (!form.city.trim()) errs.city = 'City is required.';
 
       if (Object.keys(errs).length > 0) {
         setFieldErrors(errs);
@@ -362,22 +362,22 @@ export default function SignupPage() {
       return;
     }
     setLoading(true);
-    const { error } = await auth.signup({
-      email:                form.email,
-      password:             form.password,
-      full_name:            form.name,
-      company:              form.company,
-      country:              form.country,
-      state:                form.state,
-      city:                 form.city,
-      role:                 form.role,
-      territory_id:         inviteData?.territory_id || inviteTerritoryId || null,
-      assigned_director_id: inviteDirectorId  || null,
-      license_number:       form.licenseNumber || null,
-      license_state:        form.licenseState  || null,
-      license_expiry:       form.licenseExpiry || null,
-      invite_token:         inviteToken || null,
-      referred_by:          referredBy  || null,
+    const { error, data: signupResult } = await auth.signup({
+      email: form.email,
+      password: form.password,
+      full_name: form.name,
+      company: form.company,
+      country: form.country,
+      state: form.state,
+      city: form.city,
+      role: form.role,
+      territory_id: inviteData?.territory_id || inviteTerritoryId || null,
+      assigned_director_id: inviteDirectorId || null,
+      license_number: form.licenseNumber || null,
+      license_state: form.licenseState || null,
+      license_expiry: form.licenseExpiry || null,
+      invite_token: inviteToken || null,
+      referred_by: referredBy || null,
     });
     setLoading(false);
     if (error) {
@@ -617,21 +617,21 @@ export default function SignupPage() {
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                <InputField label="Full Name"           placeholder="John Smith"                       value={form.name}     onChange={e => { update('name')(e);     setFieldErrors(p => ({ ...p, name: '' })); }}     icon={{ component: HiIdentification }} error={fieldErrors.name} />
-                <InputField label="Company / Brokerage" placeholder="Acme Realty"                     value={form.company}  onChange={e => { update('company')(e);  setFieldErrors(p => ({ ...p, company: '' })); }} icon={{ component: HiBuildingOffice }} error={fieldErrors.company} />
-                <InputField label="Email Address"       type="email" placeholder="john@brokerage.com" value={form.email}    onChange={e => { update('email')(e);    setFieldErrors(p => ({ ...p, email: '' })); }}    icon={{ component: HiEnvelope }} error={fieldErrors.email} />
+                <InputField label="Full Name" placeholder="John Smith" value={form.name} onChange={e => { update('name')(e); setFieldErrors(p => ({ ...p, name: '' })); }} icon={{ component: HiIdentification }} error={fieldErrors.name} />
+                <InputField label="Company / Brokerage" placeholder="Acme Realty" value={form.company} onChange={e => { update('company')(e); setFieldErrors(p => ({ ...p, company: '' })); }} icon={{ component: HiBuildingOffice }} error={fieldErrors.company} />
+                <InputField label="Email Address" type="email" placeholder="john@brokerage.com" value={form.email} onChange={e => { update('email')(e); setFieldErrors(p => ({ ...p, email: '' })); }} icon={{ component: HiEnvelope }} error={fieldErrors.email} />
                 <PasswordField value={form.password} onChange={e => { update('password')(e); setFieldErrors(p => ({ ...p, password: '' })); }} error={fieldErrors.password} />
-                <InputField label="Country"             placeholder="United States"                    value={form.country}  onChange={e => { update('country')(e);  setFieldErrors(p => ({ ...p, country: '' })); }} icon={{ component: HiMap }} error={fieldErrors.country} />
-                <InputField label="State / Province"    placeholder="Nevada"                           value={form.state}    onChange={e => { update('state')(e);    setFieldErrors(p => ({ ...p, state: '' })); }}    icon={{ component: HiMap }} error={fieldErrors.state} />
-                <InputField label="City"                placeholder="Las Vegas"                        value={form.city}     onChange={e => { update('city')(e);     setFieldErrors(p => ({ ...p, city: '' })); }}     icon={{ component: HiMap }} error={fieldErrors.city} />
+                <InputField label="Country" placeholder="United States" value={form.country} onChange={e => { update('country')(e); setFieldErrors(p => ({ ...p, country: '' })); }} icon={{ component: HiMap }} error={fieldErrors.country} />
+                <InputField label="State / Province" placeholder="Nevada" value={form.state} onChange={e => { update('state')(e); setFieldErrors(p => ({ ...p, state: '' })); }} icon={{ component: HiMap }} error={fieldErrors.state} />
+                <InputField label="City" placeholder="Las Vegas" value={form.city} onChange={e => { update('city')(e); setFieldErrors(p => ({ ...p, city: '' })); }} icon={{ component: HiMap }} error={fieldErrors.city} />
               </div>
 
               {/* License fields — realtors only */}
               {!isDirector && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                   <InputField label="License Number" placeholder="e.g. LIC-12345" value={form.licenseNumber} onChange={update('licenseNumber')} icon={{ component: HiClipboardDocumentList }} required={false} />
-                  <InputField label="License State"  placeholder="e.g. NV"        value={form.licenseState}  onChange={update('licenseState')}  icon={{ component: HiMap }} required={false} />
-                  <InputField label="License Expiry" type="date"                   value={form.licenseExpiry} onChange={update('licenseExpiry')} icon={{ component: HiDocumentText }} required={false} />
+                  <InputField label="License State" placeholder="e.g. NV" value={form.licenseState} onChange={update('licenseState')} icon={{ component: HiMap }} required={false} />
+                  <InputField label="License Expiry" type="date" value={form.licenseExpiry} onChange={update('licenseExpiry')} icon={{ component: HiDocumentText }} required={false} />
                 </div>
               )}
 
@@ -657,23 +657,23 @@ export default function SignupPage() {
               <div className="flex flex-col gap-3 mb-6">
                 {pricingPlans.map(plan => (
                   <button
-                    key={plan.name}
-                    onClick={() => setForm(p => ({ ...p, plan: plan.name }))}
+                    key={plan.id}
+                    onClick={() => setForm(p => ({ ...p, plan: plan.id }))}
                     className="flex items-center gap-4 p-4 rounded-xl text-left transition-all"
                     style={{
-                      border: form.plan === plan.name ? `1.5px solid ${P}` : `1px solid ${BORDER}`,
-                      background: form.plan === plan.name ? SCL : '#fff',
-                      borderLeftWidth: form.plan === plan.name ? '3px' : '1px',
+                      border: form.plan === plan.id ? `1.5px solid ${P}` : `1px solid ${BORDER}`,
+                      background: form.plan === plan.id ? SCL : '#fff',
+                      borderLeftWidth: form.plan === plan.id ? '3px' : '1px',
                     }}
                   >
                     <div
                       className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors"
                       style={{
-                        borderColor: form.plan === plan.name ? P : '#CBD5E0',
-                        background: form.plan === plan.name ? P : 'transparent',
+                        borderColor: form.plan === plan.id ? P : '#CBD5E0',
+                        background: form.plan === plan.id ? P : 'transparent',
                       }}
                     >
-                      {form.plan === plan.name && <div className="w-2 h-2 bg-white rounded-full" />}
+                      {form.plan === plan.id && <div className="w-2 h-2 bg-white rounded-full" />}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-0.5">
@@ -715,12 +715,12 @@ export default function SignupPage() {
 
               <div className="rounded-xl mb-6 overflow-hidden" style={{ border: `1px solid ${BORDER}` }}>
                 {[
-                  { icon: HiIdentification, label: 'Name',     value: form.name },
-                  { icon: HiEnvelope,       label: 'Email',    value: form.email },
-                  { icon: HiBuildingOffice, label: 'Company',  value: form.company },
-                  { icon: HiMap,            label: 'Location', value: [form.city, form.state, form.country].filter(Boolean).join(', ') || '—' },
+                  { icon: HiIdentification, label: 'Name', value: form.name },
+                  { icon: HiEnvelope, label: 'Email', value: form.email },
+                  { icon: HiBuildingOffice, label: 'Company', value: form.company },
+                  { icon: HiMap, label: 'Location', value: [form.city, form.state, form.country].filter(Boolean).join(', ') || '—' },
                   { icon: isDirector ? HiUserGroup : HiHomeModern, label: 'Role', value: isDirector ? 'Regional Director' : 'Realtor' },
-                  ...(!isDirector ? [{ icon: HiSparkles, label: 'Plan', value: form.plan }] : []),
+                  ...(!isDirector ? [{ icon: HiSparkles, label: 'Plan', value: pricingPlans.find(p => p.id === form.plan)?.name || form.plan }] : []),
                 ].map((r, i, arr) => (
                   <div
                     key={r.label}
@@ -744,7 +744,7 @@ export default function SignupPage() {
                 <div className="flex items-start gap-3 p-4 rounded-xl mb-6" style={{ background: SCL, border: `1px solid rgba(212,175,55,0.3)` }}>
                   <HiCheckBadge size={18} color={P} />
                   <p className="text-[12px] leading-relaxed" style={{ color: S }}>
-                    Your subscription begins immediately upon confirmation. Cancel anytime from account settings.
+                    Your subscription begins immediately upon confirmation. An active subscription is required for full platform access. Cancel anytime from account settings.
                   </p>
                 </div>
               )}
@@ -786,9 +786,9 @@ export default function SignupPage() {
                     {isDirector ? (
                       <>
                         I agree to the{' '}
-                        <Link to="/full-contracts"  target="_blank" className="font-semibold" style={{ color: P }}>Regional Director Agreement</Link>
+                        <Link to="/full-contracts" target="_blank" className="font-semibold" style={{ color: P }}>Regional Director Agreement</Link>
                         ,{' '}
-                        <Link to="/platform-rules"  target="_blank" className="font-semibold" style={{ color: P }}>Platform Rules</Link>
+                        <Link to="/platform-rules" target="_blank" className="font-semibold" style={{ color: P }}>Platform Rules</Link>
                         {' '}and{' '}
                         <Link to="/terms-of-service" target="_blank" className="font-semibold" style={{ color: P }}>Terms of Service</Link>.
                       </>
@@ -797,9 +797,9 @@ export default function SignupPage() {
                         I agree to the{' '}
                         <Link to="/terms-of-service" target="_blank" className="font-semibold" style={{ color: P }}>Terms of Service</Link>
                         {' '}and{' '}
-                        <Link to="/privacy-policy"   target="_blank" className="font-semibold" style={{ color: P }}>Privacy Policy</Link>.
+                        <Link to="/privacy-policy" target="_blank" className="font-semibold" style={{ color: P }}>Privacy Policy</Link>.
                         {' '}I understand the{' '}
-                        <Link to="/platform-rules"   target="_blank" className="font-semibold" style={{ color: P }}>Platform Rules</Link>
+                        <Link to="/platform-rules" target="_blank" className="font-semibold" style={{ color: P }}>Platform Rules</Link>
                         {' '}including the 180-day lead attribution policy.
                       </>
                     )}
@@ -813,7 +813,7 @@ export default function SignupPage() {
                 </Button>
                 <Button onClick={next} isLoading={loading} className="flex-1">
                   <HiRocketLaunch size={15} />
-                  {isDirector ? 'Activate Account' : 'Start Free Trial'}
+                  {isDirector ? 'Activate Account' : 'Create Account'}
                 </Button>
               </div>
             </div>
